@@ -6166,7 +6166,7 @@ function toTarget(P, e)
 		if ReadyToDodge and cpMob and cpMob.Parent and cpMob:FindFirstChild("HumanoidRootPart") then
 			TweenManager.CancelTweenOnly()
 			I()
-			H.CFrame = cpMob.HumanoidRootPart.CFrame * CFrame.new(0, -30, 0)
+			H.CFrame = cpMob.HumanoidRootPart.CFrame * CFrame.new(0, -40, 0)
 			return
 		end
 	end
@@ -6437,6 +6437,24 @@ function toTarget(P, e)
 	end
 	if H.Position.Y < -60 and H.Position.Y > -100 then
 		H.CFrame = H.CFrame * CFrame.new(0, 20, 0)
+	end
+	if ReadyToDodge and getgenv().DodgeSkillMobActive and not G then
+		-- Dodge skill mob: giữ Y theo WORLD = Y mob + Y dodge (không phụ thuộc mob nghiêng/ngửa)
+		getgenv().DodgeDescend = true
+		local dodgeOffsetY = 200
+		local mobHRP = AttackingMob and AttackingMob.Parent and AttackingMob:FindFirstChild("HumanoidRootPart")
+		local basePos = mobHRP and mobHRP.Position or P.Position
+		local dodgePos = Vector3.new(basePos.X, basePos.Y + dodgeOffsetY, basePos.Z)
+		local dodgeCF = CFrame.new(dodgePos) -- luôn thẳng đứng, không xoay theo mob
+		if (dodgePos - H.Position).Magnitude < 3 then
+			TweenManager.CancelTweenOnly()
+			H.CFrame = dodgeCF
+			H.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+			H.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+			return
+		end
+		B(H, dodgeCF, 1000)
+		return
 	end
 	Z = CFrame.new()
 	Z = (function() if ReadyToDodge then return (CFrame.new(0, 200, 0)) else return (function() if G then return (CFrame.new(0, Settings["Distance Teleport Y"] or 800, 0)) else return Z end end)() end end)()
@@ -7519,6 +7537,7 @@ game:GetService("Workspace").Enemies.DescendantAdded:Connect(function(descendant
 	if flag and descendant.Parent.Parent == AttackingMob then
 		Doding = true
 		getgenv().DodgeCakePrinceMob = (AttackingMob.Name == "Cake Prince") and AttackingMob or nil
+		getgenv().DodgeSkillMobActive = true
 		ReadyToDodge = true
 		local now = tick()
 
@@ -7536,6 +7555,7 @@ game:GetService("Workspace").Enemies.DescendantAdded:Connect(function(descendant
 
 		Doding = false
 		ReadyToDodge = false
+		getgenv().DodgeSkillMobActive = false
 		getgenv().DodgeCakePrinceMob = nil
 	end
 end)
