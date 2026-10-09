@@ -1134,7 +1134,7 @@ local A = (function()
 			pcall(function()
 				Library:Notify({
 					Title = "Update",
-					Description = "Add Toggle buddha farming (Tab Farming).\nAdd label Ken Level [FarmObservation] (Tab Farming Other).",
+					Description = "Add Toggle buddha farming (Tab Farming).\nAdd label Ken Level [FarmObservation] (Tab Farming Other).\nAdd shoot all Gun aura (only Mastery Farm)",
 					Duration = 10,
 				})
 			end)
@@ -7035,6 +7035,61 @@ do
 			VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1)
 		end)
 	end
+
+	-- Support: bắn bằng MỌI súng (ToolTip == "Gun"). Chỉ dùng cho Farm Mastery (Gun).
+	-- Không tự trang bị súng. Trả về false nếu không có súng đang cầm / không có part.
+	local CombatUtilSupport
+	pcall(function()
+		CombatUtilSupport = require(RS.Modules.CombatUtil)
+	end)
+	getgenv().ShootAllGun = function(part, gun)
+		if not part then
+			return false
+		end
+		local char = lp.Character
+		if not char then
+			return false
+		end
+		if not gun then
+			for _, v in ipairs(char:GetChildren()) do
+				if v:IsA("Tool") and v.ToolTip == "Gun" then
+					gun = v
+					break
+				end
+			end
+		end
+		if not gun or gun.Parent ~= char then
+			return false
+		end
+		if CombatUtilSupport then
+			local ok, reloading = pcall(function()
+				return CombatUtilSupport:IsGunReloading(gun)
+			end)
+			if ok and reloading then
+				return true
+			end
+		end
+		if gun.Name == "Skull Guitar" then
+			local re = gun:FindFirstChild("RemoteEvent")
+			if re then
+				pcall(function()
+					re:FireServer("TAP", part.Position)
+				end)
+			end
+			return true
+		end
+		local ev = findNetRemote("RE/ShootGunEvent")
+		if ev then
+			pcall(function()
+				ev:FireServer(part.Position, { part })
+			end)
+		end
+		pcall(function()
+			VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+			VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+		end)
+		return true
+	end
 end
 function ShootM1(E)
 	spawn(function()
@@ -8544,7 +8599,9 @@ function FarmMastery(V)
 		return
 	end
 	if C == "Gun" and (t.Character:FindFirstChild(J)) then
-		ShootM1(V)
+		if not (getgenv().ShootAllGun and getgenv().ShootAllGun(V.HumanoidRootPart, t.Character:FindFirstChild(J))) then
+			ShootM1(V)
+		end
 	end
 	equiptool(J)
 	if J == "Control-Control" then
