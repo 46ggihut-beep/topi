@@ -6166,7 +6166,7 @@ function toTarget(P, e)
 		if ReadyToDodge and cpMob and cpMob.Parent and cpMob:FindFirstChild("HumanoidRootPart") then
 			TweenManager.CancelTweenOnly()
 			I()
-			H.CFrame = cpMob.HumanoidRootPart.CFrame * CFrame.new(0, -40, 0)
+			H.CFrame = cpMob.HumanoidRootPart.CFrame * CFrame.new(0, -30, 0)
 			return
 		end
 	end
