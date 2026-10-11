@@ -8719,7 +8719,7 @@ local V, H =
 	require(game:GetService("ReplicatedStorage"):WaitForChild("ItemReplicationService")),
 	require(game:GetService("ReplicatedStorage"):WaitForChild("ItemConfig"))
 local function B()
-	local C, J = {}, require(game:GetService("ReplicatedStorage"):WaitForChild("ItemReplicationService")).KEYS
+	local C, J = {}, V.KEYS
 	for F, F in V:GetItems(J.QUANTITY) do
 		if F.Value and F.Value > 0 then
 			local q, c = pcall(function()
@@ -18811,7 +18811,6 @@ RaidsSection.CreateToggle({ Title = "Auto Raid", Desc = nil, Default = Settings[
 							"Workspace"
 						).Map["Boat Castle"].RaidSummon2.Button
 							:FindFirstChild("Main")) else return l end end)()
-					print("cc")
 					if not t.PlayerGui.Main.TopHUDList.RaidTimer.Visible and not CheckInRaid() then
 						if getgenv().TickTeleCastle and tick() - getgenv().TickTeleCastle < 5 then
 							return
@@ -19910,8 +19909,13 @@ local function l(y)
 end
 local y, P, Y = setmetatable({}, { __mode = "k" }), 0, getgenv().BoatSpeed
 if type(Y) ~= "table" then
-	Y = { cap = 100, ceiling = 1 / 0, nextRaise = 0 }
+	Y = { cap = 150, ceiling = 1 / 0, nextRaise = 0, lastHit = 0 }
 	getgenv().BoatSpeed = Y
+else
+	Y.cap = math.max(Y.cap or 0, 150)
+	Y.ceiling = 1 / 0
+	Y.nextRaise = 0
+	Y.lastHit = 0
 end
 local H = 5
 local function C()
@@ -20055,14 +20059,18 @@ function manageTween(J, F, q, c)
 				local y, P = math.min(D.Speed, Y.cap), D.Target
 				local q, c = (P.Position - W.Position).Magnitude, y * l
 				if (J.Position - W.Position).Magnitude > math.max(20, c * 3) then
-					Y.ceiling = y * 0.9
-					Y.cap = math.max(y * 0.7, 40)
+					Y.lastHit = tick()
+					Y.ceiling = math.max(y * 0.9, 150)
+					Y.cap = math.max(y * 0.7, 100)
 					Y.nextRaise = tick() + math.max(C() * 4, 1)
 					W = J.CFrame
 					c, q = Y.cap * l, (P.Position - W.Position).Magnitude
-				elseif q > c and Y.cap <= D.Speed and Y.cap < Y.ceiling and tick() >= Y.nextRaise then
-					Y.cap = math.min(Y.cap * 1.08, Y.ceiling)
-					Y.nextRaise = tick() + math.max(C() * 4, 1)
+				elseif q > c and Y.cap < D.Speed and tick() >= Y.nextRaise then
+					if tick() - (Y.lastHit or 0) > 8 then
+						Y.ceiling = Y.ceiling * 1.15
+					end
+					Y.cap = math.min(Y.cap * 1.12, Y.ceiling)
+					Y.nextRaise = tick() + math.max(C() * 4, 0.75)
 				end
 				if q <= c or q <= H then
 					W = P
@@ -20148,10 +20156,49 @@ function TurnOffNoclipBoat(P)
 		end
 	end
 end
+function checkFriendCannon()
+	local friendBoat = checkboat()
+	if not friendBoat then
+		return false
+	end
+	for _, v in ipairs(friendBoat:GetChildren()) do
+		if v.Name == "Cannon" then
+			local seat = v:FindFirstChild("Seat")
+			if seat and not seat:FindFirstChild("SeatWeld") then
+				return v
+			end
+		end
+	end
+	return false
+end
 function BuyBoatAndTeleBoat(P)
 	local Y = checkboat()
 	if Settings["Auto Sea Event With Friend"] and Settings["Auto Sea Event"] then
-		toTarget(game:GetService("Players")[Settings["Select Friend"]].Character.HumanoidRootPart.CFrame)
+		local friendName = Settings["Select Friend"]
+		local friendPlayer = friendName and game:GetService("Players"):FindFirstChild(friendName)
+		if not friendPlayer then
+			WarnOnce("SelectFriend", "Chon ban o Sea Event > Select Friend truoc da.")
+			return
+		end
+		local hum = t.Character and t.Character:FindFirstChildOfClass("Humanoid")
+		local hrp = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
+		if not hum or not hrp then
+			return
+		end
+		if hum.Sit then
+			if hrp:FindFirstChild("FloatForce") then
+				TweenManager.CancelCurrent()
+			end
+			return
+		end
+		local cannon = checkFriendCannon()
+		if cannon then
+			toTarget(cannon.Seat.CFrame)
+		elseif Y then
+			toTarget(Y.WorldPivot * CFrame.new(0, 15, 0))
+		elseif friendPlayer.Character and friendPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			toTarget(friendPlayer.Character.HumanoidRootPart.CFrame)
+		end
 		return
 	end
 	if not Settings["Auto Sea Event"] and not P then
