@@ -21548,6 +21548,31 @@ function MultiSegmentLeviathan(s, g)
 	end
 end
 getgenv().CFrameLeviathan = CFrame.new(0, 142, 0)
+getgenv().UseDragonstormLeviathan = function(part)
+	if not part or not part.Parent then
+		return false
+	end
+	local char = t.Character
+	if not char then
+		return false
+	end
+	if not char:FindFirstChild("Dragonstorm") then
+		if t.Backpack:FindFirstChild("Dragonstorm") then
+			equiptool("Dragonstorm")
+		elseif tick() - (getgenv().__DSLevLoadTick or 0) > 3 then
+			getgenv().__DSLevLoadTick = tick()
+			pcall(function()
+				game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("LoadItem", "Dragonstorm")
+			end)
+		end
+		return false
+	end
+	if t:DistanceFromCharacter(part.Position) > (getgenv().ShootGunRange or 500) then
+		return false
+	end
+	getgenv().ShootGunDS(part)
+	return true
+end
 function AutoAttackLeviathan()
 	local s = MultiSegmentLeviathan(game.workspace.SeaBeasts, 2)
 		or (MultiSegmentLeviathan(game.workspace.SeaBeasts, 3))
@@ -21578,7 +21603,9 @@ function AutoAttackLeviathan()
 						toTarget((CFrame.new(s.HumanoidRootPart.Position.X, 142, s.HumanoidRootPart.Position.Z)))
 					end)
 				end
-				if Settings["Use Click M1 Fruit Leviathan"] then
+				if Settings["Use M1 Dragonstorm Leviathan"] then
+					getgenv().UseDragonstormLeviathan(s.Hitbox11)
+				elseif Settings["Use Click M1 Fruit Leviathan"] then
 					equiptool(NameWeapon("Blox Fruit"))
 					local b = NameWeapon("Blox Fruit")
 					if t.Character:FindFirstChild(b) and (t.Character[b]:FindFirstChild("LeftClickRemote")) then
@@ -21619,7 +21646,9 @@ function AutoAttackLeviathan()
 					toTarget((CFrame.new(b.HumanoidRootPart.Position.X, 142, b.HumanoidRootPart.Position.Z)))
 				end)
 			end
-			if Settings["Use Click M1 Fruit Leviathan"] then
+			if Settings["Use M1 Dragonstorm Leviathan"] then
+				getgenv().UseDragonstormLeviathan(b.Hitbox11)
+			elseif Settings["Use Click M1 Fruit Leviathan"] then
 				equiptool(NameWeapon("Blox Fruit"))
 				local X = NameWeapon("Blox Fruit")
 				if t.Character:FindFirstChild(X) and (t.Character[X]:FindFirstChild("LeftClickRemote")) then
@@ -21747,6 +21776,12 @@ LeviathanEventSection.CreateToggle(
 			end)
 		end
 		SaveSettings("Auto Attack Leviathan", b)
+	end
+)
+LeviathanEventSection.CreateToggle(
+	{ Title = "Use M1 Dragonstorm Leviathan", Desc = nil, Default = Settings["Use M1 Dragonstorm Leviathan"] or false },
+	function(b)
+		SaveSettings("Use M1 Dragonstorm Leviathan", b)
 	end
 )
 LeviathanEventSection.CreateToggle(
