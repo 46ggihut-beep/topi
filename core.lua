@@ -17876,13 +17876,64 @@ function DetectBerryCFrame(y)
 		end
 	end
 end
-function DetectBerry()
-	local y, P, Y = next, game:GetService("CollectionService"):GetTagged("BerryBush")
-	for H, H in y, P, Y do
-		if DetectBerryCFrame(H:GetAttributes()) then
-			return H
+getgenv().PriorityBerries = { "Pink Pig Berry", "Red Cherry Berry", "White Cloud Berry" }
+function BerryNameIsPriority(v)
+	if typeof(v) ~= "string" then
+		return false
+	end
+	local lv = v:lower()
+	for _, n in ipairs(getgenv().PriorityBerries) do
+		if lv:find(n:lower(), 1, true) then
+			return true
 		end
 	end
+	return false
+end
+function IsPriorityBerry(bush)
+	local function check(inst)
+		if not inst then
+			return false
+		end
+		if BerryNameIsPriority(inst.Name) then
+			return true
+		end
+		for _, v in pairs(inst:GetAttributes()) do
+			if BerryNameIsPriority(v) then
+				return true
+			end
+		end
+		return false
+	end
+	if check(bush) or check(bush.Parent) then
+		return true
+	end
+	for _, c in ipairs(bush:GetChildren()) do
+		if check(c) then
+			return true
+		end
+	end
+	return false
+end
+function DetectBerry()
+	local bestPri, bestPriDist = nil, 1 / 0
+	local bestAny, bestAnyDist = nil, 1 / 0
+	for _, H in ipairs(game:GetService("CollectionService"):GetTagged("BerryBush")) do
+		if H.Parent and DetectBerryCFrame(H:GetAttributes()) then
+			local ok, pos = pcall(function()
+				return H.Parent.WorldPivot.Position
+			end)
+			if ok then
+				local d = t:DistanceFromCharacter(pos)
+				if d < bestAnyDist then
+					bestAny, bestAnyDist = H, d
+				end
+				if d < bestPriDist and IsPriorityBerry(H) then
+					bestPri, bestPriDist = H, d
+				end
+			end
+		end
+	end
+	return bestPri or bestAny
 end
 function DetectBerryESP()
 	local y, P, Y = next, game:GetService("CollectionService"):GetTagged("BerryBush")
