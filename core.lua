@@ -286,6 +286,17 @@ BuyMeleeSecretForce = false
 function IsSecretQuestOn()
 	return (Settings and Settings["Auto Secret Quest"]) or BuyMeleeSecretForce
 end
+function IsRepairHold()
+	if not (Settings and Settings["Auto Repair Ur Ship"]) then
+		return false
+	end
+	if tick() >= (getgenv().RepairShipHoldUntil or 0) then
+		return false
+	end
+	local c = game:GetService("Players").LocalPlayer.Character
+	local hum = c and c:FindFirstChildOfClass("Humanoid")
+	return hum ~= nil and not hum.Sit
+end
 function BuddhaFarmOn()
 	return Settings ~= nil
 		and Settings["Use Buddha with farming"] == true
@@ -4474,6 +4485,7 @@ function ToggleNoclip()
 		or Settings["Kill Boss"]
 		or Settings["Kill Mob"]
 		or IsSecretQuestOn()
+		or IsRepairHold()
 		or Settings["Auto UP Observation V2"]
 		or Settings["Auto New World"]
 		or Settings["Auto Third World"]
@@ -4574,7 +4586,7 @@ getgenv().TweenManager = {
 		return d
 	end,
 	CancelCurrent = function()
-		if Settings and IsSecretQuestOn() then
+		if Settings and (IsSecretQuestOn() or IsRepairHold()) then
 			TweenManager.CancelTweenOnly()
 			return
 		end
@@ -20274,16 +20286,19 @@ function BuyBoatAndTeleBoat(P)
 						)
 						C = string.split(C, "/")
 						if tonumber(C[1]) < tonumber(C[2]) then
+							getgenv().RepairShipHoldUntil = tick() + 1.2
 							if t:DistanceFromCharacter(Y.PrimaryPart.Position) < 20 then
 								if not t.Character.Humanoid.Sit then
 									if t.Character:FindFirstChild("_RepairHammer") then
 										if t.Character._RepairHammer:FindFirstChild("M1UP") then
 											t.Character._RepairHammer.M1UP:Destroy()
 										elseif not t.Character._RepairHammer:GetAttribute("Repairing") then
+											getgenv().RepairShipHoldUntil = tick() + 1.2
 											t.Character._RepairHammer.M1Down:FireServer("Default")
 											task.wait(0.5)
 										end
 									else
+										getgenv().RepairShipHoldUntil = tick() + 3.5
 										game:GetService("ReplicatedStorage").Remotes.SubclassNetwork.UseSubclass
 											:InvokeServer(unpack({ [1] = { Action = "RequestHammer" } }))
 										task.wait(3)
@@ -29604,7 +29619,7 @@ if not getgenv().BananaCatMainLoop then
 				end
 			end
 			local T = t.Character:FindFirstChild("HumanoidRootPart")
-			local secretOn = IsSecretQuestOn()
+			local secretOn = IsSecretQuestOn() or IsRepairHold()
 			if T and secretOn and not T:FindFirstChild("FloatForce") then
 				local ff = Instance.new("BodyVelocity")
 				ff.Name = "FloatForce"
