@@ -6195,7 +6195,7 @@ function toTarget(P, e)
 			end
 		end
 	end
-	if Y < (e and 8 or 150) and not G and not ReadyToDodge then
+	if Y < (e and 8 or 100) and not G and not ReadyToDodge then
 		getgenv().DodgeDescend = false
 		TweenManager.CancelTweenOnly()
 		I()
