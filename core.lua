@@ -6955,6 +6955,8 @@ do
 
 	getgenv().ShootGunRange = getgenv().ShootGunRange or 500
 	getgenv().ShootGunDelay = getgenv().ShootGunDelay or 0.02
+	getgenv().ShootGunInterval = getgenv().ShootGunInterval or 1
+	local lastAllGunShot, lastDSShot = 0, 0
 
 	local function findNetRemote(name)
 		local net = RS:FindFirstChild("Modules") and RS.Modules:FindFirstChild("Net")
@@ -7036,6 +7038,11 @@ do
 		if not (char and char:FindFirstChild("Dragonstorm")) then
 			return
 		end
+		local nowDS = os.clock()
+		if nowDS - lastDSShot < (getgenv().ShootGunInterval or 1) then
+			return
+		end
+		lastDSShot = nowDS
 		local ev = findNetRemote("RE/ShootGunEvent")
 		if ev then
 			pcall(function()
@@ -7081,6 +7088,11 @@ do
 				return true
 			end
 		end
+		local nowAG = os.clock()
+		if nowAG - lastAllGunShot < (getgenv().ShootGunInterval or 1) then
+			return true
+		end
+		lastAllGunShot = nowAG
 		if gun.Name == "Skull Guitar" then
 			local re = gun:FindFirstChild("RemoteEvent")
 			if re then
@@ -7096,10 +7108,6 @@ do
 				ev:FireServer(part.Position, { part })
 			end)
 		end
-		pcall(function()
-			VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-			VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-		end)
 		return true
 	end
 end
