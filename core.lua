@@ -1145,7 +1145,7 @@ local A = (function()
 			pcall(function()
 				Library:Notify({
 					Title = "Update",
-					Description = "Add Toggle buddha farming (Tab Farming).\nAdd label Ken Level [FarmObservation] (Tab Farming Other).\nAdd shoot all Gun aura (only Mastery Farm)",
+					Description = "Add Toggle buddha farming (Tab Farming).\nAdd label Ken Level [FarmObservation] (Tab Farming Other).\nAdd shoot all Gun aura (only Mastery Farm)\nAdd Toggle kill aura raid [only 4-5].",
 					Duration = 10,
 				})
 			end)
@@ -6954,8 +6954,7 @@ do
 	local lp = game:GetService("Players").LocalPlayer
 
 	getgenv().ShootGunRange = getgenv().ShootGunRange or 500
-	getgenv().ShootGunInterval = getgenv().ShootGunInterval or 1
-	local lastAllGunShot, lastDSShot = 0, 0
+	getgenv().ShootGunDelay = getgenv().ShootGunDelay or 0.02
 
 	local function findNetRemote(name)
 		local net = RS:FindFirstChild("Modules") and RS.Modules:FindFirstChild("Net")
@@ -7037,11 +7036,6 @@ do
 		if not (char and char:FindFirstChild("Dragonstorm")) then
 			return
 		end
-		local nowDS = os.clock()
-		if nowDS - lastDSShot < (getgenv().ShootGunInterval or 1) then
-			return
-		end
-		lastDSShot = nowDS
 		local ev = findNetRemote("RE/ShootGunEvent")
 		if ev then
 			pcall(function()
@@ -7087,11 +7081,6 @@ do
 				return true
 			end
 		end
-		local nowAG = os.clock()
-		if nowAG - lastAllGunShot < (getgenv().ShootGunInterval or 1) then
-			return true
-		end
-		lastAllGunShot = nowAG
 		if gun.Name == "Skull Guitar" then
 			local re = gun:FindFirstChild("RemoteEvent")
 			if re then
@@ -7478,7 +7467,7 @@ SettingFarmMainSection.CreateToggle(
 		if I and not getgenv().__DSAuraRunning then
 			getgenv().__DSAuraRunning = true
 			spawn(function()
-				while Settings["Kill Aura With DragonStorm"] and task.wait() do
+				while Settings["Kill Aura With DragonStorm"] and task.wait(getgenv().ShootGunDelay or 0.02) do
 					pcall(function()
 						if t.Character and t.Character:FindFirstChild("Dragonstorm") then
 							local part = getgenv().GetShootGunTarget()
@@ -7498,7 +7487,7 @@ getgenv().SeaEventDSFarmTick = 0
 if not getgenv().__SeaEventDSAuraRunning then
 	getgenv().__SeaEventDSAuraRunning = true
 	spawn(function()
-		while task.wait() do
+		while task.wait(getgenv().ShootGunDelay or 0.02) do
 			pcall(function()
 				if
 					Settings["Use Dragonstorm For Sea Event"]
@@ -18870,6 +18859,20 @@ getgenv().CheckIsplayingRaid = function()
 	end
 end
 getgenv().buychip = true
+function IsRaidKillAuraActive()
+	if not Settings["Kill Aura Raid"] then
+		return false
+	end
+	if not (Settings["Auto Raid"] or Settings["Auto Multi Raid"]) then
+		return false
+	end
+	local ok, res = pcall(function()
+		local isl = GetLastRaidIsland()
+		local n = isl and tonumber((isl.Name:gsub("Island ", "")))
+		return n ~= nil and n >= 4
+	end)
+	return ok and res or false
+end
 RaidsSection.CreateToggle({ Title = "Auto Raid", Desc = nil, Default = Settings["Auto Raid"] or false }, function(b)
 	if b then
 		spawn(function()
@@ -18915,7 +18918,7 @@ RaidsSection.CreateToggle({ Title = "Auto Raid", Desc = nil, Default = Settings[
 						if l then
 							repeat
 								task.wait()
-								if not getgenv().KillMobRaid and (Settings["Kill Aura Only Raid And Volcano"] or RaidKillAuraIsland45()) then
+								if not getgenv().KillMobRaid and Settings["Kill Aura Only Raid And Volcano"] then
 									getgenv().KillMobRaid = true
 									local y = Settings["Time Delay Kill"] or 5
 									l.Humanoid:ChangeState(Enum.HumanoidStateType.Dead)
@@ -18990,28 +18993,33 @@ RaidsSection.CreateToggle({ Title = "Auto Raid", Desc = nil, Default = Settings[
 	end
 	SaveSettings("Auto Raid", b)
 end)
--- Kill Aura Raid: chỉ chạy khi Auto Raid hoặc Auto Multi Raid bật, và chỉ từ Island 4 trở lên (Island 1-3 farm thường)
-function RaidKillAuraIsland45()
-	if not Settings["Kill Aura Raid"] then
-		return false
-	end
-	if not (Settings["Auto Raid"] or Settings["Auto Multi Raid"]) then
-		return false
-	end
-	local ok, res = pcall(function()
-		local isl = GetLastRaidIsland()
-		local n = isl and tonumber((isl.Name:gsub("Island ", "")))
-		return n ~= nil and n >= 4
-	end)
-	return ok and res or false
-end
 RaidsSection.CreateToggle(
-	{ Title = "Kill Aura Raid", Desc = nil, Default = Settings["Kill Aura Raid"] or false },
+	{ Title = "Kill Aura Raid", Desc = "Island 4-5: kill any mob within 300 studs while farming (needs Auto Raid / Auto Multi Raid)", Default = Settings["Kill Aura Raid"] or false },
 	function(b)
 		if b and not (Settings["Auto Raid"] or Settings["Auto Multi Raid"]) then
 			A.CreateNoti({ Title = "Banana Cat Hub", Desc = "Turn On Auto Raid Plz", ShowTime = 5 })
 		end
 		SaveSettings("Kill Aura Raid", b)
+		if b and not getgenv().__KillAuraRaidRunning then
+			getgenv().__KillAuraRaidRunning = true
+			spawn(function()
+				while Settings["Kill Aura Raid"] and task.wait(0.1) do
+					pcall(function()
+						if not IsRaidKillAuraActive() then
+							return
+						end
+						for _, mob in ipairs(game.Workspace.Enemies:GetChildren()) do
+							local hrp = mob:FindFirstChild("HumanoidRootPart")
+							local hum = mob:FindFirstChild("Humanoid")
+							if hrp and hum and IsMobAlive(mob) and t:DistanceFromCharacter(hrp.Position) <= 300 then
+								hum:ChangeState(Enum.HumanoidStateType.Dead)
+							end
+						end
+					end)
+				end
+				getgenv().__KillAuraRaidRunning = false
+			end)
+		end
 	end
 )
 RaidsSection.CreateToggle(
@@ -19150,14 +19158,6 @@ function Multiraid(b)
 		if E then
 			repeat
 				task.wait()
-				if not getgenv().KillMobRaid and RaidKillAuraIsland45() then
-					getgenv().KillMobRaid = true
-					local y = Settings["Time Delay Kill"] or 5
-					E.Humanoid:ChangeState(Enum.HumanoidStateType.Dead)
-					delay(y, function()
-						getgenv().KillMobRaid = false
-					end)
-				end
 				UsedualFlock()
 				ClickM1(E)
 				if Settings["Select Weapon"] == "Blox Fruit" then
