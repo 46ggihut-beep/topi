@@ -18916,7 +18916,7 @@ RaidsSection.CreateToggle({ Title = "Auto Raid", Desc = nil, Default = Settings[
 						if l then
 							repeat
 								task.wait()
-								if not getgenv().KillMobRaid and Settings["Kill Aura Only Raid And Volcano"] then
+								if not getgenv().KillMobRaid and (Settings["Kill Aura Only Raid And Volcano"] or RaidKillAuraIsland45()) then
 									getgenv().KillMobRaid = true
 									local y = Settings["Time Delay Kill"] or 5
 									l.Humanoid:ChangeState(Enum.HumanoidStateType.Dead)
@@ -18991,6 +18991,30 @@ RaidsSection.CreateToggle({ Title = "Auto Raid", Desc = nil, Default = Settings[
 	end
 	SaveSettings("Auto Raid", b)
 end)
+-- Kill Aura Raid: chỉ chạy khi Auto Raid hoặc Auto Multi Raid bật, và chỉ từ Island 4 trở lên (Island 1-3 farm thường)
+function RaidKillAuraIsland45()
+	if not Settings["Kill Aura Raid"] then
+		return false
+	end
+	if not (Settings["Auto Raid"] or Settings["Auto Multi Raid"]) then
+		return false
+	end
+	local ok, res = pcall(function()
+		local isl = GetLastRaidIsland()
+		local n = isl and tonumber((isl.Name:gsub("Island ", "")))
+		return n ~= nil and n >= 4
+	end)
+	return ok and res or false
+end
+RaidsSection.CreateToggle(
+	{ Title = "Kill Aura Raid", Desc = nil, Default = Settings["Kill Aura Raid"] or false },
+	function(b)
+		if b and not (Settings["Auto Raid"] or Settings["Auto Multi Raid"]) then
+			A.CreateNoti({ Title = "Banana Cat Hub", Desc = "Turn On Auto Raid Plz", ShowTime = 5 })
+		end
+		SaveSettings("Kill Aura Raid", b)
+	end
+)
 RaidsSection.CreateToggle(
 	{ Title = "Hop Sever Raid", Desc = nil, Default = Settings["Hop Sever Raid"] or false },
 	function(b)
@@ -19127,6 +19151,14 @@ function Multiraid(b)
 		if E then
 			repeat
 				task.wait()
+				if not getgenv().KillMobRaid and RaidKillAuraIsland45() then
+					getgenv().KillMobRaid = true
+					local y = Settings["Time Delay Kill"] or 5
+					E.Humanoid:ChangeState(Enum.HumanoidStateType.Dead)
+					delay(y, function()
+						getgenv().KillMobRaid = false
+					end)
+				end
 				UsedualFlock()
 				ClickM1(E)
 				if Settings["Select Weapon"] == "Blox Fruit" then
