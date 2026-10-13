@@ -6954,7 +6954,6 @@ do
 	local lp = game:GetService("Players").LocalPlayer
 
 	getgenv().ShootGunRange = getgenv().ShootGunRange or 500
-	getgenv().ShootGunDelay = getgenv().ShootGunDelay or 0.02
 	getgenv().ShootGunInterval = getgenv().ShootGunInterval or 1
 	local lastAllGunShot, lastDSShot = 0, 0
 
@@ -7479,7 +7478,7 @@ SettingFarmMainSection.CreateToggle(
 		if I and not getgenv().__DSAuraRunning then
 			getgenv().__DSAuraRunning = true
 			spawn(function()
-				while Settings["Kill Aura With DragonStorm"] and task.wait(getgenv().ShootGunDelay or 0.02) do
+				while Settings["Kill Aura With DragonStorm"] and task.wait() do
 					pcall(function()
 						if t.Character and t.Character:FindFirstChild("Dragonstorm") then
 							local part = getgenv().GetShootGunTarget()
@@ -7499,7 +7498,7 @@ getgenv().SeaEventDSFarmTick = 0
 if not getgenv().__SeaEventDSAuraRunning then
 	getgenv().__SeaEventDSAuraRunning = true
 	spawn(function()
-		while task.wait(getgenv().ShootGunDelay or 0.02) do
+		while task.wait() do
 			pcall(function()
 				if
 					Settings["Use Dragonstorm For Sea Event"]
