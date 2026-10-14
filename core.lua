@@ -29681,10 +29681,10 @@ end
 -- ===================== TOPI SYNC (web panel) =====================
 -- >>> CHỈ SỬA 1 DÒNG NÀY <<<
 local DEFAULT_URL = "https://topi-ban.onrender.com" -- link web của bạn (không có dấu / ở cuối)
--- Không cần key chung. Mỗi acc tự tạo 1 token riêng (lưu trong file TopiSync_<UserId>.txt),
--- bật "Push Data To Web" thì link điều khiển (có token) được copy vào clipboard.
+-- Không cần key chung. Mỗi lần bật "Push Data To Web" (hoặc mỗi lần chạy script) acc tự tạo
+-- 1 token MỚI, link cũ tự hết hạn. Link điều khiển (có token) được copy vào clipboard.
 -- ================================================================
-do
+;(function()
 	local HttpService = game:GetService("HttpService")
 	local Players = game:GetService("Players")
 	local httpReq = (syn and syn.request) or (http and http.request) or http_request or request
@@ -29709,32 +29709,16 @@ do
 		end)
 	end
 
-	-- token riêng của acc: đọc từ file, chưa có thì tạo mới
+	-- token ngẫu nhiên, đổi mỗi lần bật Push / mỗi lần chạy script (không lưu file)
+	-- muốn cố định token: getgenv().TopiToken = "chuoi-dai-16-ky-tu-tro-len"
 	local function getToken()
-		if token then
-			return token
-		end
 		if getgenv().TopiToken and #tostring(getgenv().TopiToken) >= 16 then
-			token = tostring(getgenv().TopiToken)
-			return token
+			return tostring(getgenv().TopiToken)
 		end
-		local fname = "TopiSync_" .. tostring(Players.LocalPlayer.UserId) .. ".txt"
-		local tok
-		pcall(function()
-			if isfile and isfile(fname) then
-				tok = readfile(fname)
-			end
-		end)
-		if type(tok) == "string" then
-			tok = tok:gsub("%s+", "")
+		if not token then
+			token = (HttpService:GenerateGUID(false):gsub("[^%w]", ""))
+				.. (HttpService:GenerateGUID(false):gsub("[^%w]", ""))
 		end
-		if type(tok) ~= "string" or #tok < 16 or not tok:match("^[%w_-]+$") then
-			tok = (HttpService:GenerateGUID(false):gsub("[^%w]", ""))
-			pcall(function()
-				writefile(fname, tok)
-			end)
-		end
-		token = tok
 		return token
 	end
 
@@ -29754,12 +29738,12 @@ do
 		print("[Topi Sync] Link web:", link)
 	end
 
-	local function http(method, path, body)
+	local function http(method, path, body, tok)
 		local url = baseUrl() .. path .. (path:find("?", 1, true) and "&" or "?") .. "user=" .. HttpService:UrlEncode(userName)
 		local ok, res = pcall(httpReq, {
 			Url = url,
 			Method = method,
-			Headers = { ["Content-Type"] = "application/json", ["x-token"] = getToken() },
+			Headers = { ["Content-Type"] = "application/json", ["x-token"] = tok or getToken() },
 			Body = body and HttpService:JSONEncode(body) or nil,
 		})
 		if ok and res and res.StatusCode == 200 then
@@ -29842,8 +29826,17 @@ do
 		if v == pushOn then
 			return
 		end
+		if not v and pushOn then
+			-- tắt push: xóa dữ liệu trên web, link cũ vô hiệu
+			local old = getToken()
+			token = nil
+			task.spawn(function()
+				http("POST", "/api/logout", nil, old)
+			end)
+		end
 		pushOn = v
 		if pushOn then
+			token = nil -- token mới cho mỗi lần bật
 			task.spawn(function()
 				if doPush(auto) then
 					if auto then
@@ -30042,7 +30035,7 @@ do
 			end
 		end
 	end)
-end
+end)()
 -- =================== END TOPI SYNC ===================
 
 getgenv().__BF_LOADED = game.JobId
