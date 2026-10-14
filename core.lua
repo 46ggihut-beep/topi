@@ -19871,6 +19871,34 @@ SettingSeaEventSection.CreateToggle(
 		SaveSettings("Will Back When over 10km", l)
 	end
 )
+SettingSeaEventSection.CreateToggle(
+	{ Title = "Remove Rocks", Desc = nil, Default = Settings["Remove Rocks"] or false },
+	function(l)
+		SaveSettings("Remove Rocks", l)
+		if l then
+			if getgenv().__RemoveRocksConn then
+				return
+			end
+			task.spawn(function()
+				local rocks = workspace:WaitForChild("Rocks")
+
+				rocks:ClearAllChildren()
+
+				if getgenv().__RemoveRocksConn then
+					return
+				end
+				getgenv().__RemoveRocksConn = rocks.ChildAdded:Connect(function(child)
+					task.defer(function()
+						child:Destroy()
+					end)
+				end)
+			end)
+		elseif getgenv().__RemoveRocksConn then
+			getgenv().__RemoveRocksConn:Disconnect()
+			getgenv().__RemoveRocksConn = nil
+		end
+	end
+)
 local function l(y)
 	local P = t and t.Character
 	if not P then
