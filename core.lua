@@ -5858,20 +5858,19 @@ end
 do
 	local st = { pos = nil, tick = 0, running = false }
 
-	local function screenOf(pos)
-		local cam = workspace.CurrentCamera
-		local v = cam:WorldToViewportPoint(pos)
-		local vp = cam.ViewportSize
-		if v.Z <= 0 or v.X < 0 or v.Y < 0 or v.X > vp.X or v.Y > vp.Y then
-			cam.CFrame = CFrame.lookAt(cam.CFrame.Position, pos)
-			v = cam:WorldToViewportPoint(pos)
+	getgenv().TapWorldPos = function(pos)
+		local char = game:GetService("Players").LocalPlayer.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local remote = hum and hum:FindFirstChild("")
+		if not remote or not pos then
+			return false
 		end
-		local x = math.clamp(v.X, 1, vp.X - 1)
-		local y = math.clamp(v.Y, 1, vp.Y - 1)
-		if getgenv().ClickUseInset then
-			y = y + game:GetService("GuiService"):GetGuiInset().Y
-		end
-		return x, y
+		task.spawn(function()
+			pcall(function()
+				remote:InvokeServer("TAP", pos)
+			end)
+		end)
+		return true
 	end
 
 	getgenv().ClickWorldPos = function(pos)
@@ -5880,13 +5879,10 @@ do
 			return
 		end
 		st.last = now
-		local x, y = screenOf(pos)
 		if getgenv().DebugTreeClick then
-			print("[TreeClick]", math.floor(x), math.floor(y))
+			print("[TreeClick TAP]", pos)
 		end
-		local vim = game:GetService("VirtualInputManager")
-		vim:SendMouseButtonEvent(x, y, 0, true, game, 1)
-		vim:SendMouseButtonEvent(x, y, 0, false, game, 1)
+		getgenv().TapWorldPos(pos)
 	end
 end
 
@@ -17693,10 +17689,7 @@ function AutoDragonHunter()
 								:InvokeServer(unpack({ [1] = "LoadItem", [2] = "Skull Guitar" }))
 						else
 							equiptool(NameWeapon("Gun"))
-							local hrp = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
-							if hrp then
-								getgenv().ClickWorldPos(hrp.Position)
-							end
+							getgenv().ClickWorldPos(C)
 						end
 					else
 						if t:DistanceFromCharacter(C) < 50 then
@@ -22751,21 +22744,7 @@ function ClickModelFixLava(model, interval)
 		return
 	end
 	getgenv().__LastRockClick = tick()
-	local cam = workspace.CurrentCamera
-	local pos = model:GetPivot().Position
-	local v = cam:WorldToViewportPoint(pos)
-	local vp = cam.ViewportSize
-	if v.Z <= 0 or v.X < 0 or v.Y < 0 or v.X > vp.X or v.Y > vp.Y then
-		cam.CFrame = CFrame.lookAt(cam.CFrame.Position, pos)
-		v = cam:WorldToViewportPoint(pos)
-	end
-	local x, y = math.clamp(v.X, 1, vp.X - 1), math.clamp(v.Y, 1, vp.Y - 1)
-	if getgenv().ClickUseInset then
-		y = y + game:GetService("GuiService"):GetGuiInset().Y
-	end
-	local vim = game:GetService("VirtualInputManager")
-	vim:SendMouseButtonEvent(x, y, 0, true, game, 1)
-	vim:SendMouseButtonEvent(x, y, 0, false, game, 1)
+	getgenv().TapWorldPos(model:GetPivot().Position)
 end
 function UseSkullGuitarFixLava(rock)
 	local char = t.Character
@@ -22783,7 +22762,7 @@ function UseSkullGuitarFixLava(rock)
 		equiptool("Skull Guitar")
 		return
 	end
-	if t:DistanceFromCharacter(rock.WorldPivot.Position) < 100 then
+	if t:DistanceFromCharacter(rock.WorldPivot.Position) < 50 then
 		ClickModelFixLava(rock, 0.6)
 	end
 end
