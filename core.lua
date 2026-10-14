@@ -19927,6 +19927,57 @@ local function C()
 	end)
 	return J and F / 1000 or 0.1
 end
+local SkyCenter = Vector3.new(-16204, 9, 479)
+local SkyAltitude, SkyRadius = 1000, 2000
+local SkyTweenKeys = { TweenBoat = true, TweenBoatBack = true }
+local SkyState = setmetatable({}, { __mode = "k" })
+local function BoatHasPassenger(seat)
+	local boat = seat and seat.Parent
+	while boat and boat.Parent and boat.Parent.Name ~= "Boats" and boat.Parent ~= workspace do
+		boat = boat.Parent
+	end
+	if not boat then
+		return false
+	end
+	for _, d in ipairs(boat:GetDescendants()) do
+		if d ~= seat and (d:IsA("Seat") or d:IsA("VehicleSeat")) and d.Occupant then
+			return true
+		end
+	end
+	return false
+end
+local function SkyRelease(st)
+	st.on = false
+	if st.bv and st.force then
+		pcall(function()
+			st.bv.MaxForce = st.force
+		end)
+	end
+	st.bv, st.force = nil, nil
+end
+-- giống đoạn nâng thuyền của AutoFindLeviathan
+local function SkyLift(seat, st)
+	local bv = seat:FindFirstChild("BodyVelocity")
+	st.origY = seat.Position.Y
+	st.on = true
+	if bv then
+		st.bv, st.force = bv, bv.MaxForce
+		bv.MaxForce = Vector3.new(1 / 0, 1 / 0, 1 / 0)
+	end
+	task.wait(0.2)
+	seat.CFrame = seat.CFrame * CFrame.new(0, SkyAltitude - seat.Position.Y, 0)
+	task.wait(1)
+end
+-- giống đoạn hạ thuyền của AutoFindLeviathan
+local function SkyDrop(seat, st)
+	st.on = false
+	task.wait(0.5)
+	if seat.Parent then
+		seat.CFrame = seat.CFrame * CFrame.new(0, st.origY - seat.Position.Y, 0)
+	end
+	task.wait(0.5)
+	SkyRelease(st)
+end
 function manageTween(J, F, q, c)
 	if not J or not J:IsA("BasePart") or typeof(F) ~= "CFrame" then
 		return
@@ -19978,6 +20029,14 @@ function manageTween(J, F, q, c)
 		if P == 0 and not (type(ToggleNoclip) == "function" and ToggleNoclip() == true) then
 			l(false)
 			getgenv().noclip = false
+		end
+		local sst = SkyState[J]
+		if sst and sst.on then
+			task.delay(2, function()
+				if sst.on and not y[J] then
+					SkyDrop(J, sst)
+				end
+			end)
 		end
 	end
 	D.Play = function(q)
@@ -20046,6 +20105,7 @@ function manageTween(J, F, q, c)
 			end
 		end)
 	end
+	local paxAt, pax = 0, false
 	task.spawn(function()
 		while not r and not u and J.Parent do
 			local l = x.Heartbeat:Wait()
@@ -20060,6 +20120,41 @@ function manageTween(J, F, q, c)
 					break
 				end
 				local y, P = math.min(D.Speed, Y.cap), D.Target
+				local Preal = P
+				if SkyTweenKeys[D.TweenKey] then
+					local st = SkyState[J]
+					if not st then
+						st = { on = false }
+						SkyState[J] = st
+					end
+					local dc = J.Position - SkyCenter
+					local flat = Vector3.new(dc.X, 0, dc.Z).Magnitude
+					if not st.on then
+						if flat <= SkyRadius and J.Position.Y < SkyAltitude - 5 then
+							if tick() - paxAt > 0.5 then
+								paxAt = tick()
+								pax = BoatHasPassenger(J)
+							end
+							if pax then
+								SkyLift(J, st)
+								if r or u then
+									break
+								end
+								W = J.CFrame
+							end
+						end
+					elseif flat > SkyRadius then
+						SkyDrop(J, st)
+						paxAt = 0
+						if r or u then
+							break
+						end
+						W = J.CFrame
+					end
+					if st.on then
+						P = CFrame.new(P.Position.X, W.Position.Y, P.Position.Z) * (P - P.Position)
+					end
+				end
 				local q, c = (P.Position - W.Position).Magnitude, y * l
 				if (J.Position - W.Position).Magnitude > math.max(20, c * 3) then
 					Y.lastHit = tick()
@@ -20076,8 +20171,12 @@ function manageTween(J, F, q, c)
 					Y.nextRaise = tick() + math.max(C() * 4, 0.75)
 				end
 				if q <= c or q <= H then
-					W = P
-					J.CFrame = P
+					W = Preal
+					J.CFrame = Preal
+					local sst = SkyState[J]
+					if sst and sst.on then
+						SkyRelease(sst)
+					end
 					J.AssemblyLinearVelocity = Vector3.new(0.0, 0.0, 0.0)
 					J.AssemblyAngularVelocity = Vector3.new(0.0, 0.0, 0.0)
 					F(Enum.PlaybackState.Completed)
