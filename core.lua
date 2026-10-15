@@ -19967,7 +19967,7 @@ function AddAnimationSeabeastPlayed(y)
 				task.wait(1.9)
 			end
 			local l = tick()
-			getgenv().PosDodgeskill = 600
+			getgenv().PosDodgeskill = 400
 			repeat
 				task.wait()
 			until not y.IsPlaying or tick() - l >= 10
