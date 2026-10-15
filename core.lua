@@ -20611,6 +20611,94 @@ function UseSkillonlyFruit()
 		end
 	end
 end
+-- Sea Event + Chest: co chest trong 500 stud thi nhay khoi thuyen farm chest, het chest thi len thuyen farm sea tiep
+SeaChestRadius = 500
+SeaChestCache = { t = 0, chest = nil }
+function SeaChestNear()
+	if Settings["Farm Chest In Sea Event"] == false then
+		return nil
+	end
+	local now = tick()
+	if now - SeaChestCache.t >= 0.5 then
+		SeaChestCache.t = now
+		local ok, c = pcall(GetNearestChest)
+		local hrp = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
+		if ok and c and hrp and (c.Position - hrp.Position).Magnitude <= SeaChestRadius then
+			SeaChestCache.chest = c
+		else
+			SeaChestCache.chest = nil
+		end
+	end
+	local c = SeaChestCache.chest
+	if c and c.Parent and not c:GetAttribute("IsDisabled") and not c:FindFirstChild("Ignored") then
+		return c
+	end
+	return nil
+end
+function SeaChestFarm()
+	SeaChestCache.t = 0
+	local chest = SeaChestNear()
+	if not chest then
+		return false
+	end
+	local char = t.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hum or not hrp then
+		return false
+	end
+	pcall(function()
+		local bt = getgenv().TweenBoat
+		if bt then
+			bt:Cancel()
+		end
+		getgenv().TweenBoat = nil
+	end)
+	if hum.SeatPart then
+		local t0 = tick()
+		repeat
+			hum.Sit = false
+			hum:ChangeState(Enum.HumanoidStateType.Jumping)
+			task.wait(0.1)
+		until not hum.SeatPart or tick() - t0 > 2
+	end
+	local stuck, startTick
+	startTick = tick()
+	repeat
+		task.wait()
+		hrp = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
+		if not hrp then
+			break
+		end
+		if (hrp.Position - chest.Position).Magnitude <= 5 then
+			if not stuck then
+				stuck = tick()
+			elseif tick() - stuck >= 5 then
+				Instance.new("IntValue", chest).Name = "Ignored"
+				task.wait(0.1)
+			end
+			if not Settings["Use Method Teleport"] then
+				game:GetService("VirtualInputManager"):SendKeyEvent(true, "Space", false, game)
+				task.wait()
+				game:GetService("VirtualInputManager"):SendKeyEvent(false, "Space", false, game)
+			end
+			TweenManager.CancelCurrent()
+		end
+		if Settings["Use Method Teleport"] then
+			hrp.CFrame = chest.CFrame
+			TweenManager.CancelCurrent()
+		else
+			toTarget(chest.CFrame, true)
+		end
+	until not chest.Parent
+		or not Settings["Auto Sea Event"]
+		or chest:GetAttribute("IsDisabled")
+		or chest:FindFirstChild("Ignored")
+		or not chest:FindFirstChild("TouchInterest")
+		or not StackFarmOther
+		or tick() - startTick > 60
+	return true
+end
 function AutoSeabeast()
 	if not StackFarmOther then
 		return
@@ -20624,6 +20712,9 @@ function AutoSeabeast()
 	end
 	if not b then
 		WarnOnce("NoSeaEvent", "Chua chon su kien nao o Sea Event > Select Sea Events.")
+		return
+	end
+	if SeaChestFarm() then
 		return
 	end
 	b = DetectSeaEvents()
@@ -20739,6 +20830,7 @@ function AutoSeabeast()
 			or b:FindFirstChild("Health") and b.Health.Value == 0
 			or b:FindFirstChildWhichIsA("Humanoid") and b.Humanoid.Health == 0
 			or not StackFarmOther
+			or SeaChestNear()
 	end
 end
 FarmingSeaEventSection = SeaEventTab.CreateSection("Farming")
@@ -20808,6 +20900,18 @@ FarmingSeaEventSection.CreateToggle(
 		SaveSettings("Auto Sea Event", _)
 	end
 )
+do
+	local d = Settings["Farm Chest In Sea Event"]
+	if d == nil then
+		d = true
+	end
+	FarmingSeaEventSection.CreateToggle(
+		{ Title = "Farm Chest In Sea Event [500 stud]", Desc = nil, Default = d },
+		function(v)
+			SaveSettings("Farm Chest In Sea Event", v)
+		end
+	)
+end
 local _
 if game.PlaceId == getgenv().CheckPlaceId then
 	_ = require(game:GetService("ReplicatedStorage").DangerDistance)
