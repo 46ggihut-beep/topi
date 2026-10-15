@@ -1138,7 +1138,7 @@ local A = (function()
 			pcall(function()
 				Library:Notify({
 					Title = "UI Library",
-					Description = "The UI automatically hides once executed.\nPress the button at the bottom-left of the screen to show the GUI.",
+					Description = "The UI automatically hides once executed.\nPress the button at the Left-Alt of the screen to show the GUI.",
 					Duration = 5,
 				})
 			end)
@@ -17313,7 +17313,7 @@ function DetectQuestSeaDragon()
 end
 function checkboat()
 	local V = t.Name
-	V = (function() if Settings["Auto Sea Event With Friend"] and Settings["Auto Sea Event"] then return Settings["Select Friend"] else return V end end)()
+	V = (function() if Settings["Auto Sea Event With Friend"] and Settings["Auto Sea Event"] then return Settings["Select Owner Boat"] else return V end end)()
 	local y, P, Y = next, game:GetService("Workspace").Boats:GetChildren()
 	for H, H in y, P, Y do
 		if H:IsA("Model") then
@@ -20062,6 +20062,27 @@ local function C()
 	end)
 	return J and F / 1000 or 0.1
 end
+local TIKI_POS = Vector3.new(-16204.08, 9.09, 479.23)
+local TIKI_AVOID_R = 3000
+local TIKI_HIGH_Y = 1000
+local function BoatHasPassenger(seat)
+	local boat = seat.Parent
+	if not boat then
+		return false
+	end
+	for _, v in ipairs(boat:GetChildren()) do
+		if v.Name == "Cannon" then
+			local s = v:FindFirstChild("Seat")
+			if s and s.Occupant then
+				return true
+			end
+		end
+	end
+	return false
+end
+local function flatDist(a, b)
+	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+end
 function manageTween(J, F, q, c)
 	if not J or not J:IsA("BasePart") or typeof(F) ~= "CFrame" then
 		return
@@ -20093,6 +20114,7 @@ function manageTween(J, F, q, c)
 		false,
 		J.CFrame
 	local noclipConn
+	local liftedHigh = false
 	local function F(q)
 		if u then
 			return
@@ -20194,7 +20216,26 @@ function manageTween(J, F, q, c)
 					F(Enum.PlaybackState.Cancelled)
 					break
 				end
-				local y, P = math.min(D.Speed, Y.cap), D.Target
+				if game.PlaceId == getgenv().CheckPlaceId and BoatHasPassenger(J) then
+					local tgt = D.Target.Position
+					local hz = flatDist(J.Position, TIKI_POS)
+					if not liftedHigh then
+						if hz < TIKI_AVOID_R and flatDist(tgt, TIKI_POS) > TIKI_AVOID_R then
+							liftedHigh = true
+							W = CFrame.new(J.Position.X, TIKI_HIGH_Y, J.Position.Z) * (J.CFrame - J.CFrame.Position)
+							J.CFrame = W
+							J.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+							J.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+						end
+					elseif hz >= TIKI_AVOID_R + 200 or flatDist(J.Position, tgt) < 50 then
+						liftedHigh = false
+						W = CFrame.new(J.Position.X, tgt.Y, J.Position.Z) * (J.CFrame - J.CFrame.Position)
+						J.CFrame = W
+						J.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+						J.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+					end
+				end
+				local y, P = math.min(D.Speed, Y.cap), (liftedHigh and (CFrame.new(D.Target.Position.X, TIKI_HIGH_Y, D.Target.Position.Z) * (D.Target - D.Target.Position)) or D.Target)
 				local q, c = (P.Position - W.Position).Magnitude, y * l
 				if (J.Position - W.Position).Magnitude > math.max(20, c * 3) then
 					Y.lastHit = tick()
@@ -20294,12 +20335,20 @@ function TurnOffNoclipBoat(P)
 		end
 	end
 end
-function checkFriendCannon()
-	local friendBoat = checkboat()
-	if not friendBoat then
+function GetOwnerDrivenBoat(name)
+	local plr = game:GetService("Players"):FindFirstChild(name or "")
+	local hum = plr and plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
+	local seat = hum and hum.SeatPart
+	if seat and seat.Name == "VehicleSeat" then
+		return seat.Parent
+	end
+	return nil
+end
+function checkFriendCannon(boat)
+	if not boat then
 		return false
 	end
-	for _, v in ipairs(friendBoat:GetChildren()) do
+	for _, v in ipairs(boat:GetChildren()) do
 		if v.Name == "Cannon" then
 			local seat = v:FindFirstChild("Seat")
 			if seat and not seat:FindFirstChild("SeatWeld") then
@@ -20309,13 +20358,35 @@ function checkFriendCannon()
 	end
 	return false
 end
+function MultiSeaReady(boat)
+	if not Settings["Muti Farm Sea Event"] then
+		return true
+	end
+	local sel = Settings["Select Muti Player Sea Event"]
+	if type(sel) ~= "table" then
+		return true
+	end
+	for name, on in pairs(sel) do
+		if on then
+			local plr = game:GetService("Players"):FindFirstChild(name)
+			if plr then
+				local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
+				local seat = hum and hum.SeatPart
+				if not (seat and seat.Name == "Seat" and seat.Parent and seat.Parent.Name == "Cannon" and seat.Parent.Parent == boat) then
+					return false
+				end
+			end
+		end
+	end
+	return true
+end
 function BuyBoatAndTeleBoat(P)
 	local Y = checkboat()
 	if Settings["Auto Sea Event With Friend"] and Settings["Auto Sea Event"] then
-		local friendName = Settings["Select Friend"]
-		local friendPlayer = friendName and game:GetService("Players"):FindFirstChild(friendName)
-		if not friendPlayer then
-			WarnOnce("SelectFriend", "Chon ban o Sea Event > Select Friend truoc da.")
+		local ownerName = Settings["Select Owner Boat"]
+		local ownerPlayer = ownerName and game:GetService("Players"):FindFirstChild(ownerName)
+		if not ownerPlayer then
+			WarnOnce("SelectFriend", "Chon owner o Sea Event > Select Owner Boat truoc da.")
 			return
 		end
 		local hum = t.Character and t.Character:FindFirstChildOfClass("Humanoid")
@@ -20329,13 +20400,14 @@ function BuyBoatAndTeleBoat(P)
 			end
 			return
 		end
-		local cannon = checkFriendCannon()
+		local boat = GetOwnerDrivenBoat(ownerName)
+		local cannon = boat and checkFriendCannon(boat)
 		if cannon then
 			toTarget(cannon.Seat.CFrame)
-		elseif Y then
-			toTarget(Y.WorldPivot * CFrame.new(0, 15, 0))
-		elseif friendPlayer.Character and friendPlayer.Character:FindFirstChild("HumanoidRootPart") then
-			toTarget(friendPlayer.Character.HumanoidRootPart.CFrame)
+		elseif boat then
+			toTarget(boat.WorldPivot * CFrame.new(0, 15, 0))
+		elseif ownerPlayer.Character and ownerPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			toTarget(ownerPlayer.Character.HumanoidRootPart.CFrame)
 		end
 		return
 	end
@@ -20378,6 +20450,11 @@ function BuyBoatAndTeleBoat(P)
 		task.spawn(function()
 			NoclipBoat(Y)
 		end)
+		if Settings["Muti Farm Sea Event"] and t.Character.Humanoid.Sit and not MultiSeaReady(Y) then
+			getgenv().TweenBoat = getgenv().TweenBoat and (function() pcall(function() getgenv().TweenBoat:Cancel() end) return nil end)()
+			WarnOnce("MultiWait", "Cho cac acc da chon ngoi du vao phao...")
+			return
+		end
 		if Settings["Tween Until Have Sea Event"] then
 			local H = CFrame.new(-118834.515625, Y.WorldPivot.Y, 999920.0494155884)
 			if not t.Character.Humanoid.Sit then
@@ -20770,94 +20847,7 @@ function UseSkillonlyFruit()
 		end
 	end
 end
--- Sea Event + Chest: co chest trong 500 stud thi nhay khoi thuyen farm chest, het chest thi len thuyen farm sea tiep
-SeaChestRadius = 500
-SeaChestCache = { t = 0, chest = nil }
-function SeaChestNear()
-	if Settings["Farm Chest In Sea Event"] == false then
-		return nil
-	end
-	local now = tick()
-	if now - SeaChestCache.t >= 0.5 then
-		SeaChestCache.t = now
-		local ok, c = pcall(GetNearestChest)
-		local hrp = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
-		if ok and c and hrp and (c.Position - hrp.Position).Magnitude <= SeaChestRadius then
-			SeaChestCache.chest = c
-		else
-			SeaChestCache.chest = nil
-		end
-	end
-	local c = SeaChestCache.chest
-	if c and c.Parent and not c:GetAttribute("IsDisabled") and not c:FindFirstChild("Ignored") then
-		return c
-	end
-	return nil
-end
-function SeaChestFarm()
-	SeaChestCache.t = 0
-	local chest = SeaChestNear()
-	if not chest then
-		return false
-	end
-	local char = t.Character
-	local hum = char and char:FindFirstChildOfClass("Humanoid")
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if not hum or not hrp then
-		return false
-	end
-	pcall(function()
-		local bt = getgenv().TweenBoat
-		if bt then
-			bt:Cancel()
-		end
-		getgenv().TweenBoat = nil
-	end)
-	if hum.SeatPart then
-		local t0 = tick()
-		repeat
-			hum.Sit = false
-			hum:ChangeState(Enum.HumanoidStateType.Jumping)
-			task.wait(0.1)
-		until not hum.SeatPart or tick() - t0 > 2
-	end
-	local stuck, startTick
-	startTick = tick()
-	repeat
-		task.wait()
-		hrp = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
-		if not hrp then
-			break
-		end
-		if (hrp.Position - chest.Position).Magnitude <= 5 then
-			if not stuck then
-				stuck = tick()
-			elseif tick() - stuck >= 5 then
-				Instance.new("IntValue", chest).Name = "Ignored"
-				task.wait(0.1)
-			end
-			if not Settings["Use Method Teleport"] then
-				game:GetService("VirtualInputManager"):SendKeyEvent(true, "Space", false, game)
-				task.wait()
-				game:GetService("VirtualInputManager"):SendKeyEvent(false, "Space", false, game)
-			end
-			TweenManager.CancelCurrent()
-		end
-		if Settings["Use Method Teleport"] then
-			hrp.CFrame = chest.CFrame
-			TweenManager.CancelCurrent()
-		else
-			toTarget(chest.CFrame, true)
-		end
-	until not chest.Parent
-		or not Settings["Auto Sea Event"]
-		or chest:GetAttribute("IsDisabled")
-		or chest:FindFirstChild("Ignored")
-		or not chest:FindFirstChild("TouchInterest")
-		or not StackFarmOther
-		or tick() - startTick > 60
-	return true
-end
+
 function AutoSeabeast()
 	if not StackFarmOther then
 		return
@@ -20873,9 +20863,7 @@ function AutoSeabeast()
 		WarnOnce("NoSeaEvent", "Chua chon su kien nao o Sea Event > Select Sea Events.")
 		return
 	end
-	if SeaChestFarm() then
-		return
-	end
+
 	b = DetectSeaEvents()
 	if not b then
 		getgenv().PathSeaBeast = false
@@ -20989,26 +20977,46 @@ function AutoSeabeast()
 			or b:FindFirstChild("Health") and b.Health.Value == 0
 			or b:FindFirstChildWhichIsA("Humanoid") and b.Humanoid.Health == 0
 			or not StackFarmOther
-			or SeaChestNear()
 			or SeaBeastShouldLeave(b)
 	end
 end
 FarmingSeaEventSection = SeaEventTab.CreateSection("Farming")
 local b = FarmingSeaEventSection.CreateDropdown(
 	{
-		Title = "Select Friend",
+		Title = "Select Owner Boat",
 		List = DetectNamePlayer(),
 		Search = true,
 		Selected = false,
-		Default = Settings["Select Friend"] or nil,
+		Default = Settings["Select Owner Boat"] or nil,
 	},
 	function(X)
-		SaveSettings("Select Friend", X)
+		SaveSettings("Select Owner Boat", X)
 	end
 )
 FarmingSeaEventSection.CreateButton({ Title = "Refresh Player" }, function()
 	b:GetNewList(DetectNamePlayer())
 end)
+local mb = FarmingSeaEventSection.CreateDropdown(
+	{
+		Title = "Select Muti Player Sea Event",
+		List = PrepareMultiSelectList(DetectNamePlayerMulti(), Settings["Select Muti Player Sea Event"]),
+		Search = true,
+		Selected = true,
+		Default = Settings["Select Muti Player Sea Event"] or nil,
+	},
+	function(n, on)
+		SaveSettings("Select Muti Player Sea Event", n, on)
+	end
+)
+FarmingSeaEventSection.CreateButton({ Title = "Refresh Player Muti Sea" }, function()
+	mb:GetNewList(PrepareMultiSelectList(DetectNamePlayerMulti(), Settings["Select Muti Player Sea Event"]))
+end)
+FarmingSeaEventSection.CreateToggle(
+	{ Title = "Muti Farm Sea Event", Desc = "Owner: doi cac acc da chon ngoi du vao phao roi moi di san", Default = Settings["Muti Farm Sea Event"] or false },
+	function(v)
+		SaveSettings("Muti Farm Sea Event", v)
+	end
+)
 FarmingSeaEventSection.CreateToggle(
 	{ Title = "Auto Sea Event With Friend", Desc = nil, Default = Settings["Auto Sea Event With Friend"] or false },
 	function(b)
@@ -21060,18 +21068,7 @@ FarmingSeaEventSection.CreateToggle(
 		SaveSettings("Auto Sea Event", _)
 	end
 )
-do
-	local d = Settings["Farm Chest In Sea Event"]
-	if d == nil then
-		d = true
-	end
-	FarmingSeaEventSection.CreateToggle(
-		{ Title = "Farm Chest In Sea Event [500 stud]", Desc = nil, Default = d },
-		function(v)
-			SaveSettings("Farm Chest In Sea Event", v)
-		end
-	)
-end
+
 local _
 if game.PlaceId == getgenv().CheckPlaceId then
 	_ = require(game:GetService("ReplicatedStorage").DangerDistance)
@@ -29854,7 +29851,7 @@ a.CreateButton({ Title = "Copy Config" }, function()
 	setclipboard(b((HttpService:JSONDecode(readfile(FolderName .. "/" .. SaveFileName)))))
 	A.CreateNoti({ Title = "Banana Cat Hub", Desc = "Successfully Copy Config", ShowTime = 5 })
 end)
-a.CreateBind({ Title = "Toggle GUI", Key = Enum.KeyCode.LeftControl }, function()
+a.CreateBind({ Title = "Toggle GUI", Key = Enum.KeyCode.LeftAlt }, function()
 	if getgenv().UIToggled == nil then
 		getgenv().UIToggled = true
 	end
