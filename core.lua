@@ -735,13 +735,6 @@ local A = (function()
 		local sec = {}
 		local order = 0
 
-		local function emit(title)
-			local f = getgenv().TopiSyncEmit
-			if f then
-				pcall(f, title)
-			end
-		end
-
 		local function stamp(n0, keepOrder)
 			local all = getgenv().AllControls
 			if all and #all > n0 then
@@ -764,8 +757,6 @@ local A = (function()
 			o.type = kind
 			o.Page_Name = pageName
 			o.Section_Name = secName
-			getgenv().__TopiIdx = (getgenv().__TopiIdx or 0) + 1
-			o.idx = getgenv().__TopiIdx
 			Options[title] = o
 			return o
 		end
@@ -781,7 +772,6 @@ local A = (function()
 				Default = default,
 				Callback = function(v)
 					opt.value = v
-					emit(title)
 					if cb then
 						cb(v)
 					end
@@ -792,7 +782,6 @@ local A = (function()
 			function obj.SetStage(a, b)
 				ret.SetStage(pick(a, b))
 			end
-			opt.cb = cb
 			opt.FunctionCreate = obj
 			if default then
 				fire(cb, true)
@@ -802,8 +791,7 @@ local A = (function()
 
 		function sec.CreateButton(s, cb)
 			local title = tostring(s.Title or s.Text or "")
-			local bopt = reg(title, "button", {})
-			bopt.callback = cb
+			reg(title, "button", {})
 			local n0 = controlCount()
 			local ret = gb:AddButton({
 				Title = title,
@@ -863,7 +851,6 @@ local A = (function()
 				Rounding = rounding,
 				Callback = function(v)
 					opt.value = v
-					emit(title)
 					if cb then
 						cb(v)
 					end
@@ -874,7 +861,6 @@ local A = (function()
 			function obj.SetValue(a, b)
 				ret.SetValue(pick(a, b))
 			end
-			opt.cb = cb
 			opt.FunctionCreate = obj
 			fire(cb, default)
 			return obj
@@ -895,7 +881,6 @@ local A = (function()
 				Default = default,
 				Callback = function(v)
 					opt.value = v
-					emit(title)
 					if cb then
 						cb(v)
 					end
@@ -906,7 +891,6 @@ local A = (function()
 			function obj.SetValue(a, b)
 				ret.SetValue(pick(a, b))
 			end
-			opt.cb = cb
 			opt.FunctionCreate = obj
 			if default and default ~= "" then
 				fire(cb, default)
@@ -965,72 +949,6 @@ local A = (function()
 			})
 			local ctl, ret
 
-			local function onChange(name, on)
-				if prio then
-					for i = #ord, 1, -1 do
-						if ord[i] == name then
-							table.remove(ord, i)
-						end
-					end
-					if on then
-						ord[#ord + 1] = name
-					end
-					opt.value = table.clone(ord)
-					emit(title)
-					if cb then
-						cb(table.clone(ord))
-					end
-				else
-					opt.value[name] = on and true or false
-					emit(title)
-					if cb then
-						cb(name, on)
-					end
-				end
-			end
-
-			-- web -> game: ap gia tri cho multi / priority dropdown
-			local function flip(name, want)
-				pcall(function()
-					ret:SetValue(name)
-				end)
-				task.wait(0.1)
-				local now
-				if prio then
-					now = table.find(ord, name) ~= nil
-				else
-					now = opt.value[name] == true
-				end
-				if now ~= want then
-					onChange(name, want)
-				end
-			end
-			function opt.applyWeb(v)
-				if prio then
-					local want = {}
-					for _, n in ipairs(v) do
-						want[tostring(n)] = true
-					end
-					for _, n in ipairs(table.clone(ord)) do
-						if not want[n] then
-							flip(n, false)
-						end
-					end
-					for _, n in ipairs(v) do
-						n = tostring(n)
-						if table.find(opt.list or {}, n) and not table.find(ord, n) then
-							flip(n, true)
-						end
-					end
-				else
-					for n, on in pairs(v) do
-						if table.find(opt.list or {}, n) and (opt.value[n] == true) ~= (on == true) then
-							flip(n, on == true)
-						end
-					end
-				end
-			end
-
 			local function build(ns, initial, keepOrder)
 				local n0 = controlCount()
 				local r = gb:AddDropdown(title, {
@@ -1039,7 +957,25 @@ local A = (function()
 					Search = s.Search,
 					Selected = true,
 					Callback = function(name, on)
-						onChange(name, on)
+						if prio then
+							for i = #ord, 1, -1 do
+								if ord[i] == name then
+									table.remove(ord, i)
+								end
+							end
+							if on then
+								ord[#ord + 1] = name
+							end
+							opt.value = table.clone(ord)
+							if cb then
+								cb(table.clone(ord))
+							end
+						else
+							opt.value[name] = on and true or false
+							if cb then
+								cb(name, on)
+							end
+						end
 					end,
 				})
 				ctl = stamp(n0, keepOrder)
@@ -1159,7 +1095,6 @@ local A = (function()
 				Default = def,
 				Callback = function(v)
 					opt.value = v
-					emit(title)
 					if cb then
 						cb(v)
 					end
@@ -1182,7 +1117,6 @@ local A = (function()
 			function obj.GetValue()
 				return opt.value
 			end
-			opt.cb = cb
 			opt.FunctionCreate = obj
 			if def then
 				fire(cb, def)
@@ -3798,26 +3732,212 @@ SectionLocalPlayerMain.CreateButton({ Title = "Fix UI Button Game" }, function()
 	wait(0.5)
 	t.Character.Humanoid.Health = 0
 end)
-SectionLocalPlayerMain.CreateToggle({ Title = "Load config in Web", Default = Settings["Load config in Web"] == true }, function(v)
-	SaveSettings("Load config in Web", v)
-	local S = getgenv().TopiSync
-	if S then
-		S.SetLive(v)
+SectionLocalPlayerMain.CreateButton({ Title = "Load config in Web" }, function()
+	local K = game:GetService("HttpService")
+	game:GetService("RunService")
+	local R, m, E = "https://cfg.banana-hub.xyz", getgenv().Key, game.Players.LocalPlayer.Name
+	function ApplyConfigFromWeb(l)
+		for Q, S in pairs(l) do repeat 
+			if not S.name then
+				break
+			end
+			Q = Options[S.name]
+			if Q and S then
+				if S.value ~= nil and Q.type ~= "slider_dropdown" and Q.type ~= "priority_dropdown" then
+					if Q.FunctionCreate and Q.FunctionCreate.SetValue then
+						if Q.type == "box" then
+							Q.FunctionCreate.SetValue(tostring(S.value))
+						elseif Q.type == "dropdown" then
+							Q.FunctionCreate.SetValue(S.value)
+						elseif Q.type == "slider" then
+							Q.FunctionCreate.SetValue(S.value)
+						else
+							Q.FunctionCreate:SetValue(S.value)
+						end
+					elseif Q.FunctionCreate and Q.FunctionCreate.SetStage then
+						Q.FunctionCreate.SetStage(S.value)
+					end
+				end
+				if Q.type == "priority_dropdown" and S.selected then
+					if Q.FunctionCreate and Q.FunctionCreate.SetValue then
+						Q.FunctionCreate.SetValue(S.selected)
+					end
+				end
+				if Q.type == "slider_dropdown" and S.values then
+					for l, L in pairs(S.values) do
+						if Q.FunctionCreate and Q.FunctionCreate.SetSubValue then
+							Q.FunctionCreate:SetSubValue(l, L)
+						end
+					end
+				end
+			end
+		until true end
+	end
+	local l, Q = pcall(function()
+		return request({
+			Url = string.format("%s/config/get?authId=%s&userId=%s&roblox=true", R, K:UrlEncode(m), K:UrlEncode(E)),
+			Method = "GET",
+		})
+	end)
+	if l and Q.StatusCode == 200 then
+		ApplyConfigFromWeb((K:JSONDecode(Q.Body)))
 	end
 end)
-SectionLocalPlayerMain.CreateToggle({ Title = "Push Data To Web", Default = Settings["Push Data To Web"] == true }, function(v)
-	SaveSettings("Push Data To Web", v)
-	local S = getgenv().TopiSync
-	if S then
-		S.SetPush(v)
+SectionLocalPlayerMain.CreateButton(
+	{ Title = "Push Data To Web ( just push when join game,if push again plz rejoin )" },
+	function()
+		local K, R = game:GetService("HttpService"), "https://cfg.banana-hub.xyz"
+		function BuildSchema()
+			local m, E = {}, 1
+			for l, Q in pairs(Options) do
+				local S, L, d = Q.Page_Name or "Default Page", Q.Section_Name or "Default Section", tostring(E)
+				if Q.type == "toggle" then
+					m[d] = { name = l, type = "toggle", value = Q.value, page = S, section = L }
+				elseif Q.type == "button" then
+					m[d] = { name = l, type = "button", value = l, text = l, page = S, section = L }
+				elseif Q.type == "textlabel" then
+					local I = Q.FunctionCreate and Q.FunctionCreate.GetText and (Q.FunctionCreate.GetText())
+						or Q.text
+						or l
+					m[d] = {
+						name = l,
+						type = "label",
+						value = I,
+						text = I,
+						color = Q.color or "#B8B8B8",
+						size = Q.size or "14px",
+						bold = Q.bold or false,
+						page = S,
+						section = L,
+					}
+				elseif Q.type == "box" then
+					m[d] = { name = l, type = "box", value = Q.value or "", page = S, section = L }
+				elseif Q.type == "slider" then
+					m[d] = {
+						name = l,
+						type = "slider",
+						min = Q.min or 0,
+						max = Q.max or 100,
+						step = Q.step or 1,
+						value = Q.value or Q.min or 0,
+						page = S,
+						section = L,
+					}
+				elseif Q.type == "dropdown" then
+					m[d] = {
+						name = l,
+						type = "dropdown",
+						options = table.clone(Q.list or {}),
+						value = Q.value or Q.list and Q.list[1] or "",
+						page = S,
+						section = L,
+					}
+				elseif Q.type == "priority_dropdown" then
+					local I = table.clone(Q.value or {})
+					m[d] = {
+						name = l,
+						type = "priority_dropdown",
+						options = table.clone(Q.list or {}),
+						selected = I,
+						value = I,
+						page = S,
+						section = L,
+					}
+				elseif Q.type == "multi_toggle" then
+					m[d] = {
+						name = l,
+						type = "multi_toggle",
+						options = table.clone(Q.list or {}),
+						value = table.clone(Q.value or {}),
+						page = S,
+						section = L,
+					}
+				elseif Q.type == "slider_dropdown" then
+					local I, _ = {}, {}
+					for o, V in pairs(Q.list or {}) do
+						I[o] = { min = V.min or 0, max = V.max or 100, step = V.step or 1 }
+						_[o] = Q.value and Q.value[o] or V.Default or V.min or 0
+					end
+					m[d] = { name = l, type = "slider_dropdown", sliders = I, values = _, page = S, section = L }
+				end
+				E = E + (1)
+			end
+			return m
+		end
+		function UploadSchemaToWeb(m, E)
+			if not m or not E then
+				warn("\226\157\140 Missing authId or userId for schema upload")
+				return false
+			end
+			local l = BuildSchema()
+			local Q, S = pcall(function()
+				return request({
+					Url = string.format("%s/schema/init?authId=%s&userId=%s", R, K:UrlEncode(m), K:UrlEncode(E)),
+					Method = "POST",
+					Headers = { ["Content-Type"] = "application/json" },
+					Body = K:JSONEncode(l),
+				})
+			end)
+			if Q and S.StatusCode == 200 then
+				print("\226\156\133 Schema initialized (first time)")
+				return true
+			end
+			if Q and S.StatusCode == 409 then
+				print("\226\132\185\239\184\143 Schema already exists, skipping upload")
+				return true
+			end
+			warn("\226\157\140 Schema upload failed")
+			if Q then
+				warn("Status:", S.StatusCode)
+				warn("Body:", S.Body)
+			end
+			return false
+		end
+		function PushSchemaToWebupdate(m, E)
+			if not m or not E then
+				return
+			end
+			local l = BuildSchema()
+			local Q, S = pcall(function()
+				return request({
+					Url = string.format("%s/schema/update?authId=%s&userId=%s", R, K:UrlEncode(m), K:UrlEncode(E)),
+					Method = "POST",
+					Headers = { ["Content-Type"] = "application/json" },
+					Body = K:JSONEncode(l),
+				})
+			end)
+			if Q and S.StatusCode == 200 then
+				print("\226\156\133 Schema UPDATED \226\134\146 web will reload")
+			else
+				warn("\226\157\140 Push schema failed")
+				if Q then
+					warn("Status:", S.StatusCode)
+					warn("Body:", S.Body)
+				end
+			end
+		end
+		local m, E = getgenv().Key, game.Players.LocalPlayer.Name
+		if not m then
+			warn("Missing Key, cannot push data")
+			return
+		end
+		request({
+			Url = "https://cfg.banana-hub.xyz/config/get?authId=" .. m .. "&userId=" .. E .. "&roblox=true",
+			Method = "GET",
+		})
+		function ForceResetSchema(l, Q)
+			pcall(function()
+				request({
+					Url = string.format("%s/schema/delete?authId=%s&userId=%s", R, K:UrlEncode(l), K:UrlEncode(Q)),
+					Method = "DELETE",
+				})
+			end)
+			wait(0.5)
+			return UploadSchemaToWeb(l, Q)
+		end
+		ForceResetSchema(m, E)
 	end
-end)
-SectionLocalPlayerMain.CreateButton({ Title = "Copy Web Link" }, function()
-	local S = getgenv().TopiSync
-	if S then
-		S.CopyLink()
-	end
-end)
+)
 local K = require(game.ReplicatedStorage:WaitForChild("Controllers"):WaitForChild("UI"):WaitForChild("Inventory"))
 SectionLocalPlayerMain.CreateButton({ Title = "Show Item" }, function()
 	if not game:GetService("CoreGui").ExperienceChat.bubbleChat:FindFirstChild("Right") then
@@ -5858,19 +5978,20 @@ end
 do
 	local st = { pos = nil, tick = 0, running = false }
 
-	getgenv().TapWorldPos = function(pos)
-		local char = game:GetService("Players").LocalPlayer.Character
-		local hum = char and char:FindFirstChildOfClass("Humanoid")
-		local remote = hum and hum:FindFirstChild("")
-		if not remote or not pos then
-			return false
+	local function screenOf(pos)
+		local cam = workspace.CurrentCamera
+		local v = cam:WorldToViewportPoint(pos)
+		local vp = cam.ViewportSize
+		if v.Z <= 0 or v.X < 0 or v.Y < 0 or v.X > vp.X or v.Y > vp.Y then
+			cam.CFrame = CFrame.lookAt(cam.CFrame.Position, pos)
+			v = cam:WorldToViewportPoint(pos)
 		end
-		task.spawn(function()
-			pcall(function()
-				remote:InvokeServer("TAP", pos)
-			end)
-		end)
-		return true
+		local x = math.clamp(v.X, 1, vp.X - 1)
+		local y = math.clamp(v.Y, 1, vp.Y - 1)
+		if getgenv().ClickUseInset then
+			y = y + game:GetService("GuiService"):GetGuiInset().Y
+		end
+		return x, y
 	end
 
 	getgenv().ClickWorldPos = function(pos)
@@ -5879,10 +6000,13 @@ do
 			return
 		end
 		st.last = now
+		local x, y = screenOf(pos)
 		if getgenv().DebugTreeClick then
-			print("[TreeClick TAP]", pos)
+			print("[TreeClick]", math.floor(x), math.floor(y))
 		end
-		getgenv().TapWorldPos(pos)
+		local vim = game:GetService("VirtualInputManager")
+		vim:SendMouseButtonEvent(x, y, 0, true, game, 1)
+		vim:SendMouseButtonEvent(x, y, 0, false, game, 1)
 	end
 end
 
@@ -6964,6 +7088,7 @@ do
 					re:FireServer("TAP", part.Position)
 				end)
 			end
+			FireHumanoidTap(part.Position)
 			return true
 		end
 		local ev = findNetRemote("RE/ShootGunEvent")
@@ -6974,6 +7099,24 @@ do
 		end
 		return true
 	end
+end
+getgenv().FireHumanoidTap = function(pos)
+	-- code moi: Humanoid:GetChildren()[19] cua character local (workspace.Characters[ten])
+	pcall(function()
+		local lpl = game:GetService("Players").LocalPlayer
+		local chars = workspace:FindFirstChild("Characters")
+		local ch = (chars and chars:FindFirstChild(lpl.Name)) or lpl.Character
+		local hum = ch and ch:FindFirstChild("Humanoid")
+		local obj = hum and hum:GetChildren()[19]
+		if not obj then
+			return
+		end
+		if obj:IsA("RemoteEvent") then
+			obj:FireServer("TAP", pos)
+		elseif obj:IsA("RemoteFunction") then
+			obj:InvokeServer("TAP", pos)
+		end
+	end)
 end
 function ShootM1(E)
 	spawn(function()
@@ -7022,6 +7165,7 @@ function ShootM1(E)
 				game:GetService("Players").LocalPlayer.Character
 					:FindFirstChild("Skull Guitar").RemoteEvent
 					:FireServer(unpack(l))
+				FireHumanoidTap(E.HumanoidRootPart.Position)
 				task.wait(t.Character[NameWeapon("Gun")].Cooldown.Value)
 			end
 		end
@@ -7034,6 +7178,7 @@ getgenv().SpamGunSkullGuitar = function(E)
 		return
 	end
 	m.RemoteEvent:FireServer("TAP", E.Position)
+	FireHumanoidTap(E.Position)
 end
 local function m(E, l)
 	local Q, d, I, _, o, V, N =
@@ -17689,7 +17834,10 @@ function AutoDragonHunter()
 								:InvokeServer(unpack({ [1] = "LoadItem", [2] = "Skull Guitar" }))
 						else
 							equiptool(NameWeapon("Gun"))
-							getgenv().ClickWorldPos(C)
+							local hrp = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
+							if hrp then
+								getgenv().ClickWorldPos(hrp.Position)
+							end
 						end
 					else
 						if t:DistanceFromCharacter(C) < 50 then
@@ -19871,34 +20019,6 @@ SettingSeaEventSection.CreateToggle(
 		SaveSettings("Will Back When over 10km", l)
 	end
 )
-SettingSeaEventSection.CreateToggle(
-	{ Title = "Remove Rocks", Desc = nil, Default = Settings["Remove Rocks"] or false },
-	function(l)
-		SaveSettings("Remove Rocks", l)
-		if l then
-			if getgenv().__RemoveRocksConn then
-				return
-			end
-			task.spawn(function()
-				local rocks = workspace:WaitForChild("Rocks")
-
-				rocks:ClearAllChildren()
-
-				if getgenv().__RemoveRocksConn then
-					return
-				end
-				getgenv().__RemoveRocksConn = rocks.ChildAdded:Connect(function(child)
-					task.defer(function()
-						child:Destroy()
-					end)
-				end)
-			end)
-		elseif getgenv().__RemoveRocksConn then
-			getgenv().__RemoveRocksConn:Disconnect()
-			getgenv().__RemoveRocksConn = nil
-		end
-	end
-)
 local function l(y)
 	local P = t and t.Character
 	if not P then
@@ -19926,57 +20046,6 @@ local function C()
 		return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
 	end)
 	return J and F / 1000 or 0.1
-end
-local SkyCenter = Vector3.new(-16204, 9, 479)
-local SkyAltitude, SkyRadius = 1000, 2000
-local SkyTweenKeys = { TweenBoat = true, TweenBoatBack = true }
-local SkyState = setmetatable({}, { __mode = "k" })
-local function BoatHasPassenger(seat)
-	local boat = seat and seat.Parent
-	while boat and boat.Parent and boat.Parent.Name ~= "Boats" and boat.Parent ~= workspace do
-		boat = boat.Parent
-	end
-	if not boat then
-		return false
-	end
-	for _, d in ipairs(boat:GetDescendants()) do
-		if d ~= seat and (d:IsA("Seat") or d:IsA("VehicleSeat")) and d.Occupant then
-			return true
-		end
-	end
-	return false
-end
-local function SkyRelease(st)
-	st.on = false
-	if st.bv and st.force then
-		pcall(function()
-			st.bv.MaxForce = st.force
-		end)
-	end
-	st.bv, st.force = nil, nil
-end
--- giống đoạn nâng thuyền của AutoFindLeviathan
-local function SkyLift(seat, st)
-	local bv = seat:FindFirstChild("BodyVelocity")
-	st.origY = seat.Position.Y
-	st.on = true
-	if bv then
-		st.bv, st.force = bv, bv.MaxForce
-		bv.MaxForce = Vector3.new(1 / 0, 1 / 0, 1 / 0)
-	end
-	task.wait(0.2)
-	seat.CFrame = seat.CFrame * CFrame.new(0, SkyAltitude - seat.Position.Y, 0)
-	task.wait(1)
-end
--- giống đoạn hạ thuyền của AutoFindLeviathan
-local function SkyDrop(seat, st)
-	st.on = false
-	task.wait(0.5)
-	if seat.Parent then
-		seat.CFrame = seat.CFrame * CFrame.new(0, st.origY - seat.Position.Y, 0)
-	end
-	task.wait(0.5)
-	SkyRelease(st)
 end
 function manageTween(J, F, q, c)
 	if not J or not J:IsA("BasePart") or typeof(F) ~= "CFrame" then
@@ -20029,14 +20098,6 @@ function manageTween(J, F, q, c)
 		if P == 0 and not (type(ToggleNoclip) == "function" and ToggleNoclip() == true) then
 			l(false)
 			getgenv().noclip = false
-		end
-		local sst = SkyState[J]
-		if sst and sst.on then
-			task.delay(2, function()
-				if sst.on and not y[J] then
-					SkyDrop(J, sst)
-				end
-			end)
 		end
 	end
 	D.Play = function(q)
@@ -20105,7 +20166,6 @@ function manageTween(J, F, q, c)
 			end
 		end)
 	end
-	local paxAt, pax = 0, false
 	task.spawn(function()
 		while not r and not u and J.Parent do
 			local l = x.Heartbeat:Wait()
@@ -20120,41 +20180,6 @@ function manageTween(J, F, q, c)
 					break
 				end
 				local y, P = math.min(D.Speed, Y.cap), D.Target
-				local Preal = P
-				if SkyTweenKeys[D.TweenKey] then
-					local st = SkyState[J]
-					if not st then
-						st = { on = false }
-						SkyState[J] = st
-					end
-					local dc = J.Position - SkyCenter
-					local flat = Vector3.new(dc.X, 0, dc.Z).Magnitude
-					if not st.on then
-						if flat <= SkyRadius and J.Position.Y < SkyAltitude - 5 then
-							if tick() - paxAt > 0.5 then
-								paxAt = tick()
-								pax = BoatHasPassenger(J)
-							end
-							if pax then
-								SkyLift(J, st)
-								if r or u then
-									break
-								end
-								W = J.CFrame
-							end
-						end
-					elseif flat > SkyRadius then
-						SkyDrop(J, st)
-						paxAt = 0
-						if r or u then
-							break
-						end
-						W = J.CFrame
-					end
-					if st.on then
-						P = CFrame.new(P.Position.X, W.Position.Y, P.Position.Z) * (P - P.Position)
-					end
-				end
 				local q, c = (P.Position - W.Position).Magnitude, y * l
 				if (J.Position - W.Position).Magnitude > math.max(20, c * 3) then
 					Y.lastHit = tick()
@@ -20171,12 +20196,8 @@ function manageTween(J, F, q, c)
 					Y.nextRaise = tick() + math.max(C() * 4, 0.75)
 				end
 				if q <= c or q <= H then
-					W = Preal
-					J.CFrame = Preal
-					local sst = SkyState[J]
-					if sst and sst.on then
-						SkyRelease(sst)
-					end
+					W = P
+					J.CFrame = P
 					J.AssemblyLinearVelocity = Vector3.new(0.0, 0.0, 0.0)
 					J.AssemblyAngularVelocity = Vector3.new(0.0, 0.0, 0.0)
 					F(Enum.PlaybackState.Completed)
@@ -22871,7 +22892,21 @@ function ClickModelFixLava(model, interval)
 		return
 	end
 	getgenv().__LastRockClick = tick()
-	getgenv().TapWorldPos(model:GetPivot().Position)
+	local cam = workspace.CurrentCamera
+	local pos = model:GetPivot().Position
+	local v = cam:WorldToViewportPoint(pos)
+	local vp = cam.ViewportSize
+	if v.Z <= 0 or v.X < 0 or v.Y < 0 or v.X > vp.X or v.Y > vp.Y then
+		cam.CFrame = CFrame.lookAt(cam.CFrame.Position, pos)
+		v = cam:WorldToViewportPoint(pos)
+	end
+	local x, y = math.clamp(v.X, 1, vp.X - 1), math.clamp(v.Y, 1, vp.Y - 1)
+	if getgenv().ClickUseInset then
+		y = y + game:GetService("GuiService"):GetGuiInset().Y
+	end
+	local vim = game:GetService("VirtualInputManager")
+	vim:SendMouseButtonEvent(x, y, 0, true, game, 1)
+	vim:SendMouseButtonEvent(x, y, 0, false, game, 1)
 end
 function UseSkullGuitarFixLava(rock)
 	local char = t.Character
@@ -22889,7 +22924,7 @@ function UseSkullGuitarFixLava(rock)
 		equiptool("Skull Guitar")
 		return
 	end
-	if t:DistanceFromCharacter(rock.WorldPivot.Position) < 50 then
+	if t:DistanceFromCharacter(rock.WorldPivot.Position) < 100 then
 		ClickModelFixLava(rock, 0.6)
 	end
 end
@@ -29784,364 +29819,4 @@ if not getgenv().BananaCatMainLoop then
 		end
 	end)
 end
--- ===================== TOPI SYNC (web panel) =====================
--- >>> CHỈ SỬA 1 DÒNG NÀY <<<
-local DEFAULT_URL = "https://topi-ban.onrender.com" -- link web của bạn (không có dấu / ở cuối)
--- Không cần key chung. Mỗi lần bật "Push Data To Web" (hoặc mỗi lần chạy script) acc tự tạo
--- 1 token MỚI, link cũ tự hết hạn. Link điều khiển (có token) được copy vào clipboard.
--- ================================================================
-;(function()
-	local HttpService = game:GetService("HttpService")
-	local Players = game:GetService("Players")
-	local httpReq = (syn and syn.request) or (http and http.request) or http_request or request
-	local Sync = {}
-	getgenv().TopiSync = Sync
-
-	local SKIP = { ["Load config in Web"] = true, ["Push Data To Web"] = true, ["Copy Web Link"] = true }
-	local live = false -- toggle Load config in Web
-	local pushOn = false -- toggle Push Data To Web
-	local applying = false
-	local quietUntil = 0
-	local cursor = 0
-	local userName = Players.LocalPlayer.Name
-	local token
-
-	local function baseUrl()
-		return (tostring(getgenv().TopiApiUrl or DEFAULT_URL):gsub("/+$", ""))
-	end
-	local function notify(text)
-		pcall(function()
-			A.CreateNoti({ Title = "Topi Sync", Description = text, Duration = 5 })
-		end)
-	end
-
-	-- token ngẫu nhiên, đổi mỗi lần bật Push / mỗi lần chạy script (không lưu file)
-	-- muốn cố định token: getgenv().TopiToken = "chuoi-dai-16-ky-tu-tro-len"
-	local function getToken()
-		if getgenv().TopiToken and #tostring(getgenv().TopiToken) >= 16 then
-			return tostring(getgenv().TopiToken)
-		end
-		if not token then
-			token = (HttpService:GenerateGUID(false):gsub("[^%w]", ""))
-				.. (HttpService:GenerateGUID(false):gsub("[^%w]", ""))
-		end
-		return token
-	end
-
-	local function webLink()
-		return baseUrl() .. "/#" .. getToken()
-	end
-
-	local function copyLink()
-		local link = webLink()
-		local clip = setclipboard or toclipboard or (Clipboard and Clipboard.set)
-		local ok = clip and pcall(clip, link)
-		if ok then
-			notify("Đã copy link web vào clipboard. Chỉ người có link này mới điều khiển được acc!")
-		else
-			notify("Executor không hỗ trợ clipboard, link đã in ra console (F9)")
-		end
-		print("[Topi Sync] Link web:", link)
-	end
-
-	local function http(method, path, body, tok)
-		local url = baseUrl() .. path .. (path:find("?", 1, true) and "&" or "?") .. "user=" .. HttpService:UrlEncode(userName)
-		local ok, res = pcall(httpReq, {
-			Url = url,
-			Method = method,
-			Headers = { ["Content-Type"] = "application/json", ["x-token"] = tok or getToken() },
-			Body = body and HttpService:JSONEncode(body) or nil,
-		})
-		if ok and res and res.StatusCode == 200 then
-			local ok2, data = pcall(HttpService.JSONDecode, HttpService, res.Body)
-			return ok2 and data or {}, res
-		end
-		return nil, ok and res or nil
-	end
-
-	local function isApplying()
-		return applying or os.clock() < quietUntil
-	end
-
-	-- đóng gói 1 control thành item gửi lên web
-	local function item(title, o)
-		local t = {
-			name = title,
-			type = o.type,
-			page = o.Page_Name or "Default Page",
-			section = o.Section_Name or "Default Section",
-			idx = o.idx or 0,
-		}
-		local k = o.type
-		if k == "toggle" then
-			t.value = (o.value == true)
-		elseif k == "slider" then
-			t.min, t.max, t.step = o.min or 0, o.max or 100, o.step or 1
-			t.value = tonumber(o.value) or o.min or 0
-		elseif k == "box" then
-			t.value = tostring(o.value or "")
-		elseif k == "dropdown" then
-			t.options = table.clone(o.list or {})
-			t.value = o.value or ""
-		elseif k == "multi_toggle" or k == "priority_dropdown" then
-			t.options = table.clone(o.list or {})
-			t.value = table.clone(o.value or {})
-		elseif k == "textlabel" then
-			t.text = tostring(o.text or title)
-		elseif k == "button" then
-			t.value = true
-		else
-			return nil
-		end
-		return t
-	end
-
-	-- GAME -> WEB : đẩy toàn bộ (thử lại vài lần vì Render free có thể đang ngủ)
-	local lastRepush = 0
-	local function doPush(silent)
-		local items = {}
-		for title, o in pairs(getgenv().Options) do
-			if not SKIP[title] then
-				local t = item(title, o)
-				if t then
-					items[#items + 1] = t
-				end
-			end
-		end
-		table.sort(items, function(a, b)
-			return a.idx < b.idx
-		end)
-		for attempt = 1, 3 do
-			local d = http("POST", "/api/push", { items = items })
-			if d then
-				if not silent then
-					notify("Đã push " .. #items .. " mục lên web")
-				end
-				return true
-			end
-			if attempt < 3 then
-				task.wait(5)
-			end
-		end
-		notify("Push lỗi! Kiểm tra link web trong file Lua / web đang ngủ")
-		return false
-	end
-
-	function Sync.SetPush(v, auto)
-		v = (v == true)
-		if v == pushOn then
-			return
-		end
-		if not v and pushOn then
-			-- tắt push: xóa dữ liệu trên web, link cũ vô hiệu
-			local old = getToken()
-			token = nil
-			task.spawn(function()
-				http("POST", "/api/logout", nil, old)
-			end)
-		end
-		pushOn = v
-		if pushOn then
-			token = nil -- token mới cho mỗi lần bật
-			task.spawn(function()
-				if doPush(auto) then
-					if auto then
-						print("[Topi Sync] Link web:", webLink())
-						notify("Đang đồng bộ lên web. Bấm 'Copy Web Link' để lấy link")
-					else
-						copyLink()
-					end
-				end
-			end)
-		end
-	end
-	function Sync.CopyLink()
-		copyLink()
-	end
-
-	-- GAME -> WEB : đổi gì đẩy ngay (debounce 0.3s)
-	local pending, scheduled = {}, false
-	getgenv().TopiSyncEmit = function(title)
-		if isApplying() or SKIP[title] or not (pushOn or live) then
-			return
-		end
-		pending[title] = true
-		if scheduled then
-			return
-		end
-		scheduled = true
-		task.delay(0.3, function()
-			scheduled = false
-			local items = {}
-			for t in pairs(pending) do
-				local o = getgenv().Options[t]
-				local it = o and item(t, o)
-				if it then
-					items[#items + 1] = it
-				end
-			end
-			pending = {}
-			if #items > 0 then
-				local d = http("POST", "/api/patch", { items = items })
-				if d and d.known == false and pushOn and os.clock() - lastRepush > 10 then
-					lastRepush = os.clock()
-					doPush(true) -- server bị reset -> đẩy lại toàn bộ
-				end
-			end
-		end)
-	end
-
-	-- WEB -> GAME : áp 1 giá trị
-	local function setViaUI(o, v, same)
-		local f = o.FunctionCreate
-		if f then
-			if o.type == "toggle" and f.SetStage then
-				pcall(f.SetStage, v)
-			elseif f.SetValue then
-				pcall(f.SetValue, v)
-			end
-		end
-		task.wait(0.15)
-		-- nếu UI không tự gọi callback thì gọi thẳng
-		if not same() then
-			o.value = v
-			if o.cb then
-				task.spawn(pcall, o.cb, v)
-			end
-		end
-	end
-
-	local function apply(c)
-		local o = getgenv().Options[c.name]
-		if not o or SKIP[c.name] then
-			return
-		end
-		local t, v = o.type, c.value
-		if t == "button" then
-			if o.callback then
-				task.spawn(pcall, o.callback)
-			end
-		elseif t == "toggle" then
-			v = (v == true)
-			if o.value ~= v then
-				setViaUI(o, v, function()
-					return o.value == v
-				end)
-			end
-		elseif t == "slider" then
-			v = tonumber(v)
-			if v then
-				v = math.clamp(v, o.min or v, o.max or v)
-				if o.value ~= v then
-					setViaUI(o, v, function()
-						return o.value == v
-					end)
-				end
-			end
-		elseif t == "box" then
-			v = tostring(v or "")
-			if o.value ~= v then
-				setViaUI(o, v, function()
-					return o.value == v
-				end)
-			end
-		elseif t == "dropdown" then
-			if type(v) == "string" and o.value ~= v and table.find(o.list or {}, v) then
-				setViaUI(o, v, function()
-					return o.value == v
-				end)
-			end
-		elseif t == "multi_toggle" or t == "priority_dropdown" then
-			if o.applyWeb and type(v) == "table" then
-				o.applyWeb(v)
-			end
-		end
-	end
-
-	-- WEB -> GAME : kéo toàn bộ state 1 lần khi bật toggle
-	local function pullAll()
-		local d = http("GET", "/api/state")
-		if not d then
-			notify("Không kết nối được web")
-			return
-		end
-		if d.known == false then
-			notify("Web chưa có dữ liệu acc này, hãy bật Push Data To Web trước")
-			cursor = 0
-			return
-		end
-		local items = d.items or {}
-		applying = true
-		for pass = 1, 2 do
-			for _, it in ipairs(items) do
-				local isToggle = (it.type == "toggle")
-				if it.type ~= "button" and ((pass == 1 and not isToggle) or (pass == 2 and isToggle)) then
-					pcall(apply, it)
-				end
-			end
-		end
-		applying = false
-		quietUntil = os.clock() + 0.5
-		cursor = d.cursor or 0
-		notify("Đã tải config từ web (" .. #items .. " mục)")
-	end
-
-	function Sync.SetLive(v)
-		v = (v == true)
-		if v == live then
-			return
-		end
-		live = v
-		if live then
-			task.spawn(pullAll)
-		end
-	end
-
-	-- khôi phục 2 toggle theo config đã lưu (Save config)
-	task.delay(3, function()
-		local St = getgenv().Settings or {}
-		if St["Push Data To Web"] == true then
-			Sync.SetPush(true, true)
-		end
-		if St["Load config in Web"] == true then
-			Sync.SetLive(true)
-		end
-	end)
-
-	-- vòng lặp: nhận lệnh từ web (live) / giữ kết nối + tự đẩy lại khi server reset (push)
-	task.spawn(function()
-		local tick = 0
-		while true do
-			task.wait(1)
-			tick = tick + 1
-			if live or (pushOn and tick % 10 == 0) then
-				local d = http("GET", "/api/commands?after=" .. cursor)
-				if d then
-					if d.known == false and pushOn and os.clock() - lastRepush > 10 then
-						lastRepush = os.clock()
-						doPush(true)
-					elseif live then
-						if d.cursor and d.cursor < cursor then
-							cursor = d.cursor -- server bị reset
-						end
-						local list = d.commands or {}
-						if #list > 0 then
-							applying = true
-							for _, c in ipairs(list) do
-								if c.id > cursor then
-									cursor = c.id
-								end
-								pcall(apply, c)
-							end
-							applying = false
-							quietUntil = os.clock() + 0.4
-						end
-					end
-				end
-			end
-		end
-	end)
-end)()
--- =================== END TOPI SYNC ===================
-
 getgenv().__BF_LOADED = game.JobId
