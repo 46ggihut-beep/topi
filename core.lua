@@ -9400,11 +9400,19 @@ function GetPirateRaid(f)
 	end
 end
 function DetectButtons()
-	local f, V, Y = next, game:GetService("Workspace").Map["Boat Castle"].Summoner.Circle:GetChildren()
-	for H, H in f, V, Y do
-		if H:IsA("Part") and H.Part.BrickColor.Name ~= "Lime green" then
-			return H
+	local ok, res = pcall(function()
+		local circle = game:GetService("Workspace").Map["Boat Castle"].Summoner.Circle
+		for _, H in ipairs(circle:GetChildren()) do
+			if H:IsA("BasePart") then
+				local ind = H:FindFirstChild("Part")
+				if ind and ind:IsA("BasePart") and ind.BrickColor.Name ~= "Lime green" then
+					return H
+				end
+			end
 		end
+	end)
+	if ok then
+		return res
 	end
 end
 local f = { "Winter Sky", "Pure Red", "Snow White" }
@@ -9425,31 +9433,38 @@ function IsMisisngLegHaki(V)
 	end
 	return Y
 end
+PadHakiMap = { ["Hot pink"] = "Winter Sky", ["Really red"] = "Pure Red", ["Oyster"] = "Snow White" }
 function TouchPadHaki()
 	local f = DetectButtons()
-	if f then
-		if f.BrickColor.Name == "Hot pink" then
-			game:GetService("ReplicatedStorage").Modules.Net
-				:FindFirstChild("RF/FruitCustomizerRF")
-				:InvokeServer(unpack({ [1] = { StorageName = "Winter Sky", Type = "AuraSkin", Context = "Equip" } }))
-			toTarget(f.CFrame)
-			wait(2)
-		elseif f.BrickColor.Name == "Really red" then
-			game:GetService("ReplicatedStorage").Modules.Net
-				:FindFirstChild("RF/FruitCustomizerRF")
-				:InvokeServer(unpack({ [1] = { StorageName = "Pure Red", Type = "AuraSkin", Context = "Equip" } }))
-			game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("activateColor", "Pure Red")
-			toTarget(f.CFrame)
-			wait(2)
-		elseif f.BrickColor.Name == "Oyster" then
-			game:GetService("ReplicatedStorage").Modules.Net
-				:FindFirstChild("RF/FruitCustomizerRF")
-				:InvokeServer(unpack({ [1] = { StorageName = "Snow White", Type = "AuraSkin", Context = "Equip" } }))
-			game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("activateColor", "Snow White")
-			toTarget(f.CFrame)
-			wait(2)
-		end
+	if not f then
+		return
 	end
+	local RS = game:GetService("ReplicatedStorage")
+	local color = PadHakiMap[f.BrickColor.Name]
+	if color then
+		pcall(function()
+			local rf = RS.Modules.Net:FindFirstChild("RF/FruitCustomizerRF")
+			if rf then
+				rf:InvokeServer({ StorageName = color, Type = "AuraSkin", Context = "Equip" })
+			end
+		end)
+		pcall(function()
+			RS.Remotes.CommF_:InvokeServer("activateColor", color)
+		end)
+	elseif tick() - (getgenv().__PadWarn or 0) > 10 then
+		getgenv().__PadWarn = tick()
+		print("[TouchPadHaki] mau pad la la:", f.BrickColor.Name, "- chua co trong PadHakiMap")
+	end
+	toTarget(f.CFrame)
+	local hrp = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
+	if hrp and firetouchinterest and (hrp.Position - f.Position).Magnitude < 15 then
+		pcall(function()
+			firetouchinterest(hrp, f, 0)
+			task.wait()
+			firetouchinterest(hrp, f, 1)
+		end)
+	end
+	wait(2)
 end
 getgenv().CheckCountItem = function(f, V)
 	local Y, H, C = next, B()
@@ -20466,28 +20481,172 @@ function WarnOnce(b, l)
 		A.CreateNoti({ Title = "Banana Cat Hub", Desc = l, ShowTime = 5 })
 	end)
 end
+-- Sea Beast: theo doi Submerge/Reappear/Death (theo ten animation) + HP text, de doi sea khi lan va bo ngay khi chet
+SeaBeastStates = SeaBeastStates or setmetatable({}, { __mode = "k" })
+local function seaBeastApplyTrack(st, track)
+	local n1, n2 = "", ""
+	pcall(function()
+		n1 = tostring(track.Name):lower()
+	end)
+	pcall(function()
+		n2 = tostring(track.Animation.Name):lower()
+	end)
+	local function has(w)
+		return n1:find(w, 1, true) or n2:find(w, 1, true)
+	end
+	if has("submerge") then
+		st.submerged = true
+		st.submergedAt = tick()
+	elseif has("reappear") then
+		task.spawn(function()
+			local t0 = tick()
+			repeat
+				task.wait()
+			until not track.IsPlaying or tick() - t0 > 8
+			st.submerged = false
+		end)
+	elseif has("death") then
+		st.dead = true
+	end
+end
+function SeaBeastWatch(model)
+	local st = SeaBeastStates[model]
+	if not st then
+		st = { submerged = false, dead = false, conns = {}, animOk = false, lastTry = 0 }
+		SeaBeastStates[model] = st
+		pcall(function()
+			model.Destroying:Connect(function()
+				for _, c in ipairs(st.conns) do
+					pcall(function()
+						c:Disconnect()
+					end)
+				end
+			end)
+		end)
+	end
+	if model:FindFirstChild("HealthBBG") then
+		st.hadHBG = true
+	end
+	if not st.animOk and tick() - st.lastTry >= 1 then
+		st.lastTry = tick()
+		pcall(function()
+			local animator = model:FindFirstChildWhichIsA("Animator", true)
+			if animator then
+				st.animOk = true
+				for _, tr in ipairs(animator:GetPlayingAnimationTracks()) do
+					seaBeastApplyTrack(st, tr)
+				end
+				st.conns[#st.conns + 1] = animator.AnimationPlayed:Connect(function(tr)
+					seaBeastApplyTrack(st, tr)
+				end)
+			end
+		end)
+	end
+	return st
+end
+function SeaBeastHP(model)
+	local ok, hp = pcall(function()
+		local txt = model.HealthBBG.Frame.TextLabel.Text:gsub(",", "")
+		return tonumber(txt:match("(%d+%.?%d*)%s*/"))
+	end)
+	return ok and hp or nil
+end
+function SeaBeastDead(model)
+	if not model or not model.Parent then
+		return true
+	end
+	local st = SeaBeastStates[model]
+	if st and st.dead then
+		return true
+	end
+	local hbg = model:FindFirstChild("HealthBBG")
+	if st and hbg then
+		st.hadHBG = true
+	end
+	local hp = SeaBeastHP(model)
+	if (hp and hp <= 0) or (st and st.hadHBG and not hbg) then
+		if st then
+			st.dead = true
+		end
+		return true
+	end
+	return false
+end
+function SeaBeastSubmerged(model)
+	local st = SeaBeastStates[model]
+	if not st or not st.submerged then
+		return false
+	end
+	if tick() - (st.submergedAt or 0) > 25 then
+		st.submerged = false
+		return false
+	end
+	return true
+end
+function SeaBeastQualified(C)
+	if C.Name ~= "SeaBeast1" or not C:FindFirstChild("HumanoidRootPart") or not C:FindFirstChild("HealthBBG") then
+		return false
+	end
+	local ok, res = pcall(function()
+		local txt = C.HealthBBG.Frame.TextLabel.Text
+		local P = txt:gsub("/%d+,%d+", "")
+		local maxText
+		if string.find(P, ",") then
+			maxText = txt:gsub("%d+,%d+/", "")
+		else
+			maxText = txt:gsub("%d+/", "")
+		end
+		local mx = tonumber((maxText:gsub(",", "")))
+		return mx and mx >= 90000 and t:DistanceFromCharacter(C.HumanoidRootPart.Position) < 2000
+	end)
+	return ok and res or false
+end
+SeaBeastLeaveCache = { b = nil, t = 0, v = false }
+function SeaBeastShouldLeave(b)
+	if not b or b.Name ~= "SeaBeast1" then
+		return false
+	end
+	SeaBeastWatch(b)
+	if SeaBeastDead(b) then
+		return true
+	end
+	if not SeaBeastSubmerged(b) then
+		return false
+	end
+	local now = tick()
+	if SeaBeastLeaveCache.b == b and now - SeaBeastLeaveCache.t < 0.3 then
+		return SeaBeastLeaveCache.v
+	end
+	local v = false
+	for _, C in ipairs(game:GetService("Workspace").SeaBeasts:GetChildren()) do
+		if C ~= b and SeaBeastQualified(C) then
+			SeaBeastWatch(C)
+			if not SeaBeastDead(C) and not SeaBeastSubmerged(C) then
+				v = true
+				break
+			end
+		end
+	end
+	SeaBeastLeaveCache = { b = b, t = now, v = v }
+	return v
+end
 function DetectSeaEvents(b)
 	local l = SafeMultiSelect("Select Sea Events")
 	if b or l.SeaBeast then
-		local P, Y, H = next, game:GetService("Workspace").SeaBeasts:GetChildren()
-		for C, C in P, Y, H do
-			if C.Name == "SeaBeast1" and (C:FindFirstChild("HumanoidRootPart")) and (C:FindFirstChild("HealthBBG")) then
-				local P, Y = C.HealthBBG.Frame.TextLabel.Text:gsub("/%d+,%d+", ""), C.HealthBBG.Frame.TextLabel.Text
-				if
-					tonumber(
-							(
-								((function() if string.find(P, ",") then return (Y:gsub("%d+,%d+/", "")) else return (Y:gsub("%d+/", "")) end end)()):gsub(
-									",",
-									""
-								)
-							)
-						)
-						>= 90000
-					and t:DistanceFromCharacter(C.HumanoidRootPart.Position) < 2000
-				then
-					return C
+		local fallback
+		for _, C in ipairs(game:GetService("Workspace").SeaBeasts:GetChildren()) do
+			if SeaBeastQualified(C) then
+				SeaBeastWatch(C)
+				if not SeaBeastDead(C) then
+					if not SeaBeastSubmerged(C) then
+						return C
+					end
+					fallback = fallback or C
 				end
 			end
+		end
+		if fallback then
+			return fallback
 		end
 	end
 	if b or l.Terrorshark then
@@ -20831,6 +20990,7 @@ function AutoSeabeast()
 			or b:FindFirstChildWhichIsA("Humanoid") and b.Humanoid.Health == 0
 			or not StackFarmOther
 			or SeaChestNear()
+			or SeaBeastShouldLeave(b)
 	end
 end
 FarmingSeaEventSection = SeaEventTab.CreateSection("Farming")
