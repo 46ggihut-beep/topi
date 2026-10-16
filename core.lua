@@ -17313,7 +17313,6 @@ function DetectQuestSeaDragon()
 end
 function checkboat()
 	local V = t.Name
-	V = (function() if Settings["Auto Sea Event With Friend"] and Settings["Auto Sea Event"] then return Settings["Select Owner Boat"] else return V end end)()
 	local y, P, Y = next, game:GetService("Workspace").Boats:GetChildren()
 	for H, H in y, P, Y do
 		if H:IsA("Model") then
@@ -17350,6 +17349,9 @@ function TeleportSeaEvents(V)
 	else
 		local y = V.Name
 		local P = ((Settings["Use Click M1 Fruit For Sea Event"]) and 20 or ((y == "Terrorshark") and 60 or 20))
+		if y == "Terrorshark" and Settings["Use Dragonstorm For Sea Event"] then
+			P = 200
+		end
 		if V:FindFirstChildWhichIsA("Humanoid") and V.Humanoid.Health > 0 then
 			toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, P, 0))
 		end
@@ -19935,6 +19937,7 @@ game.workspace._WorldOrigin.ChildAdded:Connect(function(y)
 	if
 		(Settings["Auto Sea Event"] or Settings["Auto Shipwright"])
 		and Settings["Auto Dodge Skill Terrorshark"]
+		and not Settings["Use Dragonstorm For Sea Event"]
 		and getgenv().PathTerrorshark
 	then
 		if
@@ -20064,7 +20067,7 @@ local function C()
 end
 local TIKI_POS = Vector3.new(-16204.08, 9.09, 479.23)
 local TIKI_AVOID_R = 3000
-local TIKI_HIGH_Y = 1000
+local TIKI_LIFT_Y = 1000
 local function BoatHasPassenger(seat)
 	local boat = seat.Parent
 	if not boat then
@@ -20073,7 +20076,7 @@ local function BoatHasPassenger(seat)
 	for _, v in ipairs(boat:GetChildren()) do
 		if v.Name == "Cannon" then
 			local s = v:FindFirstChild("Seat")
-			if s and s.Occupant then
+			if s and (s.Occupant or s:FindFirstChild("SeatWeld")) then
 				return true
 			end
 		end
@@ -20083,7 +20086,7 @@ end
 local function flatDist(a, b)
 	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
 end
-function manageTween(J, F, q, c)
+function manageTween(J, F, q, c, lvl)
 	if not J or not J:IsA("BasePart") or typeof(F) ~= "CFrame" then
 		return
 	end
@@ -20095,6 +20098,7 @@ function manageTween(J, F, q, c)
 	if D and D.TweenKey == c and D.PlaybackState == Enum.PlaybackState.Playing then
 		D.Target = F
 		D.Speed = q
+		D.Level = lvl and true or nil
 		getgenv()[c] = D
 		return D
 	end
@@ -20108,16 +20112,58 @@ function manageTween(J, F, q, c)
 		end)
 	end
 	local D, r, n, u, W =
-		{ PlaybackState = Enum.PlaybackState.Playing, Speed = q, Target = F, TweenKey = c },
+		{ PlaybackState = Enum.PlaybackState.Playing, Speed = q, Target = F, TweenKey = c, Level = lvl and true or nil },
 		false,
 		false,
 		false,
 		J.CFrame
 	local noclipConn
 	local liftedHigh = false
+	local baseY = J.Position.Y
+	local holdUntil = 0
+	local levelY = nil
+	local function bvHold(on)
+		local bv = J:FindFirstChild("BodyVelocity")
+		if not bv then
+			return
+		end
+		if on then
+			if bv:GetAttribute("__origMF") == nil then
+				bv:SetAttribute("__origMF", bv.MaxForce)
+			end
+			bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+			bv.Velocity = Vector3.new(0, 0, 0)
+		else
+			local o = bv:GetAttribute("__origMF")
+			if o ~= nil then
+				bv.MaxForce = o
+				bv:SetAttribute("__origMF", nil)
+			end
+		end
+	end
 	local function F(q)
 		if u then
 			return
+		end
+		if levelY then
+			-- dang giu Y 160/1000 voi player tren phao: giu MaxForce, chi tra khi khong con tween va het nguoi ngoi
+			task.delay(4, function()
+				if J and J.Parent and not y[J] and not BoatHasPassenger(J) then
+					bvHold(false)
+				end
+			end)
+		elseif liftedHigh and J and J.Parent then
+			liftedHigh = false
+			pcall(function()
+				J.CFrame = CFrame.new(J.Position.X, baseY, J.Position.Z) * (J.CFrame - J.CFrame.Position)
+				J.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+				J.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+			end)
+			task.delay(1, function()
+				bvHold(false)
+			end)
+		else
+			bvHold(false)
 		end
 		u = true
 		if noclipConn then
@@ -20216,26 +20262,65 @@ function manageTween(J, F, q, c)
 					F(Enum.PlaybackState.Cancelled)
 					break
 				end
-				if game.PlaceId == getgenv().CheckPlaceId and BoatHasPassenger(J) then
+				if D.Level then
+					-- chi khi co player ngoi phao: trong 3000 cua Tiki = Y 1000, ngoai 3000 = Y 160
+					local wantY = nil
+					if BoatHasPassenger(J) then
+						local nearTiki = game.PlaceId == getgenv().CheckPlaceId and flatDist(J.Position, TIKI_POS) < TIKI_AVOID_R
+						wantY = nearTiki and 1000 or 160
+					end
+					if wantY ~= levelY then
+						levelY = wantY
+						if wantY then
+							bvHold(true)
+							holdUntil = tick() + 1
+							W = CFrame.new(J.Position.X, wantY, J.Position.Z) * (J.CFrame - J.CFrame.Position)
+							J.CFrame = W
+							J.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+							J.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+						else
+							task.delay(1, function()
+								if not levelY then
+									bvHold(false)
+								end
+							end)
+						end
+					end
+				elseif game.PlaceId == getgenv().CheckPlaceId and BoatHasPassenger(J) then
 					local tgt = D.Target.Position
 					local hz = flatDist(J.Position, TIKI_POS)
 					if not liftedHigh then
 						if hz < TIKI_AVOID_R and flatDist(tgt, TIKI_POS) > TIKI_AVOID_R then
 							liftedHigh = true
-							W = CFrame.new(J.Position.X, TIKI_HIGH_Y, J.Position.Z) * (J.CFrame - J.CFrame.Position)
+							baseY = J.Position.Y
+							bvHold(true)
+							holdUntil = tick() + 1
+							W = CFrame.new(J.Position.X, baseY + TIKI_LIFT_Y, J.Position.Z) * (J.CFrame - J.CFrame.Position)
 							J.CFrame = W
 							J.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 							J.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
 						end
 					elseif hz >= TIKI_AVOID_R + 200 or flatDist(J.Position, tgt) < 50 then
 						liftedHigh = false
+						bvHold(true)
+						holdUntil = tick() + 1
 						W = CFrame.new(J.Position.X, tgt.Y, J.Position.Z) * (J.CFrame - J.CFrame.Position)
 						J.CFrame = W
 						J.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 						J.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+						task.delay(1.5, function()
+							if not liftedHigh then
+								bvHold(false)
+							end
+						end)
 					end
 				end
-				local y, P = math.min(D.Speed, Y.cap), (liftedHigh and (CFrame.new(D.Target.Position.X, TIKI_HIGH_Y, D.Target.Position.Z) * (D.Target - D.Target.Position)) or D.Target)
+				if tick() < holdUntil then
+					J.CFrame = W
+					J.AssemblyLinearVelocity = Vector3.new(0.0, 0.0, 0.0)
+					J.AssemblyAngularVelocity = Vector3.new(0.0, 0.0, 0.0)
+				else
+				local y, P = math.min(D.Speed, Y.cap), (levelY and (CFrame.new(D.Target.Position.X, levelY, D.Target.Position.Z) * (D.Target - D.Target.Position)) or (liftedHigh and (CFrame.new(D.Target.Position.X, baseY + TIKI_LIFT_Y, D.Target.Position.Z) * (D.Target - D.Target.Position)) or D.Target))
 				local q, c = (P.Position - W.Position).Magnitude, y * l
 				if (J.Position - W.Position).Magnitude > math.max(20, c * 3) then
 					Y.lastHit = tick()
@@ -20263,6 +20348,7 @@ function manageTween(J, F, q, c)
 				J.CFrame = W
 				J.AssemblyLinearVelocity = Vector3.new(0.0, 0.0, 0.0)
 				J.AssemblyAngularVelocity = Vector3.new(0.0, 0.0, 0.0)
+				end
 			end
 		end
 		if not u then
@@ -20271,11 +20357,11 @@ function manageTween(J, F, q, c)
 	end)
 	return D
 end
-local function l(y, P, Y)
+local function l(y, P, Y, lvl)
 	if not (y and (y:FindFirstChild("VehicleSeat"))) then
 		return
 	end
-	return manageTween(y.VehicleSeat, P, Y or 350, "TweenBoat")
+	return manageTween(y.VehicleSeat, P, Y or 350, "TweenBoat", lvl)
 end
 local function y()
 	local P = getgenv().TweenBoat
@@ -20344,6 +20430,35 @@ function GetOwnerDrivenBoat(name)
 	end
 	return nil
 end
+-- san cung: owner reset/chet thi acc san cung cung reset de hoi sinh gan owner, do phai bay ve lau
+task.spawn(function()
+	local lastChar, diedMarked, lastReset = nil, nil, 0
+	while task.wait(0.3) do
+		pcall(function()
+			if not (Settings["Auto Sea Event With Friend"] and Settings["Auto Sea Event"]) then
+				lastChar = nil
+				return
+			end
+			local ownerName = Settings["Select Owner Boat"]
+			local owner = ownerName and game:GetService("Players"):FindFirstChild(ownerName)
+			local ch = owner and owner.Character
+			local hum = ch and ch:FindFirstChildOfClass("Humanoid")
+			local ownerDied = hum ~= nil and hum.Health <= 0 and diedMarked ~= ch
+			local ownerNewChar = lastChar ~= nil and ch ~= lastChar and diedMarked ~= lastChar
+			if ownerDied then
+				diedMarked = ch
+			end
+			lastChar = ch
+			if (ownerDied or ownerNewChar) and tick() - lastReset > 3 then
+				local myHum = t.Character and t.Character:FindFirstChildOfClass("Humanoid")
+				if myHum and myHum.Health > 0 then
+					lastReset = tick()
+					myHum.Health = 0
+				end
+			end
+		end)
+	end
+end)
 function checkFriendCannon(boat)
 	if not boat then
 		return false
@@ -20383,12 +20498,7 @@ end
 function BuyBoatAndTeleBoat(P)
 	local Y = checkboat()
 	if Settings["Auto Sea Event With Friend"] and Settings["Auto Sea Event"] then
-		local ownerName = Settings["Select Owner Boat"]
-		local ownerPlayer = ownerName and game:GetService("Players"):FindFirstChild(ownerName)
-		if not ownerPlayer then
-			WarnOnce("SelectFriend", "Chon owner o Sea Event > Select Owner Boat truoc da.")
-			return
-		end
+		-- san cung: chi tele len phao trong cua thuyen owner dang lai. Da ngoi roi thi dung yen, khong bam theo nua.
 		local hum = t.Character and t.Character:FindFirstChildOfClass("Humanoid")
 		local hrp = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
 		if not hum or not hrp then
@@ -20400,14 +20510,15 @@ function BuyBoatAndTeleBoat(P)
 			end
 			return
 		end
+		local ownerName = Settings["Select Owner Boat"]
+		if not ownerName or not game:GetService("Players"):FindFirstChild(ownerName) then
+			WarnOnce("SelectFriend", "Chon owner o Sea Event > Select Owner Boat truoc da.")
+			return
+		end
 		local boat = GetOwnerDrivenBoat(ownerName)
 		local cannon = boat and checkFriendCannon(boat)
 		if cannon then
 			toTarget(cannon.Seat.CFrame)
-		elseif boat then
-			toTarget(boat.WorldPivot * CFrame.new(0, 15, 0))
-		elseif ownerPlayer.Character and ownerPlayer.Character:FindFirstChild("HumanoidRootPart") then
-			toTarget(ownerPlayer.Character.HumanoidRootPart.CFrame)
 		end
 		return
 	end
@@ -20455,12 +20566,24 @@ function BuyBoatAndTeleBoat(P)
 			WarnOnce("MultiWait", "Cho cac acc da chon ngoi du vao phao...")
 			return
 		end
+		-- co player khac ngoi phao: tween Y 160; chi minh localplayer tren thuyen: giu Y mac dinh cua mode tween boat
+		-- Y mac dinh cua mode tween boat (nho lai khi thuyen dang o muc 160/1000 do co player tren phao)
+		local pivotY = Y.WorldPivot.Y
+		if math.abs(pivotY - 160) > 5 and math.abs(pivotY - 1000) > 5 then
+			getgenv().__SeaBoatDefaultY = pivotY
+		end
+		local seaY = getgenv().__SeaBoatDefaultY or pivotY
+		if BoatHasPassenger(Y.VehicleSeat) then
+			-- co player tren phao: trong 3000 cua Tiki = Y 1000, ngoai = Y 160 (manageTween tu nhay Y theo vi tri)
+			local nearTiki = game.PlaceId == getgenv().CheckPlaceId and flatDist(Y.VehicleSeat.Position, TIKI_POS) < TIKI_AVOID_R
+			seaY = nearTiki and 1000 or 160
+		end
 		if Settings["Tween Until Have Sea Event"] then
-			local H = CFrame.new(-118834.515625, Y.WorldPivot.Y, 999920.0494155884)
+			local H = CFrame.new(-118834.515625, seaY, 999920.0494155884)
 			if not t.Character.Humanoid.Sit then
 				toTarget(Y.VehicleSeat.CFrame)
 			else
-				l(Y, H, 350)
+				l(Y, H, 350, true)
 			end
 		else
 			local H, C = CFrame.new(654.3875732421875, Y.WorldPivot.Y, 6321.95947265625), DecectPartRoughSea()
@@ -20472,12 +20595,12 @@ function BuyBoatAndTeleBoat(P)
 			end
 			getgenv().RoughSea = Settings["Teleport Boat Other CFrame if Rough Sea"] and V or 0
 			H = (function() if game.PlaceId == getgenv().CheckPlaceId then return SelectedZoneCFrame() * CFrame.new(0, Y.WorldPivot.Y, 0 + RoughSea) else return H end end)()
-			if (Y.VehicleSeat.Position - H.Position).Magnitude > 200 then
-				C = CFrame.new(H.Position.X, Y.WorldPivot.Y, H.Position.Z)
+			if flatDist(Y.VehicleSeat.Position, H.Position) > 200 then
+				C = CFrame.new(H.Position.X, seaY, H.Position.Z)
 				if not t.Character.Humanoid.Sit then
 					toTarget(Y.VehicleSeat.CFrame)
 				else
-					l(Y, C, 350)
+					l(Y, C, 350, true)
 				end
 			else
 				if Settings["Auto Repair Ur Ship"] then
@@ -20520,7 +20643,7 @@ function BuyBoatAndTeleBoat(P)
 					if not t.Character.Humanoid.Sit then
 						toTarget(Y.VehicleSeat.CFrame)
 					end
-					local P = CFrame.new(H.Position.X, Y.WorldPivot.Y, H.Position.Z)
+					local P = CFrame.new(H.Position.X, seaY, H.Position.Z)
 					if DetectSeaEvents(true) then
 						local H = tick()
 						repeat
@@ -20528,7 +20651,7 @@ function BuyBoatAndTeleBoat(P)
 							toTarget(P * CFrame.new(0, 2500, 0))
 						until tick() - H >= 12
 					elseif t.Character.Humanoid.Sit then
-						l(Y, P, 350)
+						l(Y, P, 350, true)
 					end
 				end
 			end
@@ -20880,7 +21003,10 @@ function AutoSeabeast()
 			task.wait()
 			TeleportSeaEvents(b)
 			if b:FindFirstChildWhichIsA("Humanoid") then
-				if Settings["Use Dragonstorm For Sea Event"] then
+				if b.Name == "Piranha" then
+					UsedualFlock()
+					ClickM1(b, true)
+				elseif Settings["Use Dragonstorm For Sea Event"] then
 					if Settings["Auto Change Dragonstorm With Skull Guitar"] then
 						if not NameWeapon("Gun") or NameWeapon("Gun") ~= "Dragonstorm" then
 							game:GetService("ReplicatedStorage").Remotes.CommF_
@@ -30015,11 +30141,14 @@ if not getgenv().BananaCatMainLoop then
 			end
 		end)
 		task.spawn(function()
-			if Settings["Change WalkSpeed"] then
-				t.Character.Humanoid.WalkSpeed = Settings["Input WalkSpeed"] or 16
-			end
-			if Settings["Change JumpPower"] then
-				t.Character.Humanoid.JumpPower = Settings["Input JumpPower"] or 50
+			local hum = t.Character and t.Character:FindFirstChildOfClass("Humanoid")
+			if hum then
+				if Settings["Change WalkSpeed"] then
+					hum.WalkSpeed = Settings["Input WalkSpeed"] or 16
+				end
+				if Settings["Change JumpPower"] then
+					hum.JumpPower = Settings["Input JumpPower"] or 50
+				end
 			end
 		end)
 		if tick() - lastFruitTick >= 0.5 then
