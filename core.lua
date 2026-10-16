@@ -9441,15 +9441,15 @@ function TouchPadHaki()
 	end
 	local RS = game:GetService("ReplicatedStorage")
 	local color = PadHakiMap[f.BrickColor.Name]
-	if color then
+	local PadItemId = { ["Hot pink"] = 292, ["Really red"] = 287, ["Oyster"] = 277 }
+	local itemId = PadItemId[f.BrickColor.Name]
+	if itemId then
 		pcall(function()
-			local rf = RS.Modules.Net:FindFirstChild("RF/FruitCustomizerRF")
-			if rf then
-				rf:InvokeServer({ StorageName = color, Type = "AuraSkin", Context = "Equip" })
-			end
-		end)
-		pcall(function()
-			RS.Remotes.CommF_:InvokeServer("activateColor", color)
+			RS.Modules.Net["RF/ModificationFunction"]:InvokeServer({
+				Type = "SetEquip",
+				IsEquipped = true,
+				ItemId = itemId,
+			})
 		end)
 	elseif tick() - (getgenv().__PadWarn or 0) > 10 then
 		getgenv().__PadWarn = tick()
