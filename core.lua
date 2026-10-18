@@ -948,6 +948,66 @@ local A = (function()
 				value = prio and {} or table.clone(states),
 			})
 			local ctl, ret
+			local headerLabel, headerBusy, headerHooked = nil, false, nil
+			local refreshHeader
+
+			local function headerText()
+				if #ord == 0 then
+					return title .. ": "
+				end
+				return title .. ": " .. table.concat(ord, " > ")
+			end
+
+			-- thu vien: Search=true -> header la TextBox (hien qua PlaceholderText), Search=false -> TextLabel (Text)
+			local headerProp = "Text"
+			local function findHeader()
+				if headerLabel and headerLabel.Parent then
+					return headerLabel
+				end
+				local el = ctl and ctl.Element
+				if not el then
+					return nil
+				end
+				local d = el:FindFirstChild("TextColorPlaceholder", true)
+				if d and (d:IsA("TextBox") or d:IsA("TextLabel")) then
+					headerLabel = d
+					headerProp = d:IsA("TextBox") and "PlaceholderText" or "Text"
+					if headerHooked ~= d then
+						headerHooked = d
+						local prop = headerProp
+						d:GetPropertyChangedSignal(prop):Connect(function()
+							if not headerBusy and prio and d[prop] ~= headerText() then
+								headerBusy = true
+								pcall(function()
+									d[prop] = headerText()
+								end)
+								headerBusy = false
+							end
+						end)
+					end
+					return d
+				end
+				return nil
+			end
+
+			refreshHeader = function()
+				if not prio then
+					return
+				end
+				local function apply()
+					local lbl = findHeader()
+					if lbl and lbl[headerProp] ~= headerText() then
+						headerBusy = true
+						pcall(function()
+							lbl[headerProp] = headerText()
+						end)
+						headerBusy = false
+					end
+				end
+				apply()
+				task.defer(apply)
+				task.delay(0.1, apply)
+			end
 
 			local function build(ns, initial, keepOrder)
 				local n0 = controlCount()
@@ -967,6 +1027,7 @@ local A = (function()
 								ord[#ord + 1] = name
 							end
 							opt.value = table.clone(ord)
+							refreshHeader()
 							if cb then
 								cb(table.clone(ord))
 							end
@@ -980,11 +1041,13 @@ local A = (function()
 				})
 				ctl = stamp(n0, keepOrder)
 				ret = r
+				headerLabel = nil
 				for _, n in ipairs(initial) do
 					pcall(function()
 						r:SetValue(n)
 					end)
 				end
+				refreshHeader()
 			end
 			build(names, init, nil)
 
@@ -19616,47 +19679,99 @@ DungeonSection.CreateDropdown(
 		SaveSettings("Select Card Priority", table.clone(b))
 	end
 )
-function AutoPickDungeonCard()
-	local b, E, l, y = Settings["Select Card Priority"] or {}, {}, 1 / 0
-	for P, Y in pairs(t.PlayerGui:GetChildren()) do repeat 
-		local H, C, J =
-			Y:FindFirstChild("DisplayName", true),
-			Y:FindFirstChild("BuffDescription", true),
-			Y:FindFirstChildWhichIsA("TextButton", true)
-		if H and C and J and (H:IsA("TextLabel")) then
-			P = DisplayNameToKey[stripFont(H.Text)]
-			if P then
-				if IsSkillCooldown(P) then
-					break
-				end
-				for Y, H in ipairs(b) do
-					if DisplayNameToKey[H] == P then
-						if Y < l then
-							l, y = Y, J
-						end
-						break
+local function ClickCardButton(btn)
+	for _, sig in ipairs({ "Activated", "MouseButton1Click", "MouseButton1Down", "MouseButton1Up" }) do
+		local ok, conns = pcall(getconnections, btn[sig])
+		if ok and conns and #conns > 0 then
+			for _, c in ipairs(conns) do
+				pcall(function()
+					if c.Function then
+						c.Function()
+					else
+						c:Fire()
 					end
-				end
-				table.insert(E, J)
+				end)
 			end
+			return true
 		end
-	until true end
-	if y then
-		print("AUTO PICK (PRIORITY INDEX):", l)
-		for l, l in pairs(getconnections(y.Activated)) do
-			l.Function()
-		end
-		return true
 	end
-	if #E > 0 then
-		b = E[math.random(1, #E)]
-		print("AUTO PICK (RANDOM)")
-		for E, E in pairs(getconnections(b.Activated)) do
-			E.Function()
+	if firesignal then
+		local ok = pcall(firesignal, btn.Activated)
+		if ok then
+			return true
 		end
-		return true
+		ok = pcall(firesignal, btn.MouseButton1Click)
+		return ok
 	end
 	return false
+end
+function GetDungeonCards()
+	local cards, seen = {}, {}
+	local pg = t:FindFirstChild("PlayerGui")
+	if not pg then
+		return cards
+	end
+	for _, lbl in ipairs(pg:GetDescendants()) do
+		if lbl.Name == "DisplayName" and lbl:IsA("TextLabel") and lbl.Visible and lbl.Text ~= "" then
+			local key = DisplayNameToKey[stripFont(lbl.Text)]
+			if key then
+				local node, btn = lbl.Parent, nil
+				for _ = 1, 8 do
+					if not node or node == pg then
+						break
+					end
+					if node:FindFirstChild("BuffDescription", true) then
+						local count = 0
+						for _, d in ipairs(node:GetDescendants()) do
+							if d.Name == "DisplayName" and d:IsA("TextLabel") then
+								count = count + 1
+							end
+						end
+						if count == 1 then
+							btn = node:IsA("GuiButton") and node or node:FindFirstChildWhichIsA("GuiButton", true)
+							if btn then
+								break
+							end
+						end
+					end
+					node = node.Parent
+				end
+				if btn and not seen[btn] then
+					seen[btn] = true
+					cards[#cards + 1] = { key = key, btn = btn }
+				end
+			end
+		end
+	end
+	return cards
+end
+function AutoPickDungeonCard()
+	local prio = Settings["Select Card Priority"] or {}
+	local rank = {}
+	for i, name in ipairs(prio) do
+		local key = DisplayNameToKey[name]
+		if key and not rank[key] then
+			rank[key] = i
+		end
+	end
+	local cards = GetDungeonCards()
+	if #cards == 0 then
+		return false
+	end
+	local best, bestRank = nil, math.huge
+	for _, c in ipairs(cards) do
+		local r = rank[c.key]
+		if r and r < bestRank then
+			best, bestRank = c, r
+		end
+	end
+	if best then
+		print("AUTO PICK (PRIORITY INDEX):", bestRank, best.key)
+	else
+		best = cards[math.random(1, #cards)]
+		print("AUTO PICK (RANDOM):", best.key)
+	end
+	return ClickCardButton(best.btn)
 end
 DungeonSection.CreateToggle(
 	{
@@ -19785,12 +19900,12 @@ DungeonSection.CreateToggle(
 		end
 		task.spawn(function()
 			while Settings["Auto Pick Card Dungeon"] do
-				task.wait()
-				local b, b = pcall(function()
-					AutoPickDungeonCard()
-				end)
-				if b then
-					warn("[Auto Pick Card Dungeon Error]:", b)
+				task.wait(0.3)
+				local ok, res = pcall(AutoPickDungeonCard)
+				if not ok then
+					warn("[Auto Pick Card Dungeon Error]:", res)
+				elseif res then
+					task.wait(1.5)
 				end
 			end
 		end)
