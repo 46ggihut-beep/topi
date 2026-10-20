@@ -494,7 +494,7 @@ task.spawn(function()
 		msg.TextYAlignment = Enum.TextYAlignment.Top
 		msg.TextColor3 = Color3.fromRGB(200, 204, 214)
 		msg.Text = "Script lỗi hoặc cần cập nhật? Vào server Discord.\n"
-			.. "Đây là Server của TopiHub.\nVÀO 12:30 NGÀY 21/10/2026, SCRIPT SẼ THÊM KEY (KHÔNG CẦN GET, JOIN DISCORD ĐỂ LẤY KEY)"
+			.. "Đây là Server của TopiHub."
 		msg.Parent = card
 
 		local btn = Instance.new("TextButton")
