@@ -22,6 +22,11 @@ function ElevateIdentity()
 end
 ElevateIdentity()
 
+-- [BananaFix] limit_type tu loader goc khong ton tai -> goi nil lam chet vong hop. Dat ham rong mac dinh.
+if type(getgenv().limit_type) ~= "function" then
+	getgenv().limit_type = function() end
+end
+
 getgenv().__BF_TELEPORTING = false
 local __streamOrig = {}
 pcall(function()
@@ -347,12 +352,16 @@ end
 repeat
 	wait()
 until game:FindFirstChild("CoreGui")
-repeat
-	wait()
-until not game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("LoadingScreen")
-repeat
-	wait()
-until game:IsLoaded() and (game.Players.LocalPlayer:FindFirstChild("DataLoaded"))
+do
+	local tw = tick()
+	repeat
+		wait()
+	until not game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("LoadingScreen") or tick() - tw > 60
+	tw = tick()
+	repeat
+		wait()
+	until game:IsLoaded() and (game.Players.LocalPlayer:FindFirstChild("DataLoaded")) or tick() - tw > 90
+end
 function FireButton(b)
 	b.Selectable = true
 	game:GetService("GuiService").SelectedObject = b
@@ -373,16 +382,20 @@ do
 	until HasTeam() or tick() - t0 > 1
 end
 if not HasTeam() then
+	local tMain = tick()
 	repeat
 		wait()
 	until game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("Main (minimal)")
 		or (game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("Main"))
+		or tick() - tMain > 30
 	local b = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("Main (minimal)")
 		or (game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("Main"))
+		or Instance.new("Folder")
 	local waitUI = tick()
 	repeat
 		wait()
 	until b:FindFirstChild("ChooseTeam") or HasTeam() or tick() - waitUI > 15
+	local tTeam = tick()
 	repeat
 		task.wait()
 		pcall(function()
@@ -393,7 +406,7 @@ if not HasTeam() then
 				wait(1)
 			end
 		end)
-	until HasTeam() or not b.Parent or not b:FindFirstChild("ChooseTeam") or not b.ChooseTeam.Visible
+	until HasTeam() or not b.Parent or not b:FindFirstChild("ChooseTeam") or not b.ChooseTeam.Visible or tick() - tTeam > 25
 	if not HasTeam() then
 		pcall(function()
 			local isPirate = Settings["Select Team"] == "Pirate"
@@ -419,8 +432,14 @@ getgenv().ExploitReq = (syn and syn.request)
 	or request
 	or requests
 getgenv().request = getgenv().request or getgenv().ExploitReq
-if getgenv().LoadScript then
-	return print("Double UI")
+do
+	local g = getgenv()
+	local sameJob = g.LoadScriptJob == nil or g.LoadScriptJob == game.JobId
+	-- Chi coi la "Double UI" khi CUNG server va ban truoc con dang load / da load xong.
+	-- Neu ban truoc chet giua chung (qua 45s ma chua xong) hoac da sang server moi -> cho chay lai.
+	if g.LoadScript and sameJob and (g.__BF_LOADED == game.JobId or tick() - (g.LoadScriptAt or 0) < 45) then
+		return print("Double UI")
+	end
 end
 
 task.spawn(function()
@@ -553,6 +572,8 @@ getgenv().CheckPlaceId = game.PlaceId == 100117331123089 and 100117331123089 or 
 getgenv().CheckPlaceId2 = game.PlaceId == 4442272183 and 4442272183 or 79091703265657
 getgenv().CheckPlaceId3 = game.PlaceId == 2753915549 and 2753915549 or 85211729168715
 getgenv().LoadScript = true
+getgenv().LoadScriptJob = game.JobId
+getgenv().LoadScriptAt = tick()
 local t = game.Players.LocalPlayer
 getgenv().getupvalue = debug.getupvalue
 getgenv().getupvalues = debug.getupvalues
@@ -564,8 +585,74 @@ game:GetService("Players").LocalPlayer.Idled:connect(function()
 	wait(1)
 	vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
 end)
+function BF_LoadUILibrary()
+	local URL = "https://pastefy.app/vgSGtrbP/raw"
+	local CACHE = "Banana Cat Hub/ui_library_cache.lua"
+	local lastErr = "unknown"
+	local function build(src)
+		if type(src) ~= "string" or #src < 200 then
+			lastErr = "empty/short response"
+			return nil
+		end
+		local head = src:sub(1, 300):lower()
+		if head:find("<!doctype", 1, true) or head:find("<html", 1, true) then
+			lastErr = "html response (rate limit / challenge)"
+			return nil
+		end
+		local fn, cerr = loadstring(src)
+		if not fn then
+			lastErr = "compile: " .. tostring(cerr)
+			return nil
+		end
+		local ok, lib = pcall(fn)
+		if ok and lib then
+			return lib
+		end
+		lastErr = "run: " .. tostring(lib)
+		return nil
+	end
+	for attempt = 1, 6 do
+		local ok, body = pcall(function()
+			return game:HttpGet(URL, true)
+		end)
+		if ok then
+			local lib = build(body)
+			if lib then
+				pcall(function()
+					if not isfolder("Banana Cat Hub") then
+						makefolder("Banana Cat Hub")
+					end
+					writefile(CACHE, body)
+				end)
+				return lib
+			end
+		else
+			lastErr = tostring(body)
+		end
+		warn(("[BananaFix] tai UI that bai (lan %d/6): %s"):format(attempt, lastErr))
+		task.wait(math.min(attempt, 3))
+	end
+	-- fallback: dung ban cache lan truoc
+	local okc, cached = pcall(readfile, CACHE)
+	if okc then
+		local lib = build(cached)
+		if lib then
+			warn("[BananaFix] dung UI library tu cache")
+			return lib
+		end
+	end
+	getgenv().LoadScript = nil -- cho phep chay lai script, khong bi 'Double UI'
+	pcall(function()
+		game:GetService("StarterGui"):SetCore("SendNotification", {
+			Title = "Topi Hub",
+			Text = "Khong tai duoc UI (" .. tostring(lastErr):sub(1, 60) .. "). Hay execute lai.",
+			Duration = 10,
+		})
+	end)
+	error("[BananaFix] Khong tai duoc UI library: " .. tostring(lastErr), 0)
+end
 local A = (function()
-	local Library = loadstring(game:HttpGet("https://pastefy.app/vgSGtrbP/raw"))()
+	local Library = BF_LoadUILibrary()
 	local API = { Options = {} }
 
 	local LOGO = "rbxassetid://77671524243147"
@@ -3387,14 +3474,55 @@ function CheckJobIdServer()
 	end
 	return R
 end
-function HopServer(R)
+BF_HopTried = BF_HopTried or {}
+function BF_ServerNotFull(info)
+	-- chi vao server co DUOI 10 nguoi (<= 9). Server tu 10 nguoi tro len -> bo qua. Khong biet so nguoi -> bo qua
+	local c = type(info) == "table" and (tonumber(info.Count) or tonumber(info.count) or tonumber(info.Players) or tonumber(info.playing)) or nil
+	if not c then
+		return false
+	end
+	return c < 10
+end
+function HopServer(R, stop)
+	local function shouldStop()
+		if type(stop) ~= "function" then
+			return false
+		end
+		local ok, r = pcall(stop)
+		return ok and r and true or false
+	end
 	local function m()
 		for E = 1, 100, 1 do
-			for l, Q in pairs((game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer(E))) do
-				if l ~= game.JobId and not table.find(CheckJobIdServer(), l) then
-					game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", l)
-					writefile("Banana Cat Hub/Jobid.json", game:GetService("HttpService"):JSONEncode(K))
-					getgenv().limit_type("clearAll")
+			if shouldStop() then
+				return
+			end
+			local okL, list = pcall(function()
+				return game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer(E)
+			end)
+			if not okL or type(list) ~= "table" then
+				return
+			end
+			for l, Q in pairs(list) do
+				if
+					l ~= game.JobId
+					and not table.find(CheckJobIdServer(), l)
+					and BF_ServerNotFull(Q)
+					and tick() - (BF_HopTried[l] or 0) > 120
+				then
+					if shouldStop() then
+						return
+					end
+					BF_HopTried[l] = tick()
+					pcall(function()
+						game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", l)
+					end)
+					pcall(function()
+						writefile("Banana Cat Hub/Jobid.json", game:GetService("HttpService"):JSONEncode(K))
+					end)
+					pcall(function()
+						getgenv().limit_type("clearAll")
+					end)
+					return -- 1 server moi lan, cho ket qua roi moi thu server khac
 				end
 			end
 		end
@@ -3404,11 +3532,44 @@ function HopServer(R)
 		.new("<Color=Red>Banana Cat Hub : Wait " .. K .. "s [Hop Server]<Color=/>")
 		:Display()
 	while wait(K) do
+		if shouldStop() then
+			return
+		end
 		require(game:GetService("ReplicatedStorage").Notification)
 			.new("<Color=Red>Banana Cat Hub : Hop Server<Color=/>")
 			:Display()
 		m()
 	end
+end
+
+-- Elite Hunter: KHONG hop neu co Elite, dang giu God's Chalice, hoac co rip_indra
+function BF_EliteBlocked()
+	local function safe(f, ...)
+		local ok, r = pcall(f, ...)
+		return ok and r or nil
+	end
+	if safe(DetectEliteHunter) then
+		return true, "elite"
+	end
+	if safe(DetectItemPlr, "God's Chalice") then
+		return true, "chalice"
+	end
+	if safe(CheckNameBoss, "rip_indra True Form") or safe(CheckNameBoss, "rip_indra") then
+		return true, "rip_indra"
+	end
+	return false
+end
+function EliteHopStep()
+	local blocked, why = BF_EliteBlocked()
+	if blocked then
+		if why == "chalice" then
+			pcall(toTarget, CFrame.new(-12463.8740234375, 374.9144592285156, -7523.77392578125))
+		end
+		return
+	end
+	HopServer(nil, function()
+		return not Settings["Hop Server Elite Hunter"] or (BF_EliteBlocked())
+	end)
 end
 SectionServer.CreateButton({ Title = "Hop Server" }, function()
 	HopServer()
@@ -3443,6 +3604,10 @@ function HopLessAll()
 		if K then
 			m = l.nextPageCursor
 		end
+		if type(l) ~= "table" or type(l.data) ~= "table" then
+			wait(2)
+			return
+		end
 		K = 0
 		for m, S in pairs(l.data) do
 			m = true
@@ -3475,7 +3640,7 @@ function HopLessAll()
 		end
 	end
 	while wait() do
-		HopServerLess()
+		pcall(HopServerLess)
 	end
 end
 SectionServer.CreateButton({ Title = "Hop Server Less People" }, function()
@@ -9337,8 +9502,8 @@ BossRipIndraSection.CreateToggle(
 )
 BossRipIndraSection.CreateToggle(
 	{
-		Title = 'Hop Server Elite Hunter"',
-		Desc = "Hop if u have God chalice and teleport in safezone",
+		Title = "Hop Server Elite Hunter",
+		Desc = "Hop khi khong co Elite / Chen (God's Chalice) / rip_indra",
 		Default = Settings["Hop Server Elite Hunter"] or false,
 	},
 	function(f)
@@ -10351,13 +10516,10 @@ task.spawn(function()
 						end
 					end
 					return
-				elseif Settings["Hop Server Elite Hunter"] then
-					if not DetectItemPlr("God's Chalice") then
-						HopServer()
-					else
-						toTarget(CFrame.new(-12463.8740234375, 374.9144592285156, -7523.77392578125))
-					end
 				end
+			end
+			if Settings["Hop Server Elite Hunter"] then
+				EliteHopStep()
 			end
 			if Settings["Auto Factory"] then
 				CoreBoss = CheckNameBoss("Core")
