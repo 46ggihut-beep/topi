@@ -3542,6 +3542,143 @@ function HopServer(R, stop)
 	end
 end
 
+-- ================= TopiHub API =================
+-- Dung global table de khong ton slot local cua main chunk
+TopiHub = TopiHub or {
+	API = "https://topihub.onrender.com",
+	Key = "topi_8f3k29xz", -- phai trung voi bien API_KEY tren Render
+	Reported = {},
+	Cache = {},
+	LastHop = 0,
+	Busy = false,
+}
+
+function TopiHub.Request(method, path, body)
+	local fn = getgenv().ExploitReq or request or http_request
+	if not fn then
+		return nil
+	end
+	local ok, res = pcall(fn, {
+		Url = TopiHub.API .. path,
+		Method = method,
+		Headers = { ["Content-Type"] = "application/json", ["x-key"] = TopiHub.Key },
+		Body = body and game:GetService("HttpService"):JSONEncode(body) or nil,
+	})
+	if ok and type(res) == "table" and res.StatusCode == 200 then
+		return res.Body
+	end
+	return nil
+end
+
+function TopiHub.Report(name)
+	TopiHub.Request("POST", "/report", {
+		placeId = game.PlaceId,
+		jobId = game.JobId,
+		name = name,
+		players = #game.Players:GetPlayers(),
+		maxPlayers = game.Players.MaxPlayers,
+	})
+end
+
+function TopiHub.Remove(name)
+	TopiHub.Request("POST", "/remove", { jobId = game.JobId, name = name })
+end
+
+-- Doc danh sach server tu API (cache 10s de khong spam)
+function TopiHub.Fetch(name)
+	local c = TopiHub.Cache[name]
+	if c and tick() - c.t < 10 then
+		return c.list
+	end
+	local body = TopiHub.Request("GET", "/api/" .. game:GetService("HttpService"):UrlEncode(name))
+	if not body then
+		return nil
+	end
+	local ok, list = pcall(function()
+		return game:GetService("HttpService"):JSONDecode(body)
+	end)
+	if not ok or type(list) ~= "table" then
+		return nil
+	end
+	TopiHub.Cache[name] = { t = tick(), list = list }
+	return list
+end
+
+-- Doc API roi hop bang logic co san (__ServerBrowser teleport + BF_HopTried)
+-- Tra ve true  = da teleport / dang doi teleport
+--        false = API rong, loi, hoac khong co server hop le
+function TopiHub.Hop(name, stop)
+	if TopiHub.Busy or tick() - TopiHub.LastHop < 10 then
+		return true
+	end
+	TopiHub.Busy = true
+	local ok, done = pcall(function()
+		local list = TopiHub.Fetch(name)
+		if not list then
+			return false
+		end
+		for _, s in ipairs(list) do
+			if type(stop) == "function" and stop() then
+				return true
+			end
+			local id = tostring(s.jobId or "")
+			if
+				id ~= game.JobId
+				and #id > 0
+				and #id <= 64
+				and id:match("^[%w%-]+$") -- jobId la du lieu tu ben ngoai, kiem tra truoc khi dung
+				and tonumber(s.placeId) == game.PlaceId
+				and (tonumber(s.players) or 0) < (tonumber(s.maxPlayers) or game.Players.MaxPlayers)
+				and tick() - (BF_HopTried[id] or 0) > 120
+			then
+				BF_HopTried[id] = tick()
+				TopiHub.LastHop = tick()
+				game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", id)
+				pcall(function()
+					getgenv().limit_type("clearAll")
+				end)
+				return true
+			end
+		end
+		return false
+	end)
+	TopiHub.Busy = false
+	return ok and done or false
+end
+
+-- Bao server hien tai len API khi co Elite / Cake Prince (khong phu thuoc toggle)
+task.spawn(function()
+	task.wait(12) -- kiem tra ngay sau khi vao server (de acc dang hop van bao duoc moi server)
+	local checks = {
+		{ "Elite", function() return DetectEliteHunter() end },
+		{ "Cake Prince", function() return CheckNameBoss("Cake Prince") end },
+	}
+	while true do
+		for _, c in ipairs(checks) do
+			pcall(function()
+				if c[2]() then
+					TopiHub.Reported[c[1]] = true
+					TopiHub.Report(c[1])
+				elseif TopiHub.Reported[c[1]] then
+					TopiHub.Reported[c[1]] = nil
+					TopiHub.Remove(c[1]) -- boss/elite het -> go khoi danh sach
+				end
+			end)
+		end
+		task.wait(45)
+	end
+end)
+
+-- Katakuri: da co Cake Prince thi KHONG doc API; khong co thi doc API roi hop
+function KataHopStep()
+	if not Settings["Hop Find Katakuri"] or CheckNameBoss("Cake Prince") then
+		return
+	end
+	TopiHub.Hop("Cake Prince", function()
+		return not Settings["Hop Find Katakuri"] or (CheckNameBoss("Cake Prince") and true or false)
+	end)
+end
+
 -- Elite Hunter: KHONG hop neu co Elite, dang giu God's Chalice, hoac co rip_indra
 function BF_EliteBlocked()
 	local function safe(f, ...)
@@ -3567,9 +3704,15 @@ function EliteHopStep()
 		end
 		return
 	end
-	HopServer(nil, function()
+	-- Thieu dieu kien (khong Elite + khong chen + khong rip_indra) -> doc API roi hop
+	local function stop()
 		return not Settings["Hop Server Elite Hunter"] or (BF_EliteBlocked())
-	end)
+	end
+	if TopiHub.Hop("Elite", stop) then
+		return
+	end
+	-- API khong co server nao -> hop ngau nhien nhu cu
+	HopServer(nil, stop)
 end
 SectionServer.CreateButton({ Title = "Hop Server" }, function()
 	HopServer()
@@ -9290,11 +9433,7 @@ function FarmMethod()
 				until not IsMobAlive(V) or not Settings["Start Farm"] or not StackFarm
 				return
 			else
-				spawn(function()
-					if Settings["Hop Find Katakuri"] then
-						SpecialHop("Cake Prince")
-					end
-				end)
+				spawn(KataHopStep)
 			end
 		end
 		local V = DetectMob(f)
