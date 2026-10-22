@@ -5547,111 +5547,58 @@ local function H()
 	end
 	return B
 end
+-- Tween người chơi: logic TweenService Linear giống TweenTo của Topi SeaEvent
+-- (dùng lại TweenManager.PlayTween có sẵn: hủy tween cũ, dedupe theo đích)
 local function B(Z, C, J, F)
 	if not Z or typeof(C) ~= "CFrame" then
 		return
 	end
-	local q = t.Character
-	local c = q and (q:FindFirstChildOfClass("Humanoid"))
-	if not q or Z.Parent ~= q or not c or c.Health <= 0 then
+	local char = t.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not char or Z.Parent ~= char or not hum or hum.Health <= 0 or Z.Anchored then
 		return
 	end
-	if tick() - k.LastTP < 1 and C == k.LastCF then
+
+	J = math.max(tonumber(J) or 350, 1) -- speed (stud/s)
+	F = tonumber(F) or 2.5 -- epsilon
+	k.LastTP, k.LastCF = tick(), C
+
+	local dist = (C.Position - Z.Position).Magnitude
+	if dist <= F then
+		-- đã sát đích -> snap luôn
+		TweenManager.CancelTweenOnly()
+		I()
+		Z.CFrame = C
+		Z.AssemblyLinearVelocity = Vector3.zero
+		Z.AssemblyAngularVelocity = Vector3.zero
 		return
 	end
-	TweenManager.CancelTweenOnly()
-	if k.ActiveConnection and coroutine.status(k.ActiveConnection) == "suspended" then
-		pcall(coroutine.close, k.ActiveConnection)
-	end
-	J = math.max(tonumber(J) or 350, 1)
-	F = tonumber(F) or 2.5
-	k.LastTP = tick()
-	k.LastCF = C
-	local c, D = false
-	local r = {}
-	local function n()
-		if k.ActiveConnection == D then
-			k.ActiveConnection = nil
-		end
-		if TweenManager.currentTween == r then
-			TweenManager.currentTween = nil
-			TweenManager.currentPart = nil
-			TweenManager.currentGoal = nil
-			TweenManager.TweenRunning = false
-		end
-		if getgenv().Tween == r then
-			getgenv().Tween = nil
-		end
-	end
-	r.Pause = function(u)
-		c = true
-		if D and coroutine.status(D) == "suspended" then
-			pcall(coroutine.close, D)
-		end
-	end
-	r.Cancel = function(u)
-		u:Pause()
-		n()
-	end
-	r.Destroy = function(u)
-		u:Cancel()
-	end
-	D = coroutine.create(function()
-		local u, W = Z.Position, C.Position
-		local O, z, U, h, p, w = (W - u).Magnitude, 1 / 0, (tick()), true
-		while not c do
-			local M = t.Character
-			local j = M and (M:FindFirstChildOfClass("Humanoid"))
-			if M ~= q or Z.Parent ~= M or not j or j.Health <= 0 or Z.Anchored or O <= F then
-				break
+
+	I() -- tag "Teleporting"
+	getgenv().noclip = true
+
+	local tw = TweenManager.PlayTween(
+		Z,
+		TweenInfo.new(math.max(dist / J, 0.05), Enum.EasingStyle.Linear, Enum.EasingDirection.InOut),
+		{ CFrame = C },
+		{ TargetEpsilon = math.max(F, 6) }
+	)
+
+	-- giữ tag Teleporting trong lúc tween chạy + reset vận tốc khi xong
+	if tw and TweenManager.__keepFor ~= tw then
+		TweenManager.__keepFor = tw
+		task.spawn(function()
+			while TweenManager.currentTween == tw do
+				I()
+				task.wait(0.1)
 			end
-			local q, v0, T0 = x.Heartbeat:Wait(), H(), Z.Position
-			M = (W - T0).Magnitude
-			if M < z - 5 then
-				z, U = M, (tick())
-			else
-				h = (function() if tick() - U > 2.5 then return false else return h end end)()
-			end
-			if h and p and w and M > w + Y then
-				v0.cap = math.max(v0.cap * 0.7, e)
-				v0.nextRaise = tick() + 3
-				u = T0
-			else
-				u = (function() if h and p and (T0 - p).Magnitude > Y then return T0 else return u end end)()
-			end
-			j = W - u
-			local e, Y = j.Magnitude, math.min(math.min(J, v0.cap) * q, P)
-			if e > Y and tick() >= v0.nextRaise then
-				v0.cap = math.min(v0.cap * 1.08, J)
-				v0.nextRaise = tick() + 1.5
-			end
-			u = (function() if e <= Y or e <= 0.05 then return W else return u + j / e * Y end end)()
-			O = (W - u).Magnitude
-			I()
-			getgenv().noclip = true
-			Z.CFrame = CFrame.new(u)
-			Z.AssemblyLinearVelocity = Vector3.new(0.0, 0.0, 0.0)
-			Z.AssemblyAngularVelocity = Vector3.new(0.0, 0.0, 0.0)
-			p, w = u, M
-		end
-		if not c and Z.Parent == t.Character and (W - Z.Position).Magnitude <= F then
-			Z.CFrame = C
-			Z.AssemblyLinearVelocity = Vector3.new(0.0, 0.0, 0.0)
-			Z.AssemblyAngularVelocity = Vector3.new(0.0, 0.0, 0.0)
-		end
-		n()
-	end)
-	k.ActiveConnection = D
-	TweenManager.currentTween = r
-	TweenManager.currentPart = Z
-	TweenManager.currentGoal = C
-	TweenManager.TweenRunning = true
-	getgenv().Tween = r
-	if not coroutine.resume(D) then
-		r:Cancel()
-		return
+			pcall(function()
+				Z.AssemblyLinearVelocity = Vector3.zero
+				Z.AssemblyAngularVelocity = Vector3.zero
+			end)
+		end)
 	end
-	return r
+	return tw
 end
 
 do
@@ -20704,91 +20651,93 @@ end
 local function flatDist(a, b)
 	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
 end
+-- Tween thuyền: logic TweenBoatTo của Topi SeaEvent
+-- Heartbeat + Lerp + PivotTo, BodyVelocity "SeaBoatBV" (MaxForce chỉ trục Y), noclip thuyền
+-- Giữ nguyên chữ ký + object trả về (PlaybackState/Speed/Target/Pause/Cancel...) để code cũ không phải sửa
 function manageTween(J, F, q, c, lvl)
 	if not J or not J:IsA("BasePart") or typeof(F) ~= "CFrame" then
 		return
 	end
-	q, c = math.max(tonumber(Settings["Value Speed Tween Boat"]) or (tonumber(q)) or 350, 1), c or "TweenBoat"
+	q = math.max(tonumber(Settings["Value Speed Tween Boat"]) or tonumber(q) or 350, 1)
+	c = c or "TweenBoat"
 	if not y[J] and (J.Position - F.Position).Magnitude <= H then
 		return
 	end
-	local D = y[J]
-	if D and D.TweenKey == c and D.PlaybackState == Enum.PlaybackState.Playing then
-		D.Target = F
-		D.Speed = q
-		D.Level = lvl and true or nil
-		getgenv()[c] = D
-		return D
+
+	-- đang chạy cùng key -> chỉ cập nhật đích/tốc độ
+	local cur = y[J]
+	if cur and cur.TweenKey == c and cur.PlaybackState == Enum.PlaybackState.Playing then
+		cur.Target, cur.Speed, cur.Level = F, q, lvl and true or nil
+		getgenv()[c] = cur
+		return cur
 	end
-	if D then
-		D:Cancel()
+	if cur then
+		cur:Cancel()
 	end
-	local D = getgenv()[c]
-	if D then
+	local prev = getgenv()[c]
+	if prev then
 		pcall(function()
-			D:Cancel()
+			prev:Cancel()
 		end)
 	end
-	local D, r, n, u, W =
-		{ PlaybackState = Enum.PlaybackState.Playing, Speed = q, Target = F, TweenKey = c, Level = lvl and true or nil },
-		false,
-		false,
-		false,
-		J.CFrame
-	local noclipConn
-	local liftedHigh = false
-	local baseY = J.Position.Y
-	local holdUntil = 0
-	local levelY = nil
-	local function bvHold(on)
-		local bv = J:FindFirstChild("BodyVelocity")
-		if not bv then
-			return
-		end
-		if on then
-			if bv:GetAttribute("__origMF") == nil then
-				bv:SetAttribute("__origMF", bv.MaxForce)
-			end
-			bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-			bv.Velocity = Vector3.new(0, 0, 0)
+
+	local boat = J.Parent
+	local isModel = boat and boat:IsA("Model")
+	local rel = isModel and J.CFrame:ToObjectSpace(boat:GetPivot()) or CFrame.new()
+	local function place(seatCF)
+		if isModel then
+			boat:PivotTo(seatCF * rel)
 		else
-			local o = bv:GetAttribute("__origMF")
-			if o ~= nil then
-				bv.MaxForce = o
-				bv:SetAttribute("__origMF", nil)
-			end
+			J.CFrame = seatCF
 		end
+		J.AssemblyLinearVelocity = Vector3.zero
+		J.AssemblyAngularVelocity = Vector3.zero
 	end
-	local function F(q)
-		if u then
+
+	local D = { PlaybackState = Enum.PlaybackState.Playing, Speed = q, Target = F, TweenKey = c, Level = lvl and true or nil }
+	local finished, paused = false, false
+	local noclipConn
+	local lifted, baseY, lastOv = false, J.Position.Y, nil
+	local W = J.CFrame
+
+	-- BodyVelocity chống chìm (giống SetBoatBodyVelocity)
+	local bv = J:FindFirstChild("SeaBoatBV")
+	if not bv then
+		bv = Instance.new("BodyVelocity")
+		bv.Name = "SeaBoatBV"
+		bv.Velocity = Vector3.zero
+		bv.MaxForce = Vector3.new(0, math.huge, 0)
+		bv.P = 9999
+		bv.Parent = J
+	end
+
+	local function finish(state)
+		if finished then
 			return
 		end
-		if levelY then
-			-- dang giu Y 160/1000 voi player tren phao: giu MaxForce, chi tra khi khong con tween va het nguoi ngoi
-			task.delay(4, function()
-				if J and J.Parent and not y[J] and not BoatHasPassenger(J) then
-					bvHold(false)
-				end
-			end)
-		elseif liftedHigh and J and J.Parent then
-			liftedHigh = false
-			pcall(function()
-				J.CFrame = CFrame.new(J.Position.X, baseY, J.Position.Z) * (J.CFrame - J.CFrame.Position)
-				J.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-				J.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-			end)
-			task.delay(1, function()
-				bvHold(false)
-			end)
-		else
-			bvHold(false)
-		end
-		u = true
+		finished = true
 		if noclipConn then
 			noclipConn:Disconnect()
 			noclipConn = nil
 		end
-		D.PlaybackState = q
+		if lastOv then
+			-- đang giữ độ cao 160/1000 khi có người trên pháo -> thả BV sau 4s nếu hết người
+			task.delay(4, function()
+				if J.Parent and not y[J] and not BoatHasPassenger(J) and bv.Parent then
+					bv:Destroy()
+				end
+			end)
+		else
+			if lifted and J.Parent then
+				pcall(function()
+					place(CFrame.new(J.Position.X, baseY, J.Position.Z) * (J.CFrame - J.CFrame.Position))
+				end)
+			end
+			if bv.Parent then
+				bv:Destroy()
+			end
+		end
+		D.PlaybackState = state
 		P = math.max(P - 1, 0)
 		if y[J] == D then
 			y[J] = nil
@@ -20801,176 +20750,127 @@ function manageTween(J, F, q, c, lvl)
 			getgenv().noclip = false
 		end
 	end
-	D.Play = function(q)
-		if u then
-			return
-		end
-		n = false
-		q.PlaybackState = Enum.PlaybackState.Playing
+
+	D.Play = function(s)
+		if finished then return end
+		paused = false
+		s.PlaybackState = Enum.PlaybackState.Playing
 	end
-	D.Pause = function(q)
-		if u then
-			return
-		end
-		n = true
-		q.PlaybackState = Enum.PlaybackState.Paused
+	D.Pause = function(s)
+		if finished then return end
+		paused = true
+		s.PlaybackState = Enum.PlaybackState.Paused
 	end
-	D.Cancel = function(q)
-		if u then
-			return
-		end
-		r = true
-		F(Enum.PlaybackState.Cancelled)
+	D.Cancel = function()
+		finish(Enum.PlaybackState.Cancelled)
 	end
-	D.Destroy = function(q)
-		q:Cancel()
+	D.Destroy = function(s)
+		s:Cancel()
 	end
+
 	y[J] = D
 	getgenv()[c] = D
-	P = P + (1)
+	P = P + 1
 	l(true)
 	getgenv().noclip = true
+
+	-- noclip thuyền + nhân vật
 	do
-		local nc_parts, nc_next = {}, 0
+		local parts, nextScan = {}, 0
 		noclipConn = x.Stepped:Connect(function()
-			if u or not J.Parent then
+			if finished or not J.Parent then
 				return
 			end
-			if tick() >= nc_next then
-				nc_next = tick() + 0.5
-				nc_parts = {}
-				local boat = J.Parent
-				while boat and boat.Parent and boat.Parent.Name ~= "Boats" and boat.Parent ~= workspace do
-					boat = boat.Parent
+			if tick() >= nextScan then
+				nextScan = tick() + 0.5
+				parts = {}
+				local b = J.Parent
+				while b and b.Parent and b.Parent.Name ~= "Boats" and b.Parent ~= workspace do
+					b = b.Parent
 				end
-				if boat then
-					for _, d in ipairs(boat:GetDescendants()) do
-						if d:IsA("BasePart") then
-							nc_parts[#nc_parts + 1] = d
-						end
-					end
-				end
-				local ch = t and t.Character
-				if ch then
-					for _, d in ipairs(ch:GetDescendants()) do
-						if d:IsA("BasePart") then
-							nc_parts[#nc_parts + 1] = d
+				for _, src in ipairs({ b, t.Character }) do
+					if src then
+						for _, d in ipairs(src:GetDescendants()) do
+							if d:IsA("BasePart") then
+								parts[#parts + 1] = d
+							end
 						end
 					end
 				end
 			end
-			for i = 1, #nc_parts do
-				local part = nc_parts[i]
-				if part.CanCollide then
-					part.CanCollide = false
+			for i = 1, #parts do
+				if parts[i].CanCollide then
+					parts[i].CanCollide = false
 				end
 			end
 		end)
 	end
-	task.spawn(function()
-		while not r and not u and J.Parent do
-			local l = x.Heartbeat:Wait()
-			if not n then
-				local y = t.Character and (t.Character:FindFirstChildOfClass("Humanoid"))
-				if not y or y.SeatPart ~= J then
-					WarnOnce(
-						"BoatNotSeated",
-						"Chua ngoi tren ghe thuyen nen server khong nhan vi tri tween. Da dung tween."
-					)
-					F(Enum.PlaybackState.Cancelled)
-					break
-				end
-				if D.Level then
-					-- chi khi co player ngoi phao: trong 3000 cua Tiki = Y 1000, ngoai 3000 = Y 160
-					local wantY = nil
-					if BoatHasPassenger(J) then
-						local nearTiki = game.PlaceId == getgenv().CheckPlaceId and flatDist(J.Position, TIKI_POS) < TIKI_AVOID_R
-						wantY = nearTiki and 1000 or 160
+
+	-- đích hiệu dụng: có người trên pháo -> giữ Y 160 (gần Tiki 1000), né vùng Tiki
+	local function effective()
+		local tgt = D.Target
+		local rot = tgt - tgt.Position
+		if BoatHasPassenger(J) then
+			local sea3 = game.PlaceId == getgenv().CheckPlaceId
+			local nearTiki = sea3 and flatDist(J.Position, TIKI_POS) < TIKI_AVOID_R
+			if D.Level then
+				local yy = nearTiki and 1000 or 160
+				return CFrame.new(tgt.X, yy, tgt.Z) * rot, yy
+			end
+			if sea3 then
+				if not lifted then
+					if nearTiki and flatDist(tgt.Position, TIKI_POS) > TIKI_AVOID_R then
+						lifted, baseY = true, J.Position.Y
 					end
-					if wantY ~= levelY then
-						levelY = wantY
-						if wantY then
-							bvHold(true)
-							holdUntil = tick() + 1
-							W = CFrame.new(J.Position.X, wantY, J.Position.Z) * (J.CFrame - J.CFrame.Position)
-							J.CFrame = W
-							J.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-							J.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-						else
-							task.delay(1, function()
-								if not levelY then
-									bvHold(false)
-								end
-							end)
-						end
-					end
-				elseif game.PlaceId == getgenv().CheckPlaceId and BoatHasPassenger(J) then
-					local tgt = D.Target.Position
-					local hz = flatDist(J.Position, TIKI_POS)
-					if not liftedHigh then
-						if hz < TIKI_AVOID_R and flatDist(tgt, TIKI_POS) > TIKI_AVOID_R then
-							liftedHigh = true
-							baseY = J.Position.Y
-							bvHold(true)
-							holdUntil = tick() + 1
-							W = CFrame.new(J.Position.X, baseY + TIKI_LIFT_Y, J.Position.Z) * (J.CFrame - J.CFrame.Position)
-							J.CFrame = W
-							J.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-							J.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-						end
-					elseif hz >= TIKI_AVOID_R + 200 or flatDist(J.Position, tgt) < 50 then
-						liftedHigh = false
-						bvHold(true)
-						holdUntil = tick() + 1
-						W = CFrame.new(J.Position.X, tgt.Y, J.Position.Z) * (J.CFrame - J.CFrame.Position)
-						J.CFrame = W
-						J.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-						J.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-						task.delay(1.5, function()
-							if not liftedHigh then
-								bvHold(false)
-							end
-						end)
-					end
+				elseif flatDist(J.Position, TIKI_POS) >= TIKI_AVOID_R + 200 or flatDist(J.Position, tgt.Position) < 50 then
+					lifted = false
 				end
-				if tick() < holdUntil then
-					J.CFrame = W
-					J.AssemblyLinearVelocity = Vector3.new(0.0, 0.0, 0.0)
-					J.AssemblyAngularVelocity = Vector3.new(0.0, 0.0, 0.0)
-				else
-				local y, P = math.min(D.Speed, Y.cap), (levelY and (CFrame.new(D.Target.Position.X, levelY, D.Target.Position.Z) * (D.Target - D.Target.Position)) or (liftedHigh and (CFrame.new(D.Target.Position.X, baseY + TIKI_LIFT_Y, D.Target.Position.Z) * (D.Target - D.Target.Position)) or D.Target))
-				local q, c = (P.Position - W.Position).Magnitude, y * l
-				if (J.Position - W.Position).Magnitude > math.max(20, c * 3) then
-					Y.lastHit = tick()
-					Y.ceiling = math.max(y * 0.9, 150)
-					Y.cap = math.max(y * 0.7, 100)
-					Y.nextRaise = tick() + math.max(C() * 4, 1)
-					W = J.CFrame
-					c, q = Y.cap * l, (P.Position - W.Position).Magnitude
-				elseif q > c and Y.cap < D.Speed and tick() >= Y.nextRaise then
-					if tick() - (Y.lastHit or 0) > 8 then
-						Y.ceiling = Y.ceiling * 1.15
-					end
-					Y.cap = math.min(Y.cap * 1.12, Y.ceiling)
-					Y.nextRaise = tick() + math.max(C() * 4, 0.75)
-				end
-				if q <= c or q <= H then
-					W = P
-					J.CFrame = P
-					J.AssemblyLinearVelocity = Vector3.new(0.0, 0.0, 0.0)
-					J.AssemblyAngularVelocity = Vector3.new(0.0, 0.0, 0.0)
-					F(Enum.PlaybackState.Completed)
-					break
-				end
-				W = W:Lerp(P, c / q)
-				J.CFrame = W
-				J.AssemblyLinearVelocity = Vector3.new(0.0, 0.0, 0.0)
-				J.AssemblyAngularVelocity = Vector3.new(0.0, 0.0, 0.0)
+				if lifted then
+					local yy = baseY + TIKI_LIFT_Y
+					return CFrame.new(tgt.X, yy, tgt.Z) * rot, yy
 				end
 			end
 		end
-		if not u then
-			F(Enum.PlaybackState.Cancelled)
+		return tgt, nil
+	end
+
+	task.spawn(function()
+		while not finished and J.Parent do
+			local dt = x.Heartbeat:Wait()
+			if not paused then
+				local hum = t.Character and t.Character:FindFirstChildOfClass("Humanoid")
+				if not hum or hum.SeatPart ~= J then
+					WarnOnce("BoatNotSeated", "Chua ngoi tren ghe thuyen nen server khong nhan vi tri tween. Da dung tween.")
+					finish(Enum.PlaybackState.Cancelled)
+					break
+				end
+
+				local E, ov = effective()
+				-- đổi chế độ độ cao -> snap Y ngay (không bay chéo)
+				if ov ~= lastOv then
+					local ny = ov or E.Y
+					W = CFrame.new(W.X, ny, W.Z) * (W - W.Position)
+					lastOv = ov
+				end
+				if (J.Position - W.Position).Magnitude > 100 then
+					W = J.CFrame -- bị server kéo lại -> đồng bộ lại
+				end
+
+				local diff = E.Position - W.Position
+				local d = diff.Magnitude
+				local step = math.min(D.Speed, 4000) * dt
+				if d <= step or d <= H then
+					W = E
+					place(E)
+					finish(Enum.PlaybackState.Completed)
+					break
+				end
+				W = W:Lerp(E, step / d)
+				place(W)
+			end
+		end
+		if not finished then
+			finish(Enum.PlaybackState.Cancelled)
 		end
 	end)
 	return D
