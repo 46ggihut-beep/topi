@@ -8996,7 +8996,7 @@ TakeQuestLevel = function()
 		return
 	end
 	if (H - B.Position).Magnitude <= 8 and C.Health > 0 then
-		wait(2)
+		wait(0.3)
 		CommF:InvokeServer("StartQuest", tostring(V.QuestName), V.Id)
 	else
 		toTarget(CFrame.new(H) * CFrame.new(0, 4, 2), true)
@@ -9135,8 +9135,8 @@ function QuestBoneAndkatakuri(V, H)
 	end
 	if (B.Position - C.Position).Magnitude <= 8 then
 		if J.Health > 0 then
+			task.wait(0.3)
 			CommF:InvokeServer("StartQuest", V, H)
-			task.wait(0.5)
 		end
 	else
 		toTarget(B * CFrame.new(0, 4, 2), true)
@@ -9656,7 +9656,7 @@ function FarmMethod()
 						or (DetectMob(f))
 						or not Settings["Start Farm"]
 						or not StackFarm
-					wait(0.2)
+					wait(0.4)
 				end
 			else
 				local Y = DetectPartSpawnMob(f, true)
@@ -9669,7 +9669,7 @@ function FarmMethod()
 						or (DetectMob(f))
 						or not Settings["Start Farm"]
 						or not StackFarm
-					wait(0.2)
+					wait(0.4)
 				else
 					DeleteIgnoredMobSpawn()
 				end
