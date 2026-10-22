@@ -3551,6 +3551,7 @@ TopiHub = TopiHub or {
 	Cache = {},
 	LastHop = 0,
 	Busy = false,
+	Delay = 5, -- giay cho truoc khi join server tu API (tat toggle hop trong luc cho de huy)
 }
 
 function TopiHub.Request(method, path, body)
@@ -3584,10 +3585,10 @@ function TopiHub.Remove(name)
 	TopiHub.Request("POST", "/remove", { jobId = game.JobId, name = name })
 end
 
--- Doc danh sach server tu API (cache 10s de khong spam)
+-- Doc danh sach server tu API (cache 3s de khong bi du lieu cu)
 function TopiHub.Fetch(name)
 	local c = TopiHub.Cache[name]
-	if c and tick() - c.t < 10 then
+	if c and tick() - c.t < 3 then
 		return c.list
 	end
 	local body = TopiHub.Request("GET", "/api/" .. game:GetService("HttpService"):UrlEncode(name))
@@ -3604,68 +3605,106 @@ function TopiHub.Fetch(name)
 	return list
 end
 
--- Doc API roi hop bang logic co san (__ServerBrowser teleport + BF_HopTried)
--- Tra ve true  = da teleport / dang doi teleport
+-- Chon jobId hop le dau tien trong danh sach (jobId la du lieu tu ben ngoai nen kiem tra ky)
+function TopiHub.Pick(list)
+	for _, s in ipairs(list) do
+		local id = tostring(s.jobId or "")
+		if
+			id ~= game.JobId
+			and #id > 0
+			and #id <= 64
+			and id:match("^[%w%-]+$")
+			and tonumber(s.placeId) == game.PlaceId
+			and (tonumber(s.players) or 0) < (tonumber(s.maxPlayers) or game.Players.MaxPlayers)
+			and tick() - (BF_HopTried[id] or 0) > 120
+		then
+			return id
+		end
+	end
+end
+
+-- Thu tu: thong bao -> cho TopiHub.Delay giay (stop() = true thi huy) -> HET DELAY moi doc API -> hop
+-- Tra ve true  = da teleport / bi huy / dang cho
 --        false = API rong, loi, hoac khong co server hop le
 function TopiHub.Hop(name, stop)
-	if TopiHub.Busy or tick() - TopiHub.LastHop < 10 then
+	if TopiHub.Busy or tick() - TopiHub.LastHop < 10 or tick() < (TopiHub.EmptyUntil or 0) then
 		return true
+	end
+	local function stopped()
+		if type(stop) ~= "function" then
+			return false
+		end
+		local ok, r = pcall(stop)
+		return ok and r and true or false
 	end
 	TopiHub.Busy = true
 	local ok, done = pcall(function()
+		-- 1) thong bao truoc, chua dung toi API
+		pcall(function()
+			require(game:GetService("ReplicatedStorage").Notification)
+				.new("<Color=Red>TopiHub : Hop sau " .. TopiHub.Delay .. "s, tat toggle de huy<Color=/>")
+				:Display()
+		end)
+		-- 2) delay: nguoi choi con thoi gian tat hop
+		local t0 = tick()
+		while tick() - t0 < TopiHub.Delay do
+			if stopped() then
+				return true -- da tat hop / da du dieu kien -> huy, khong doc API
+			end
+			task.wait(0.25)
+		end
+		if stopped() then
+			return true
+		end
+		-- 3) het delay moi doc API va chon server
+		TopiHub.Cache[name] = nil
 		local list = TopiHub.Fetch(name)
-		if not list then
+		local id = list and TopiHub.Pick(list)
+		if not id then
+			TopiHub.EmptyUntil = tick() + 15 -- API rong: nghi 15s roi moi thong bao/thu lai
 			return false
 		end
-		for _, s in ipairs(list) do
-			if type(stop) == "function" and stop() then
-				return true
-			end
-			local id = tostring(s.jobId or "")
-			if
-				id ~= game.JobId
-				and #id > 0
-				and #id <= 64
-				and id:match("^[%w%-]+$") -- jobId la du lieu tu ben ngoai, kiem tra truoc khi dung
-				and tonumber(s.placeId) == game.PlaceId
-				and (tonumber(s.players) or 0) < (tonumber(s.maxPlayers) or game.Players.MaxPlayers)
-				and tick() - (BF_HopTried[id] or 0) > 120
-			then
-				BF_HopTried[id] = tick()
-				TopiHub.LastHop = tick()
-				game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", id)
-				pcall(function()
-					getgenv().limit_type("clearAll")
-				end)
-				return true
-			end
-		end
-		return false
+		-- 4) hop
+		BF_HopTried[id] = tick()
+		TopiHub.LastHop = tick()
+		game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", id)
+		pcall(function()
+			getgenv().limit_type("clearAll")
+		end)
+		return true
 	end)
 	TopiHub.Busy = false
 	return ok and done or false
 end
 
--- Bao server hien tai len API khi co Elite / Cake Prince (khong phu thuoc toggle)
+-- Kiem tra moi 3s. Chi goi API khi trang thai doi (co/het) + bao lai moi 45s khi con
+-- (tranh vuot gioi han 60 request/phut cua API khi mo nhieu cua so Roblox)
 task.spawn(function()
-	task.wait(12) -- kiem tra ngay sau khi vao server (de acc dang hop van bao duoc moi server)
+	task.wait(3)
 	local checks = {
 		{ "Elite", function() return DetectEliteHunter() end },
 		{ "Cake Prince", function() return CheckNameBoss("Cake Prince") end },
 	}
+	local lastSent = {}
 	while true do
 		for _, c in ipairs(checks) do
-			pcall(function()
-				if c[2]() then
-					TopiHub.Reported[c[1]] = true
-					TopiHub.Report(c[1])
-				elseif TopiHub.Reported[c[1]] then
-					TopiHub.Reported[c[1]] = nil
-					TopiHub.Remove(c[1]) -- boss/elite het -> go khoi danh sach
+			local name = c[1]
+			local okc, has = pcall(c[2])
+			if okc then
+				if has then
+					if not TopiHub.Reported[name] or tick() - (lastSent[name] or 0) >= 45 then
+						TopiHub.Reported[name] = true
+						lastSent[name] = tick()
+						task.spawn(TopiHub.Report, name)
+					end
+				elseif TopiHub.Reported[name] then
+					TopiHub.Reported[name] = nil
+					lastSent[name] = nil
+					task.spawn(TopiHub.Remove, name) -- vua giet xong -> go khoi API ngay
 				end
-			end)
+			end
 		end
-		task.wait(45)
+		task.wait(3)
 	end
 end)
 
