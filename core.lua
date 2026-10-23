@@ -5549,7 +5549,7 @@ local function H()
 end
 -- Tween người chơi: logic TweenService Linear giống TweenTo của Topi SeaEvent
 -- (dùng lại TweenManager.PlayTween có sẵn: hủy tween cũ, dedupe theo đích)
-local function B(Z, C, J, F)
+local function B(Z, C, J, F, skipBoat)
 	if not Z or typeof(C) ~= "CFrame" then
 		return
 	end
@@ -5561,6 +5561,18 @@ local function B(Z, C, J, F)
 
 	J = math.max(tonumber(J) or 350, 1) -- speed (stud/s)
 	F = tonumber(F) or 2.5 -- epsilon
+
+	-- [BoatTween] toggle "Use Boat Tween": chang xa -> mua thuyen, ngoi, tween thuyen toi gan dich
+	if not skipBoat and Settings["Use Boat Tween"] and getgenv().BoatTween then
+		local okb, handled = pcall(getgenv().BoatTween.Hook, Z, C, J, F, B, G or ReadyToDodge)
+		if not okb and type(WarnOnce) == "function" then
+			WarnOnce("BoatTweenErr", "[BoatTween] " .. tostring(handled))
+		end
+		if okb and handled then
+			return
+		end
+	end
+
 	k.LastTP, k.LastCF = tick(), C
 
 	local dist = (C.Position - Z.Position).Magnitude
@@ -5600,6 +5612,306 @@ local function B(Z, C, J, F)
 	end
 	return tw
 end
+
+-- ===================== [BoatTween] Use Boat Tween =====================
+-- Hook nam trong B (tween nguoi choi) nen ap dung cho ca dich cuoi lan tele trung gian.
+--  * Muc tieu cach > 500 stud (mat phang ngang) va dich khong nam trong 1000 stud cua Boat Dealer gan nhat -> mua thuyen
+--  * Tween toi Boat Dealer gan nhat -> BuyBoat -> ngoi vao -> tween thuyen toi dich
+--  * Con cach dich <= 500 stud -> nhay xuong, tween thuong de farm
+--  * Chi tac dong khi chinh no dang cam thuyen (session). Thuyen cua cac tinh nang khac khong bi dung toi
+getgenv().BoatTween = (function()
+	local BOAT_NAME = "PirateGrandBrigade" -- ten remote cua GrandBrigade (khop voi code Sea Event)
+	local DEALER_KEY = "Boat Dealer"
+	local DISMOUNT_DIST = 500 -- con cach dich bay nhieu thi nhay xuong
+	local DEALER_SKIP_DIST = 1000 -- dich gan dealer <= 1000 thi khong mua
+	local REUSE_DIST = 300 -- thuyen cua minh o gan hon muc nay thi dung lai, khong mua moi
+	local lp = game:GetService("Players").LocalPlayer
+	local RS = game:GetService("ReplicatedStorage")
+	local VIM = game:GetService("VirtualInputManager")
+	local st = { busy = false, session = nil, riding = false, seaY = nil, cool = 0, drive = 0, sitUntil = 0, dealers = {}, scanAt = 0 }
+	local M = {}
+
+	local function flat(a, b)
+		return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+	end
+	-- thuyen khong di duoc: tren troi, duoi nuoc sau, vung X > 40000
+	local function zoneOk(p)
+		return p.Y > -100 and p.Y < 1500 and p.X < 40000
+	end
+
+	local function scanDealers()
+		if tick() < st.scanAt then
+			return st.dealers
+		end
+		st.scanAt = tick() + 3
+		local list = {}
+		for _, folder in ipairs({ workspace:FindFirstChild("NPCs"), RS:FindFirstChild("NPCs") }) do
+			if folder then
+				for _, n in ipairs(folder:GetChildren()) do
+					if n.Name:find(DEALER_KEY, 1, true) and not n.Name:find("Luxury", 1, true) then
+						local ok, pos = pcall(function()
+							local r = n:FindFirstChild("HumanoidRootPart")
+							return r and r.Position or n:GetPivot().Position
+						end)
+						if ok and pos then
+							list[#list + 1] = pos
+						end
+					end
+				end
+			end
+		end
+		if #list > 0 then
+			st.dealers = list
+		end
+		return st.dealers
+	end
+
+	local function nearestDealer(pos)
+		local best, bd
+		for _, d in ipairs(scanDealers()) do
+			local m = (d - pos).Magnitude
+			if not bd or m < bd then
+				best, bd = d, m
+			end
+		end
+		return best, bd
+	end
+
+	-- thuyen cua minh (gan nearPos nhat, trong maxDist neu co)
+	local function myBoat(nearPos, maxDist)
+		local boats = workspace:FindFirstChild("Boats")
+		if not boats then
+			return
+		end
+		local best, bd
+		for _, b in ipairs(boats:GetChildren()) do
+			if b:IsA("Model") then
+				local o, h, seat = b:FindFirstChild("Owner"), b:FindFirstChild("Humanoid"), b:FindFirstChild("VehicleSeat")
+				if o and seat and tostring(o.Value) == lp.Name and (not h or h.Value > 0) then
+					local m = nearPos and (seat.Position - nearPos).Magnitude or 0
+					if (not maxDist or m <= maxDist) and (not bd or m < bd) then
+						best, bd = b, m
+					end
+				end
+			end
+		end
+		return best
+	end
+
+	-- dich la thuyen / gan thuyen (ghe, engine, thuyen dich...) -> de cac tinh nang khac tu xu ly
+	local function nearAnyBoat(p)
+		local boats = workspace:FindFirstChild("Boats")
+		if boats then
+			for _, b in ipairs(boats:GetChildren()) do
+				local ok, pv = pcall(function()
+					return b:GetPivot().Position
+				end)
+				if ok and (pv - p).Magnitude < 150 then
+					return true
+				end
+			end
+		end
+		return false
+	end
+
+	local function cancelBoat()
+		local tb = getgenv().TweenBoat
+		if tb then
+			pcall(function()
+				tb:Cancel()
+			end)
+		end
+	end
+
+	local function clearSession()
+		st.session, st.riding, st.seaY = nil, false, nil
+	end
+
+	local function dismount(hum, hrp)
+		cancelBoat()
+		clearSession()
+		pcall(function()
+			VIM:SendKeyEvent(true, "Space", false, game)
+			task.wait()
+			VIM:SendKeyEvent(false, "Space", false, game)
+		end)
+		hum.Jump = true
+		local t0 = tick()
+		while hum.SeatPart and tick() - t0 < 1 do
+			task.wait()
+		end
+		if hum.SeatPart then
+			hum.Sit = false
+		end
+		task.wait(0.1)
+		if hrp.Parent then
+			hrp.CFrame = hrp.CFrame * CFrame.new(0, 10, 0)
+		end
+		-- tra lai va cham / tat noclip (giong nhanh Sit goc cua toTarget)
+		getgenv().noclip = false
+		pcall(function()
+			for _, p in ipairs(lp.Character:GetDescendants()) do
+				if p:IsA("BasePart") then
+					p.CanCollide = true
+				end
+			end
+		end)
+		TweenManager.CancelCurrent()
+	end
+
+	-- toTarget dung de biet co nen giu nguoi choi tren thuyen (khong nhay xuong) hay khong
+	function M.OwnsSeat(hum)
+		local b = st.session
+		if not b or not hum or not b.Parent then
+			return false
+		end
+		local seat = hum.SeatPart
+		if not (seat and seat.Parent == b) then
+			return false
+		end
+		-- lau khong co lenh tween nao (vd. luong khac dang xu ly rieng) -> tra quyen cho toTarget
+		return tick() - st.drive < 4
+	end
+
+	function M.Reset()
+		cancelBoat()
+		clearSession()
+		st.busy = false
+		st.cool = 0
+	end
+
+	-- tra true = da xu ly (B khong tween nguoi choi nua)
+	function M.Hook(hrp, cf, speed, eps, B, dodge)
+		if dodge or not Settings["Use Boat Tween"] then
+			return false
+		end
+		local char = lp.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if not hum or hum.Health <= 0 or hrp.Parent ~= char then
+			return false
+		end
+		if st.busy then
+			return true
+		end
+		local tpos, hp = cf.Position, hrp.Position
+		local seat = hum.SeatPart
+		if st.session and not st.session.Parent then
+			clearSession()
+		end
+
+		-- A. dang ngoi tren thuyen cua session -> tween thuyen
+		if st.session and seat and seat.Parent == st.session then
+			st.riding, st.drive = true, tick()
+			st.seaY = st.seaY or seat.Position.Y
+			local ff = hrp:FindFirstChild("FloatForce")
+			if ff then
+				ff:Destroy()
+			end
+			TweenManager.CancelTweenOnly()
+			if flat(seat.Position, tpos) <= DISMOUNT_DIST or not zoneOk(tpos) then
+				st.busy = true
+				pcall(dismount, hum, hrp)
+				st.busy = false
+				return true
+			end
+			local bspeed = tonumber(Settings["Value Speed Tween Boat"]) or 350
+			pcall(
+				manageTween,
+				seat,
+				CFrame.new(tpos.X, st.seaY, tpos.Z) * (seat.CFrame - seat.Position),
+				bspeed,
+				"TweenBoat"
+			)
+			return true
+		end
+
+		-- B. khong ngoi tren thuyen cua session
+		if st.riding then
+			clearSession() -- vua xuong thuyen
+		end
+		if seat then
+			return false -- dang ngoi cho khac (thuyen cua tinh nang khac...)
+		end
+		if flat(hp, tpos) <= DISMOUNT_DIST then
+			clearSession()
+			return false
+		end
+		if tick() < st.cool or not zoneOk(hp) or not zoneOk(tpos) or nearAnyBoat(tpos) then
+			return false
+		end
+
+		local pspeed = math.max(tonumber(Settings["Speed Tween "]) or 300, 1)
+		local bspeed = math.max(tonumber(Settings["Value Speed Tween Boat"]) or 350, 1)
+		local boat = st.session or myBoat(hp, REUSE_DIST)
+		local bseat = boat and boat:FindFirstChild("VehicleSeat")
+		local dealer
+		if not bseat then
+			boat = nil
+			dealer = nearestDealer(hp)
+			if not dealer or flat(dealer, tpos) <= DEALER_SKIP_DIST then
+				return false
+			end
+		end
+
+		-- chi tinh loi/lo luc moi bat dau (da vao session thi di tiep)
+		if not st.session then
+			local pick = bseat and bseat.Position or dealer
+			local tDirect = flat(hp, tpos) / pspeed
+			local tBoat = flat(hp, pick) / pspeed
+				+ (bseat and 0 or 4)
+				+ math.max(flat(pick, tpos) - DISMOUNT_DIST, 0) / bspeed
+				+ DISMOUNT_DIST / pspeed
+			if tBoat >= tDirect then
+				return false
+			end
+		end
+
+		if bseat then
+			-- ra ghe thuyen, cham vao la tu ngoi
+			if st.session ~= boat then
+				st.session, st.riding, st.seaY, st.sitUntil = boat, false, nil, tick() + 20
+			elseif tick() > st.sitUntil then
+				clearSession()
+				st.cool = tick() + 30
+				return false
+			end
+			st.drive = tick() -- giu quyen OwnsSeat luc vua ngoi vao, neu khong toTarget se nhay xuong ngay
+			B(hrp, bseat.CFrame, pspeed, 4, true)
+			return true
+		end
+
+		-- toi Boat Dealer gan nhat
+		if (hp - dealer).Magnitude > 15 then
+			B(hrp, CFrame.new(dealer), pspeed, 8, true)
+			return true
+		end
+		-- toi noi -> mua thuyen
+		st.busy = true
+		TweenManager.CancelTweenOnly()
+		pcall(function()
+			RS.Remotes.CommF_:InvokeServer("BuyBoat", BOAT_NAME)
+		end)
+		local t0, nb = tick(), nil
+		repeat
+			task.wait(0.25)
+			nb = myBoat(dealer, 400)
+		until nb or tick() - t0 > 6
+		st.busy = false
+		if not nb then
+			st.cool = tick() + 20
+			if type(WarnOnce) == "function" then
+				WarnOnce("BoatTweenBuy", "[BoatTween] Mua thuyen that bai (thieu tien / sai ten boat?). Tween thuong 20s.")
+			end
+			return false
+		end
+		st.session, st.riding, st.seaY, st.sitUntil = nb, false, nil, tick() + 20
+		st.drive = tick()
+		return true
+	end
+
+	return M
+end)()
+-- =====================================================================
 
 do
 	local Sea1Gate = {}
@@ -6516,7 +6828,9 @@ function toTarget(P, e)
 		return
 	end
 	k.LastCall = tick()
-	if Z and Z.Sit then
+	local ownSeat = not G and not ReadyToDodge and Settings["Use Boat Tween"] and getgenv().BoatTween
+		and getgenv().BoatTween.OwnsSeat(Z)
+	if Z and Z.Sit and not ownSeat then
 		TweenManager.CancelCurrent()
 		task.wait(0.1)
 		getgenv().noclip = false
@@ -6532,7 +6846,7 @@ function toTarget(P, e)
 		H.CFrame = H.CFrame * CFrame.new(0, 10, 0)
 		return
 	end
-	if not H:FindFirstChild("FloatForce") then
+	if not H:FindFirstChild("FloatForce") and not ownSeat then
 		y(H)
 	end
 	do
@@ -8251,6 +8565,19 @@ SettingFarmMainSection.CreateToggle(
 	{ Title = "Use Submarine Teleport", Desc = nil, Default = Settings["Use Submarine Teleport"] or false },
 	function(I)
 		SaveSettings("Use Submarine Teleport", I)
+	end
+)
+SettingFarmMainSection.CreateToggle(
+	{
+		Title = "Use Boat Tween",
+		Desc = "Tween xa: mua GrandBrigade o Boat Dealer gan nhat, lai thuyen toi cach dich 500 stud roi nhay xuong. Toc do thuyen = Value Speed Tween Boat",
+		Default = Settings["Use Boat Tween"] or false,
+	},
+	function(I)
+		SaveSettings("Use Boat Tween", I)
+		if not I and getgenv().BoatTween then
+			pcall(getgenv().BoatTween.Reset)
+		end
 	end
 )
 SettingFarmMainSection.CreateSlider(
