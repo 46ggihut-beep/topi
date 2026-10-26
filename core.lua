@@ -1241,7 +1241,7 @@ local A = (function()
 			SubTitle = "Blox Fruit by wzarii",
 			Size = UDim2.fromOffset(620, 460),
 			TabWidth = 180,
-			MinimizeKey = Enum.KeyCode.LeftAlt,
+			MinimizeKey = Enum.KeyCode.LeftControl,
 			ToggleImage = LOGO,
 		})
 		API.Library = Library
@@ -1254,7 +1254,7 @@ local A = (function()
 			pcall(function()
 				Library:Notify({
 					Title = "Topi Hub",
-					Content = "Bam logo hoac phim LeftAlt de an / hien GUI.",
+					Content = "Bam logo hoac phim LeftControl de an / hien GUI.",
 					Duration = 5,
 				})
 			end)
@@ -30799,7 +30799,7 @@ a.CreateButton({ Title = "Copy Config" }, function()
 	setclipboard(b((HttpService:JSONDecode(readfile(FolderName .. "/" .. SaveFileName)))))
 	A.CreateNoti({ Title = "Banana Cat Hub", Desc = "Successfully Copy Config", ShowTime = 5 })
 end)
-a.CreateBind({ Title = "Toggle GUI", Key = Enum.KeyCode.LeftAlt }, function()
+a.CreateBind({ Title = "Toggle GUI", Key = Enum.KeyCode.LeftControl }, function()
 	-- TopiUI: phim an/hien do cua so tu xu ly qua Window.MinimizeKey (adapter dat tu o Toggle GUI)
 	if A.Window then
 		pcall(function()
