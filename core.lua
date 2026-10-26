@@ -316,11 +316,35 @@ function FruitFarmY()
 	if TRexAuraOn() then
 		return 15
 	end
-	return getgenv().YPosFruit or 20
+	return getgenv().YPosFruit or 25
 end
 function BuddhaFarmY()
 	if TRexAuraOn() then
 		return 15
+	end
+	-- Buddha V2 has FakeHead; Buddha V1 uses the yellow Body Colors appearance.
+	local ch = t and (workspace:FindFirstChild("Characters") and workspace.Characters:FindFirstChild(t.Name) or t.Character)
+	if ch then
+		if ch:FindFirstChild("FakeHead") then
+			return 30
+		end
+		local bc = ch:FindFirstChild("Body Colors")
+		if bc then
+			local ok, yellow = pcall(function()
+				local function isYellow(c)
+					return typeof(c) == "Color3"
+						and math.floor(c.R * 255 + 0.5) == 255
+						and math.floor(c.G * 255 + 0.5) == 255
+						and math.floor(c.B * 255 + 0.5) == 0
+				end
+				return isYellow(bc.HeadColor3) and isYellow(bc.TorsoColor3)
+					and isYellow(bc.LeftArmColor3) and isYellow(bc.RightArmColor3)
+					and isYellow(bc.LeftLegColor3) and isYellow(bc.RightLegColor3)
+			end)
+			if ok and yellow then
+				return 20
+			end
+		end
 	end
 	return BuddhaFarmOn() and 30 or 20
 end
@@ -598,8 +622,8 @@ game:GetService("Players").LocalPlayer.Idled:connect(function()
 	vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
 end)
 function BF_LoadUILibrary()
-	local URL = "https://pastefy.app/vgSGtrbP/raw"
-	local CACHE = "Banana Cat Hub/ui_library_cache.lua"
+	local URL = "https://raw.githubusercontent.com/46ggihut-beep/TopiUI/refs/heads/main/TopiUI_Lib.lua"
+	local CACHE = "Banana Cat Hub/topiui_lib_cache.lua"
 	local lastErr = "unknown"
 	local function build(src)
 		if type(src) ~= "string" or #src < 200 then
@@ -641,7 +665,7 @@ function BF_LoadUILibrary()
 		else
 			lastErr = tostring(body)
 		end
-		warn(("[BananaFix] tai UI that bai (lan %d/6): %s"):format(attempt, lastErr))
+		warn(("[TopiFix] tai UI that bai (lan %d/6): %s"):format(attempt, lastErr))
 		task.wait(math.min(attempt, 3))
 	end
 	-- fallback: dung ban cache lan truoc
@@ -649,7 +673,7 @@ function BF_LoadUILibrary()
 	if okc then
 		local lib = build(cached)
 		if lib then
-			warn("[BananaFix] dung UI library tu cache")
+			warn("[TopiFix] dung UI library tu cache")
 			return lib
 		end
 	end
@@ -661,125 +685,27 @@ function BF_LoadUILibrary()
 			Duration = 10,
 		})
 	end)
-	error("[BananaFix] Khong tai duoc UI library: " .. tostring(lastErr), 0)
+	error("[TopiFix] Khong tai duoc UI library: " .. tostring(lastErr), 0)
 end
 local A = (function()
 	local Library = BF_LoadUILibrary()
+	local UIS = game:GetService("UserInputService")
 	local API = { Options = {} }
+	local Options = API.Options
+
+	-- Core tu luu config qua SaveSettings (theo tieu de), nen tat config rieng cua lib
+	-- de khong ghi de / trung file voi cac script Topi khac.
+	Library.AutoSave = false
+	Library.Settings = {}
 
 	local LOGO = "rbxassetid://77671524243147"
-	local PURPLE = Color3.fromRGB(150, 90, 255)
-	do
-		local U = getgenv().UIColor
-		if type(U) == "table" then
-			U["Logo Image"] = LOGO
-			U["Border Color"] = PURPLE
-			U["Title Text Color"] = PURPLE
-			U["Page Selected Color"] = PURPLE
-			U["Section Underline Color"] = PURPLE
-			U["Toggle Border Color"] = PURPLE
-			U["Button Color"] = PURPLE
-			U["Dropdown Selected Color"] = PURPLE
-			U["Textbox Highlight Color"] = PURPLE
-			U["Box Highlight Color"] = PURPLE
-			U["Slider Line Color"] = PURPLE
-			U["Search Icon Highlight Color"] = Color3.fromRGB(176, 128, 255)
-			U["Slider Highlight Color"] = Color3.fromRGB(176, 128, 255)
-			U["Dropdown Selected Check Color"] = Color3.fromRGB(120, 70, 215)
-			U["Background Main Color"] = Color3.fromRGB(18, 12, 30)
-			U["Background 1 Color"] = Color3.fromRGB(28, 18, 46)
-			U["Background 2 Color"] = Color3.fromRGB(40, 26, 64)
-			U["Background 3 Color"] = Color3.fromRGB(52, 34, 80)
-		end
-	end
 
-	local COLOR_MAP = {
-		["255,206,27"] = Color3.fromRGB(150, 90, 255),
-		["255,216,77"] = Color3.fromRGB(176, 128, 255),
-		["235,186,17"] = Color3.fromRGB(130, 70, 230),
-		["215,166,7"] = Color3.fromRGB(110, 50, 205),
-		["219,177,23"] = Color3.fromRGB(120, 70, 215),
-		["194,156,20"] = Color3.fromRGB(176, 128, 255),
-		["18,18,22"] = Color3.fromRGB(18, 12, 30),
-		["28,28,34"] = Color3.fromRGB(28, 18, 46),
-		["38,38,46"] = Color3.fromRGB(40, 26, 64),
-		["48,48,56"] = Color3.fromRGB(52, 34, 80),
-		["90,90,70"] = Color3.fromRGB(110, 80, 170),
-	}
-	local function remap(c)
-		if typeof(c) ~= "Color3" then
-			return nil
-		end
-		local k = math.floor(c.R * 255 + 0.5) .. "," .. math.floor(c.G * 255 + 0.5) .. "," .. math.floor(c.B * 255 + 0.5)
-		return COLOR_MAP[k]
+	-- lib bat buoc moi element co idx duy nhat (Library.Options[idx]); tieu de co the trung nen them so thu tu
+	local uid = 0
+	local function nextIdx(title)
+		uid = uid + 1
+		return title .. "#" .. uid
 	end
-	local function recolor(inst)
-		pcall(function()
-			if inst:IsA("GuiObject") then
-				local n = remap(inst.BackgroundColor3)
-				if n then
-					inst.BackgroundColor3 = n
-				end
-			end
-			if inst:IsA("ImageLabel") or inst:IsA("ImageButton") then
-				local n = remap(inst.ImageColor3)
-				if n then
-					inst.ImageColor3 = n
-				end
-			end
-			if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
-				local n = remap(inst.TextColor3)
-				if n then
-					inst.TextColor3 = n
-				end
-			end
-			if inst:IsA("UIStroke") then
-				local n = remap(inst.Color)
-				if n then
-					inst.Color = n
-				end
-			end
-			if inst:IsA("UIGradient") then
-				local kps, changed = {}, false
-				for _, kp in ipairs(inst.Color.Keypoints) do
-					local n = remap(kp.Value)
-					if n then
-						changed = true
-					end
-					kps[#kps + 1] = ColorSequenceKeypoint.new(kp.Time, n or kp.Value)
-				end
-				if changed then
-					inst.Color = ColorSequence.new(kps)
-				end
-			end
-			if inst.Name == "TextLabelNoti" and inst:IsA("TextLabel") then
-				inst.Text = string.gsub(inst.Text, "Banana Cat Hub", "Topi Hub")
-			end
-		end)
-	end
-	pcall(function()
-		local cg = game:GetService("CoreGui")
-		for _, name in ipairs({ "Nousigi Hub GUI", "Nousigi Hub Notification", "Nousigi Hub Btn" }) do
-			local g = cg:FindFirstChild(name)
-			if g then
-				for _, d in ipairs(g:GetDescendants()) do
-					recolor(d)
-				end
-				g.DescendantAdded:Connect(function(d)
-					task.defer(recolor, d)
-				end)
-			end
-		end
-		local btn = cg:FindFirstChild("Nousigi Hub Btn")
-		if btn then
-			for _, d in ipairs(btn:GetDescendants()) do
-				if d:IsA("ImageLabel") then
-					d.Image = LOGO
-				end
-			end
-		end
-	end)
-	local Options = API.Options
 
 	local function pick(a, b)
 		if b ~= nil then
@@ -796,7 +722,7 @@ local A = (function()
 		task.defer(function()
 			local ok, err = pcall(cb, table.unpack(args, 1, args.n))
 			if not ok then
-				warn("[BananaUI] initial callback error:", err)
+				warn("[TopiUI] initial callback error:", err)
 			end
 		end)
 	end
@@ -825,31 +751,35 @@ local A = (function()
 		return names, states
 	end
 
-	local function controlCount()
-		local all = getgenv().AllControls
-		return all and #all or 0
+	-- Precise (slider cu) -> lay le thap phan: khoang ngan thi 2 chu so, khoang dai thi 1 chu so
+	local function roundingFor(precise, minV, maxV)
+		if not precise then
+			return 0
+		end
+		if (maxV - minV) <= 10 then
+			return 2
+		end
+		return 1
 	end
 
-	local function makeSection(gb, pageName, secName)
-		local sec = {}
-		local order = 0
-
-		local function stamp(n0, keepOrder)
-			local all = getgenv().AllControls
-			if all and #all > n0 then
-				local c = all[#all]
-				if c and c.Element then
-					if keepOrder then
-						c.Element.LayoutOrder = keepOrder
-					else
-						order = order + 1
-						c.Element.LayoutOrder = order
-					end
-					return c
-				end
-			end
-			return nil
+	-- thu tu hien thi cho slider dropdown (List la map nen mat thu tu): phim skill truoc, con lai theo ABC
+	local SKILL_RANK = { Z = 1, X = 2, C = 3, V = 4, F = 5 }
+	local function keyLess(a, b)
+		local ra, rb = SKILL_RANK[a], SKILL_RANK[b]
+		if ra and rb then
+			return ra < rb
 		end
+		if ra then
+			return true
+		end
+		if rb then
+			return false
+		end
+		return a < b
+	end
+
+	local function makeSection(box, pageName, secName)
+		local sec = {}
 
 		local function reg(title, kind, extra)
 			local o = extra or {}
@@ -864,22 +794,23 @@ local A = (function()
 			local title = tostring(s.Title or s.Text or "")
 			local default = (s.Default == true)
 			local opt = reg(title, "toggle", { value = default })
-			local n0 = controlCount()
-			local ret = gb:AddToggle(title, {
-				Text = title,
-				Desc = s.Desc or s.Description,
+			-- lib ban callback ngay luc tao (ca khi false); chan lai, chi giu hanh vi cu: default true thi fire 1 lan
+			local ready = false
+			local ret = box:AddToggle(nextIdx(title), {
+				Title = title,
+				Description = s.Desc or s.Description,
 				Default = default,
 				Callback = function(v)
 					opt.value = v
-					if cb then
+					if ready and cb then
 						cb(v)
 					end
 				end,
 			})
-			stamp(n0)
+			ready = true
 			local obj = {}
 			function obj.SetStage(a, b)
-				ret.SetStage(pick(a, b))
+				ret:SetValue(pick(a, b) and true or false)
 			end
 			opt.FunctionCreate = obj
 			if default then
@@ -891,43 +822,32 @@ local A = (function()
 		function sec.CreateButton(s, cb)
 			local title = tostring(s.Title or s.Text or "")
 			reg(title, "button", {})
-			local n0 = controlCount()
-			local ret = gb:AddButton({
+			box:AddButton({
 				Title = title,
+				Description = s.Desc or s.Description,
 				Callback = function()
 					if cb then
 						cb()
 					end
 				end,
 			})
-			stamp(n0)
-			local obj = {}
-			function obj.SetTitle(a, b)
-				if ret and ret.SetTitle then
-					ret:SetTitle(pick(a, b))
-				end
-			end
-			return obj
+			return {}
 		end
 
 		function sec.CreateLabel(s)
 			local title = tostring(s.Title or s.Text or "")
 			local opt = reg(title, "textlabel", { text = title })
-			local n0 = controlCount()
-			local ret = gb:AddLabel(title)
-			stamp(n0)
+			local ret = box:AddParagraph({ Title = title })
 			local obj = {}
 			function obj.SetText(a, b)
 				local t = tostring(pick(a, b))
 				opt.text = t
-				ret:SetText(t)
+				ret:SetTitle(t)
 			end
 			function obj.GetText()
 				return opt.text
 			end
-			function obj.SetColor(a, b)
-				ret.SetColor(pick(a, b))
-			end
+			function obj.SetColor() end -- lib moi khong co mau chu rieng cho label
 			opt.FunctionCreate = obj
 			return obj
 		end
@@ -937,28 +857,27 @@ local A = (function()
 			local minV = tonumber(s.Min) or 0
 			local maxV = tonumber(s.Max) or 100
 			local default = math.clamp(tonumber(s.Default) or minV, minV, maxV)
-			local opt = reg(title, "slider", { min = minV, max = maxV, step = 1, value = default })
-			local n0 = controlCount()
-			local rounding = getgenv().BC_SliderRounding
-			local ret = gb:AddSlider({
+			local rounding = roundingFor(s.Precise, minV, maxV)
+			local step = rounding > 0 and (10 ^ -rounding) or 1
+			local opt = reg(title, "slider", { min = minV, max = maxV, step = step, value = default })
+			local ready = false
+			local ret = box:AddSlider(nextIdx(title), {
 				Title = title,
 				Min = minV,
 				Max = maxV,
 				Default = default,
-				Precise = s.Precise,
-				Rouding = rounding,
 				Rounding = rounding,
 				Callback = function(v)
 					opt.value = v
-					if cb then
+					if ready and cb then
 						cb(v)
 					end
 				end,
 			})
-			stamp(n0)
+			ready = true
 			local obj = {}
 			function obj.SetValue(a, b)
-				ret.SetValue(pick(a, b))
+				ret:SetValue(pick(a, b), false, true)
 			end
 			opt.FunctionCreate = obj
 			fire(cb, default)
@@ -972,12 +891,12 @@ local A = (function()
 				default = tostring(default)
 			end
 			local opt = reg(title, "box", { value = default or "" })
-			local n0 = controlCount()
-			local ret = gb:AddInput(title, {
+			local ret = box:AddInput(nextIdx(title), {
 				Title = title,
 				Placeholder = s.Placeholder or "",
 				Numeric = (s.Number == true),
 				Default = default,
+				Finished = true, -- chi bao khi roi o nhap, tranh ghi file moi phim go
 				Callback = function(v)
 					opt.value = v
 					if cb then
@@ -985,10 +904,14 @@ local A = (function()
 					end
 				end,
 			})
-			stamp(n0)
 			local obj = {}
 			function obj.SetValue(a, b)
-				ret.SetValue(pick(a, b))
+				local v = tostring(pick(a, b))
+				ret:SetValue(v)
+				opt.value = v
+				if cb then
+					task.spawn(cb, v)
+				end
 			end
 			opt.FunctionCreate = obj
 			if default and default ~= "" then
@@ -997,34 +920,53 @@ local A = (function()
 			return obj
 		end
 
+		-- lib moi: Keybind chi la o chon phim (khong tu bao khi nhan phim).
+		-- "Toggle GUI" -> doi MinimizeKey cua cua so. Bind khac -> adapter tu nghe phim va goi cb.
 		function sec.CreateBind(s, cb)
 			local title = tostring(s.Title or s.Text or "")
-			local callback = cb
-			if title == "Toggle GUI" then
-				callback = function()
-					pcall(Library.ToggleUI)
-				end
+			local raw = s.Key or s.Default
+			local keyName = "LeftControl"
+			if typeof(raw) == "EnumItem" then
+				keyName = raw.Name
+			elseif type(raw) == "string" and raw ~= "" then
+				keyName = raw
 			end
-			local n0 = controlCount()
-			local ret = gb:AddKeyBind({
+			local guiToggle = (title == "Toggle GUI")
+			local current = keyName
+			local ret = box:AddKeybind(nextIdx(title), {
 				Title = title,
-				Key = s.Key or s.Default,
-				Mode = "Toggle",
-				Callback = function(...)
-					if callback then
-						callback(...)
+				Default = keyName,
+				Callback = function(name)
+					current = name
+					if guiToggle and API.Window then
+						API.Window.MinimizeKey = name
 					end
 				end,
 			})
-			stamp(n0)
+			if not guiToggle and cb then
+				UIS.InputBegan:Connect(function(input)
+					if Library.Unloaded then
+						return
+					end
+					if input.UserInputType ~= Enum.UserInputType.Keyboard then
+						return
+					end
+					if UIS:GetFocusedTextBox() or (Library.BindCount or 0) > 0 then
+						return
+					end
+					if input.KeyCode.Name == current then
+						task.spawn(cb)
+					end
+				end)
+			end
 			return ret or {}
 		end
 
+		-- dropdown chon nhieu: multi_toggle -> cb(name, on) moi lan doi; priority -> cb(danh sach theo thu tu chon)
 		local function multiDropdown(s, cb)
 			local title = tostring(s.Title or s.Text or "")
 			local prio = (s.Priority == true)
 			local names, states = normList(s.List)
-			local ord = {}
 			local init = {}
 			if prio then
 				if type(s.Default) == "table" then
@@ -1044,186 +986,186 @@ local A = (function()
 			end
 			local opt = reg(title, prio and "priority_dropdown" or "multi_toggle", {
 				list = names,
-				value = prio and {} or table.clone(states),
+				value = prio and table.clone(init) or table.clone(states),
 			})
-			local ctl, ret
-			local headerLabel, headerBusy, headerHooked = nil, false, nil
-			local refreshHeader
 
-			local function headerText()
-				if #ord == 0 then
-					return title .. ": "
+			local r
+			local silent = true -- true trong luc dung/ dat lai danh sach: khong bao callback
+			local prev = {}
+			local function setPrev(list)
+				prev = {}
+				for _, n in ipairs(list) do
+					prev[n] = true
 				end
-				return title .. ": " .. table.concat(ord, " > ")
 			end
+			setPrev(init)
 
-			-- thu vien: Search=true -> header la TextBox (hien qua PlaceholderText), Search=false -> TextLabel (Text)
-			local headerProp = "Text"
-			local function findHeader()
-				if headerLabel and headerLabel.Parent then
-					return headerLabel
-				end
-				local el = ctl and ctl.Element
-				if not el then
-					return nil
-				end
-				local d = el:FindFirstChild("TextColorPlaceholder", true)
-				if d and (d:IsA("TextBox") or d:IsA("TextLabel")) then
-					headerLabel = d
-					headerProp = d:IsA("TextBox") and "PlaceholderText" or "Text"
-					if headerHooked ~= d then
-						headerHooked = d
-						local prop = headerProp
-						d:GetPropertyChangedSignal(prop):Connect(function()
-							if not headerBusy and prio and d[prop] ~= headerText() then
-								headerBusy = true
-								pcall(function()
-									d[prop] = headerText()
-								end)
-								headerBusy = false
-							end
-						end)
+			r = box:AddDropdown(nextIdx(title), {
+				Title = title,
+				Values = names,
+				Multi = true,
+				ClickOrder = prio, -- priority: mo ta dropdown hien chuoi a -> b -> c theo thu tu chon
+				Default = init,
+				Callback = function(val)
+					if silent then
+						return
 					end
-					return d
-				end
-				return nil
-			end
-
-			refreshHeader = function()
-				if not prio then
-					return
-				end
-				local function apply()
-					local lbl = findHeader()
-					if lbl and lbl[headerProp] ~= headerText() then
-						headerBusy = true
-						pcall(function()
-							lbl[headerProp] = headerText()
-						end)
-						headerBusy = false
+					local changes = {}
+					for n in pairs(val) do
+						if not prev[n] then
+							changes[#changes + 1] = { n, true }
+						end
 					end
-				end
-				apply()
-				task.defer(apply)
-				task.delay(0.1, apply)
-			end
-
-			local function build(ns, initial, keepOrder)
-				local n0 = controlCount()
-				local r = gb:AddDropdown(title, {
-					Text = title,
-					Values = ns,
-					Search = s.Search,
-					Selected = true,
-					Callback = function(name, on)
-						if prio then
-							for i = #ord, 1, -1 do
-								if ord[i] == name then
-									table.remove(ord, i)
-								end
-							end
-							if on then
-								ord[#ord + 1] = name
-							end
-							opt.value = table.clone(ord)
-							refreshHeader()
-							if cb then
-								cb(table.clone(ord))
-							end
-						else
-							opt.value[name] = on and true or false
-							if cb then
-								cb(name, on)
+					for n in pairs(prev) do
+						if not val[n] then
+							changes[#changes + 1] = { n, false }
+						end
+					end
+					prev = table.clone(val)
+					if prio then
+						local ord = {}
+						for _, n in ipairs(r.Order or {}) do
+							if val[n] then
+								ord[#ord + 1] = n
 							end
 						end
-					end,
-				})
-				ctl = stamp(n0, keepOrder)
-				ret = r
-				headerLabel = nil
-				for _, n in ipairs(initial) do
-					pcall(function()
-						r:SetValue(n)
-					end)
-				end
-				refreshHeader()
-			end
-			build(names, init, nil)
+						opt.value = table.clone(ord)
+						if cb then
+							cb(table.clone(ord))
+						end
+					else
+						for _, c in ipairs(changes) do
+							opt.value[c[1]] = c[2]
+							if cb then
+								cb(c[1], c[2])
+							end
+						end
+					end
+				end,
+			})
+			silent = false
 
 			local obj = {}
 			function obj.GetNewList(a, b)
 				local ns, st = normList(pick(a, b))
-				local lo = ctl and ctl.Element and ctl.Element.LayoutOrder or nil
-				if ctl then
-					pcall(function()
-						ctl.Element:Destroy()
-					end)
-					local all = getgenv().AllControls
-					for i = #all, 1, -1 do
-						if all[i] == ctl then
-							table.remove(all, i)
-						end
-					end
-				end
-				ord = {}
-				opt.list = ns
-				opt.value = prio and {} or table.clone(st)
 				local initial = {}
 				for _, n in ipairs(ns) do
 					if st[n] then
 						initial[#initial + 1] = n
 					end
 				end
-				build(ns, initial, lo)
+				silent = true
+				r.Values = ns
+				r:SetValue(initial)
+				silent = false
+				setPrev(initial)
+				opt.list = ns
+				opt.value = prio and table.clone(initial) or table.clone(st)
 			end
+			-- thay toan bo lua chon: list {"A","B"} (giu thu tu), map {A=true}, hoac 1 ten (them vao)
 			function obj.SetValue(a, b)
 				local v = pick(a, b)
+				local list = {}
 				if type(v) == "table" then
 					if #v > 0 then
 						for _, n in ipairs(v) do
-							pcall(function()
-								ret:SetValue(tostring(n))
-							end)
+							list[#list + 1] = tostring(n)
 						end
 					else
-						for n, on in pairs(v) do
-							if on == true then
-								pcall(function()
-									ret:SetValue(tostring(n))
-								end)
+						for _, n in ipairs(r.Values) do
+							if v[n] == true then
+								list[#list + 1] = n
 							end
 						end
 					end
 				elseif v ~= nil then
-					pcall(function()
-						ret:SetValue(tostring(v))
-					end)
+					for _, n in ipairs(r.Values) do
+						if r.Value[n] then
+							list[#list + 1] = n
+						end
+					end
+					local add = tostring(v)
+					if not table.find(list, add) then
+						list[#list + 1] = add
+					end
 				end
+				local valid = {}
+				for _, n in ipairs(list) do
+					if table.find(r.Values, n) then
+						valid[#valid + 1] = n
+					end
+				end
+				r:SetValue(valid)
 			end
 			opt.FunctionCreate = obj
 			return obj
 		end
 
+		-- slider dropdown: List la map ten -> { Title, KeyName, Min, Max, Default, Precise }
+		-- cb(ten, item) voi item.Default da cap nhat bang gia tri moi
 		local function sliderDropdown(s, cb)
 			local title = tostring(s.Title or s.Text or "")
-			local opt = reg(title, "slider_dropdown", { list = s.List })
-			local n0 = controlCount()
-			local ret = gb:AddDropdown(title, {
-				Text = title,
-				Values = s.List,
-				Search = s.Search,
-				Slider = true,
-				SliderRelease = s.SliderRelease,
-				Callback = function(...)
+			local list = s.List or {}
+			local keys = {}
+			for k in pairs(list) do
+				keys[#keys + 1] = k
+			end
+			table.sort(keys, function(x, y)
+				return keyLess(tostring(x), tostring(y))
+			end)
+			local items, byName, nameByKey = {}, {}, {}
+			for _, k in ipairs(keys) do
+				local it = list[k]
+				local minV = it.Min or 0
+				local maxV = it.Max or 100
+				local nm = tostring(it.Title or it.KeyName or k)
+				items[#items + 1] = {
+					Name = nm,
+					Min = minV,
+					Max = maxV,
+					Default = it.Default,
+					Rounding = roundingFor(it.Precise, minV, maxV),
+					Suffix = it.Suffix,
+				}
+				byName[nm] = { key = k, item = it }
+				nameByKey[tostring(k)] = nm
+				nameByKey[nm] = nm
+			end
+			local opt = reg(title, "slider_dropdown", { list = list })
+			local ready = false
+			local ret = box:AddSliderDropdown(nextIdx(title), {
+				Title = title,
+				Description = s.Desc or s.Description,
+				Items = items,
+				Callback = function(_, name, value)
+					if not ready then
+						return
+					end
+					local e = byName[name]
+					if not e then
+						return
+					end
+					e.item.Default = value
 					if cb then
-						cb(...)
+						cb(e.key, e.item)
 					end
 				end,
 			})
-			stamp(n0)
+			ready = true
+			opt.value = ret.Value
 			local obj = {}
-			function obj.GetNewList(a, b)
-				ret:GetNewList(pick(a, b))
+			function obj.SetSubValue(a, b, c)
+				local k, v = a, b
+				if a == obj then
+					k, v = b, c
+				end
+				local nm = nameByKey[tostring(k)]
+				if nm then
+					ret:SetItem(nm, v)
+				end
+			end
+			function obj.GetNewList()
+				warn("[TopiUI] slider dropdown khong ho tro GetNewList")
 			end
 			opt.FunctionCreate = obj
 			return obj
@@ -1248,27 +1190,31 @@ local A = (function()
 				def = nil
 			end
 			local opt = reg(title, "dropdown", { list = names, value = def })
-			local n0 = controlCount()
-			local ret = gb:AddDropdown(title, {
-				Text = title,
+			local silent = true
+			local ret = box:AddDropdown(nextIdx(title), {
+				Title = title,
 				Values = names,
-				Search = s.Search,
-				Selected = false,
 				Default = def,
 				Callback = function(v)
+					if silent then
+						return
+					end
 					opt.value = v
 					if cb then
 						cb(v)
 					end
 				end,
 			})
-			stamp(n0)
+			silent = false
 			local obj = {}
 			function obj.GetNewList(a, b)
 				local ns = normList(pick(a, b))
 				opt.list = ns
 				opt.value = nil
-				ret:GetNewList(ns)
+				silent = true
+				ret.Values = ns
+				ret:SetValue(nil)
+				silent = false
 			end
 			function obj.SetValue(a, b)
 				local v = pick(a, b)
@@ -1292,22 +1238,30 @@ local A = (function()
 	function API.CreateMain(_)
 		local Window = Library:CreateWindow({
 			Title = "Topi Hub",
-			Subtitle = "- Blox Fruit by wzarii",
-			Image = "rbxassetid://77671524243147",
+			SubTitle = "Blox Fruit by wzarii",
+			Size = UDim2.fromOffset(620, 460),
+			TabWidth = 180,
+			MinimizeKey = Enum.KeyCode.LeftAlt,
+			ToggleImage = LOGO,
 		})
+		API.Library = Library
+		API.Window = Window
+		pcall(function()
+			API.Gui = Window.Main:FindFirstAncestorWhichIsA("ScreenGui")
+		end)
 
 		task.delay(1, function()
 			pcall(function()
 				Library:Notify({
-					Title = "UI Library",
-					Description = "The UI automatically hides once executed.\nPress the button at the Left-Alt of the screen to show the GUI.",
+					Title = "Topi Hub",
+					Content = "Bam logo hoac phim LeftAlt de an / hien GUI.",
 					Duration = 5,
 				})
 			end)
 			pcall(function()
 				Library:Notify({
 					Title = "Update",
-					Description = "Add Toggle buddha farming (Tab Farming).\nAdd label Ken Level [FarmObservation] (Tab Farming Other).\nAdd shoot all Gun aura (only Mastery Farm)\nAdd Toggle kill aura raid [only 4-5].",
+					Content = "Add Toggle buddha farming (Tab Farming).\nAdd label Ken Level [FarmObservation] (Tab Farming Other).\nAdd shoot all Gun aura (only Mastery Farm)\nAdd Toggle kill aura raid [only 4-5].",
 					Duration = 10,
 				})
 			end)
@@ -1316,11 +1270,11 @@ local A = (function()
 		local main = {}
 		function main.CreatePage(s)
 			local name = tostring(s.Page_Name or s.Page_Title or "Page")
-			local tab = Window:AddTab(name)
+			local tab = Window:AddTab({ Title = name })
 			local page = {}
 			function page.CreateSection(secName)
-				local gb = tab:AddLeftGroupbox(tostring(secName))
-				return makeSection(gb, name, tostring(secName))
+				local box = tab:AddSection(tostring(secName))
+				return makeSection(box, name, tostring(secName))
 			end
 			return page
 		end
@@ -1330,13 +1284,13 @@ local A = (function()
 	function API.CreateNoti(s)
 		s = s or {}
 		local title = s.Title
-		if title == "Banana Cat Hub" then
-			title = ""
+		if title == nil or title == "" or title == "Banana Cat Hub" then
+			title = "Topi Hub"
 		end
 		pcall(function()
 			Library:Notify({
-				Title = title or "",
-				Description = s.Description or s.Desc or s.Content or "",
+				Title = title,
+				Content = s.Description or s.Desc or s.Content or "",
 				Duration = s.Duration or s.ShowTime or 5,
 			})
 		end)
@@ -1350,7 +1304,6 @@ getgenv().TopiTranslator = (function()
 
 	local BASE = "https://raw.githubusercontent.com/46ggihut-beep/topi-lang/main/lang/"
 	local CACHE_DIR = "Banana Cat Hub/lang"
-	local GUI_NAMES = { "Nousigi Hub GUI", "Nousigi Hub Notification" }
 
 	local T = { Enabled = false }
 	local exact, patterns = {}, {}
@@ -1465,21 +1418,11 @@ getgenv().TopiTranslator = (function()
 		end)
 	end
 
-	local started = false
 	local function ensureAttached()
-		for _, n in ipairs(GUI_NAMES) do
-			local g = CoreGui:FindFirstChild(n)
-			if g then
-				attach(g)
-			end
-		end
-		if not started then
-			started = true
-			CoreGui.ChildAdded:Connect(function(c)
-				if table.find(GUI_NAMES, c.Name) then
-					task.defer(attach, c)
-				end
-			end)
+		-- TopiUI chi co 1 ScreenGui (ten ngau nhien, co the nam trong gethui) chua ca cua so, popup va thong bao
+		local g = A.Gui
+		if g and g.Parent then
+			attach(g)
 		end
 	end
 
@@ -8001,85 +7944,119 @@ function isnetworkowner2(Q)
 	end
 	return true
 end
+-- BringMob reliability patch:
+-- Re-checks eligible same-name mobs each call instead of using the old DaBringMob
+-- early-return lock, which caused alternating successful/failed bring attempts.
+local __BringFreezeState = setmetatable({}, { __mode = "k" })
+local function __FreezeMobLocally(mob)
+	if not mob or not mob.Parent then return end
+	local hum = mob:FindFirstChildOfClass("Humanoid")
+	if hum and not __BringFreezeState[hum] then
+		__BringFreezeState[hum] = {
+			WalkSpeed = hum.WalkSpeed,
+			JumpPower = hum.JumpPower,
+			JumpHeight = hum.JumpHeight,
+			AutoRotate = hum.AutoRotate,
+		}
+	end
+	if hum then
+		pcall(function()
+			hum.WalkSpeed = 0
+			hum.JumpPower = 0
+			hum.JumpHeight = 0
+			hum.AutoRotate = false
+			hum:Move(Vector3.zero, false)
+			for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+				track:Stop(0)
+			end
+		end)
+	end
+	local root = mob:FindFirstChild("HumanoidRootPart")
+	if root then
+		pcall(function()
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.AssemblyAngularVelocity = Vector3.zero
+		end)
+	end
+end
+
 function BringMob(Q)
-	if not Settings["Bring Mob"] then
+	if not Settings["Bring Mob"] or not Q or not Q.Parent then
 		return
 	end
-	if Q and E ~= Q then
+	local root = Q:FindFirstChild("HumanoidRootPart")
+	local hum = Q:FindFirstChildOfClass("Humanoid")
+	if not root or not hum or hum.Health <= 0 then
+		return
+	end
+
+	if E ~= Q or not l then
 		local spawnPart = DetectPartMobBring(Q.Name, Q, true)
-		if not spawnPart then
-			return
-		end
 		E = Q
-		l = spawnPart.CFrame
-		local d = game:GetService("Players").LocalPlayer.Data.Race.Value == "Cyborg"
-			and (t.Character:FindFirstChild("RaceTransformed"))
-			and t.Character.RaceTransformed.Value
-		if d then
-			l = getcenter(Q.Name)
+		if spawnPart then
+			l = spawnPart.CFrame
+		else
+			-- Keep the target's current position as a fallback if spawn-part lookup fails.
+			l = root.CFrame
+		end
+		local cyborgTransformed = false
+		pcall(function()
+			cyborgTransformed = game:GetService("Players").LocalPlayer.Data.Race.Value == "Cyborg"
+				and t.Character:FindFirstChild("RaceTransformed")
+				and t.Character.RaceTransformed.Value
+		end)
+		if cyborgTransformed then
+			pcall(function() l = getcenter(Q.Name) end)
 		end
 		DeleteIgnoredMob()
 	end
-	if DaBringMob then
-		delay(0.1, function()
-			getgenv().DaBringMob = false
-		end)
+
+	local playerRoot = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
+	if not playerRoot or (playerRoot.Position - root.Position).Magnitude > 300 then
 		return
 	end
-	local d = {}
-	if not Q:FindFirstChild("Ignored") then
-		table.insert(d, Q)
-	end
+
 	local buddhaFarm = BuddhaFarmOn() or TRexAuraOn()
-	local I = buddhaFarm and math.huge or (Settings["Bring Mob Count"] or 2)
-	local _, o = (buddhaFarm and 500 or ((I > 2) and 350 or 200))
-	if
-		game:GetService("Players").LocalPlayer.Data.Race.Value == "Cyborg"
-		and (t.Character:FindFirstChild("RaceTransformed"))
-		and t.Character.RaceTransformed.Value
-	then
-		_, o = (buddhaFarm and 500 or 300), (buddhaFarm and math.huge or 6)
-	else
-		o = I
+	local maxCount = buddhaFarm and math.huge or math.max(2, tonumber(Settings["Bring Mob Count"]) or 2)
+	local range = buddhaFarm and 500 or (maxCount > 2 and 350 or 200)
+	local targets = {}
+
+	if not Q:FindFirstChild("Ignored") then
+		table.insert(targets, Q)
 	end
-	for I, I in pairs(workspace.Enemies:GetChildren()) do
-		if
-			I ~= Q
-			and I.Name == Q.Name
-			and not I:FindFirstChild("Ignored")
-			and (IsMobAlive(I))
-			and (isnetworkowner2(I.HumanoidRootPart))
-		then
-			if (I.HumanoidRootPart.Position - l.Position).Magnitude <= _ and #d < o then
-				table.insert(d, I)
+
+	for _, mob in ipairs(workspace.Enemies:GetChildren()) do
+		if #targets >= maxCount then break end
+		if mob ~= Q and mob.Name == Q.Name and not mob:FindFirstChild("Ignored") and IsMobAlive(mob) then
+			local mobRoot = mob:FindFirstChild("HumanoidRootPart")
+			if mobRoot and (mobRoot.Position - l.Position).Magnitude <= range then
+				table.insert(targets, mob)
 			end
 		end
 	end
-	if
-		l
-		and (t.Character.HumanoidRootPart.Position - Q.HumanoidRootPart.Position).Magnitude <= 50
-		and (isnetworkowner2(t.Character.HumanoidRootPart))
-		and #d >= 2
-	then
-		for Q, Q in pairs(d) do
-			sizepart(Q)
-			if not isnetworkowner2(Q.HumanoidRootPart) then
-				Q.HumanoidRootPart.CFrame = Q.WorldPivot
-				Instance.new("IntValue", Q).Name = "Ignored"
-				task.wait(0.3)
-			else
-				Q.HumanoidRootPart.CFrame = l * CFrame.new(0, math.random(0, 2), math.random(0, 2))
-				task.spawn(function()
-					local d = Q.Humanoid.Health
-					task.wait(2.2)
-					if Q.Humanoid.Health == d and not Q:FindFirstChild("Ignored") then
-						Q.HumanoidRootPart.CFrame = Q.WorldPivot
-						Instance.new("IntValue", Q).Name = "Ignored"
-						task.wait(0.3)
-					end
-				end)
+
+	if #targets < 2 or (playerRoot.Position - root.Position).Magnitude > 300 then
+		return
+	end
+
+	for _, mob in ipairs(targets) do
+		if mob.Parent and IsMobAlive(mob) then
+			local mobRoot = mob:FindFirstChild("HumanoidRootPart")
+			if mobRoot then
+				sizepart(mob)
+				-- Network ownership is controlled by Roblox; only move when the client can
+				-- plausibly control the assembly. Recheck on every call for transient changes.
+				local canControl = true
+				pcall(function() canControl = isnetworkowner2(mobRoot) end)
+				if canControl then
+					pcall(function()
+						mobRoot.CFrame = l * CFrame.new(0, math.random(0, 2), 0)
+						mobRoot.AssemblyLinearVelocity = Vector3.zero
+						mobRoot.AssemblyAngularVelocity = Vector3.zero
+					end)
+					__FreezeMobLocally(mob)
+				end
 			end
-			getgenv().DaBringMob = true
 		end
 	end
 end
@@ -9800,11 +9777,11 @@ function FarmMethod()
 						game:GetService("Players").LocalPlayer.PlayerGui.TransformationHUD.ImageLabel.Visible
 						and (Settings["Auto Finish Train Quest"] or Settings["Auto Finish Train Draco Quest"])
 					then
-						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					elseif Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 					UsedualFlock()
 					ClickM1(V)
@@ -9875,7 +9852,7 @@ function FarmMethod()
 							if not root then
 								break
 							end
-							toTarget(V.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						until (mirror.Position - root.Position).Magnitude <= 20
 							or root.Position.Y > 4000
 							or not IsMobAlive(V)
@@ -9898,11 +9875,11 @@ function FarmMethod()
 						game:GetService("Players").LocalPlayer.PlayerGui.TransformationHUD.ImageLabel.Visible
 						and (Settings["Auto Finish Train Quest"] or Settings["Auto Finish Train Draco Quest"])
 					then
-						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					elseif Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 					UsedualFlock()
 					ClickM1(V)
@@ -9959,11 +9936,11 @@ function FarmMethod()
 					game:GetService("Players").LocalPlayer.PlayerGui.TransformationHUD.ImageLabel.Visible
 					and (Settings["Auto Finish Train Quest"] or Settings["Auto Finish Train Draco Quest"])
 				then
-					toTarget(V.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+					toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				elseif Settings["Select Weapon"] == "Blox Fruit" then
-					toTarget(V.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+					toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
-					toTarget(V.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+					toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				end
 			until not IsMobAlive(V) or not Settings["Start Farm"] or not StackFarm
 			if getgenv().QuestTrainer and getgenv().QuestTrainer.CountKillMob then
@@ -10455,9 +10432,9 @@ function AutoQuestBarito()
 					UsedualFlock()
 					ClickM1(V)
 					if Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 				until not IsMobAlive(V)
 			end
@@ -10479,9 +10456,9 @@ function AutoQuestBarito()
 				UsedualFlock()
 				ClickM1(f)
 				if Settings["Select Weapon"] == "Blox Fruit" then
-					toTarget(f.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+					toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
-					toTarget(f.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+					toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				end
 			until not IsMobAlive(f)
 		end
@@ -10553,9 +10530,9 @@ function SeaThird()
 						task.wait()
 						sizepart(f)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(f.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(f.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 						UsedualFlock()
 						ClickM1(f)
@@ -10588,9 +10565,9 @@ function SeaThird()
 									task.wait()
 									sizepart(H)
 									if Settings["Select Weapon"] == "Blox Fruit" then
-										toTarget(H.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+										toTarget(H.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 									else
-										toTarget(H.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+										toTarget(H.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 									end
 									ClickM1(H)
 									UsedualFlock()
@@ -10668,9 +10645,9 @@ task.spawn(function()
 								task.wait()
 								sizepart(Y)
 								if Settings["Select Weapon"] == "Blox Fruit" then
-									toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+									toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 								else
-									toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+									toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 								end
 								ClickM1(Y)
 								UsedualFlock()
@@ -10766,9 +10743,9 @@ task.spawn(function()
 						task.wait()
 						sizepart(Y)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 						ClickM1(Y)
 						UsedualFlock()
@@ -10828,9 +10805,9 @@ task.spawn(function()
 						task.wait()
 						sizepart(Y)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 						ClickM1(Y)
 						UsedualFlock()
@@ -10900,9 +10877,9 @@ task.spawn(function()
 						task.wait()
 						sizepart(Y)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 						ClickM1(Y)
 						UsedualFlock()
@@ -10945,9 +10922,9 @@ task.spawn(function()
 						task.wait()
 						sizepart(Y)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 						ClickM1(Y)
 						UsedualFlock()
@@ -11012,9 +10989,9 @@ task.spawn(function()
 											UsedualFlock()
 											ClickM1(Y)
 											if Settings["Select Weapon"] == "Blox Fruit" then
-												toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+												toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 											else
-												toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+												toTarget(Y.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 											end
 										until not Y
 											or not Y.Parent
@@ -11034,9 +11011,9 @@ task.spawn(function()
 												task.wait()
 												sizepart(P)
 												if Settings["Select Weapon"] == "Blox Fruit" then
-													toTarget(P.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+													toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 												else
-													toTarget(P.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+													toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 												end
 												ClickM1(P)
 												UsedualFlock()
@@ -11097,9 +11074,9 @@ task.spawn(function()
 								UsedualFlock()
 								ClickM1(P)
 								if Settings["Select Weapon"] == "Blox Fruit" then
-									toTarget(P.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+									toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 								else
-									toTarget(P.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+									toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 								end
 							until not P or not P.Parent or P.Humanoid.Health == 0 or not Settings["Attack Dough King"]
 						end
@@ -11119,9 +11096,9 @@ task.spawn(function()
 							task.wait()
 							sizepart(y)
 							if Settings["Select Weapon"] == "Blox Fruit" then
-								toTarget(y.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+								toTarget(y.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 							else
-								toTarget(y.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+								toTarget(y.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 							end
 							ClickM1(y)
 							UsedualFlock()
@@ -11158,8 +11135,8 @@ task.spawn(function()
 					StackFarm = false
 					StackFarmOther = false
 					BananaOwner("Auto Pirate Raid")
-					local P = Settings["Select Weapon"] == "Blox Fruit" and (CFrame.new(-7, FruitFarmY(), 0))
-						or (CFrame.new(7, BuddhaFarmY(), 0))
+					local P = Settings["Select Weapon"] == "Blox Fruit" and (CFrame.new(0, FruitFarmY(), 0))
+						or (CFrame.new(0, BuddhaFarmY(), 0))
 					repeat
 						task.wait()
 						UsedualFlock()
@@ -18114,9 +18091,9 @@ AttackAllMobSection.CreateToggle(
 							UsedualFlock()
 							ClickM1(V)
 							if Settings["Select Weapon"] == "Blox Fruit" then
-								toTarget(V.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+								toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 							else
-								toTarget(V.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+								toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 							end
 						until not IsMobAlive(V) or not Settings["Auto Attack All Mob and Boss"] or not StackFarmOther
 					end
@@ -18279,11 +18256,11 @@ function AutoQuestDojo()
 						game:GetService("Players").LocalPlayer.PlayerGui.TransformationHUD.ImageLabel.Visible
 						and (Settings["Auto Finish Train Quest"] or Settings["Auto Finish Train Draco Quest"])
 					then
-						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					elseif Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 				until not IsMobAlive(P) or not Settings["Auto Quest Dojo Trainer"]
 				if getgenv().QuestTrainer and getgenv().QuestTrainer.CountKillMob then
@@ -18362,9 +18339,9 @@ function AutoQuestDojo()
 					task.wait()
 					sizepart(y)
 					if Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 					ClickM1(y)
 					UsedualFlock()
@@ -18636,9 +18613,9 @@ function AutoDragonHunter()
 					UsedualFlock()
 					ClickM1(P)
 					if Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 				until not IsMobAlive(P) or not Settings["Auto Quest Dragon Hunter"] or not getgenv().QuestHunterDragon
 			end
@@ -18667,9 +18644,9 @@ function AutoDragonHunter()
 					UsedualFlock()
 					ClickM1(P)
 					if Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 				until not IsMobAlive(P) or not Settings["Auto Quest Dragon Hunter"] or not getgenv().QuestHunterDragon
 			end
@@ -19016,9 +18993,9 @@ RaidLawSection.CreateToggle(
 								UsedualFlock()
 								ClickM1(P)
 								if Settings["Select Weapon"] == "Blox Fruit" then
-									toTarget(P.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+									toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 								else
-									toTarget(P.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+									toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 								end
 							until not IsMobAlive(P) or not Settings["Auto Buy Chip and Attack Law"]
 						elseif
@@ -19167,9 +19144,9 @@ function ObservationV2()
 					UsedualFlock()
 					ClickM1(y)
 					if Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 				until not IsMobAlive(y) or not Settings["Auto UP Observation V2"]
 			end
@@ -19191,9 +19168,9 @@ function ObservationV2()
 					wait()
 					sizepart(y)
 					if Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(y.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 					ClickM1(y)
 					equiptool(NameWeapon(Settings["Select Weapon"]))
@@ -19407,9 +19384,9 @@ function FarmSelectMob()
 			UsedualFlock()
 			ClickM1(P)
 			if Settings["Select Weapon"] == "Blox Fruit" then
-				toTarget(P.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+				toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 			else
-				toTarget(P.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+				toTarget(P.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 			end
 		until not IsMobAlive(P) or not Settings["Kill Mob"] or not StackFarmOther
 	end
@@ -19507,9 +19484,9 @@ function AutoKillBoss()
 			wait()
 			sizepart(y)
 			if Settings["Select Weapon"] == "Blox Fruit" then
-				toTarget(y.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+				toTarget(y.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 			else
-				toTarget(y.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+				toTarget(y.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 			end
 			ClickM1(y)
 			UsedualFlock()
@@ -19809,7 +19786,7 @@ RaidsSection.CreateToggle({ Title = "Auto Raid", Desc = nil, Default = Settings[
 								sizepart(l)
 								BringMobRaid(l)
 								if Settings["Select Weapon"] == "Blox Fruit" then
-									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 								else
 									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(10, 20, 0))
 								end
@@ -20039,7 +20016,7 @@ function Multiraid(b)
 				UsedualFlock()
 				ClickM1(E)
 				if Settings["Select Weapon"] == "Blox Fruit" then
-					toTarget(E.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+					toTarget(E.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
 					toTarget(E.HumanoidRootPart.CFrame * CFrame.new(10, 20, 0))
 				end
@@ -23871,9 +23848,9 @@ function AutoUpgradeRaceDraco()
 						UsedualFlock()
 						ClickM1(b)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(b.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(b.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(b.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(b.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 					until not IsMobAlive(b) or not Settings["Auto Upgrade Race V2-V3 Draco"]
 				end
@@ -24391,9 +24368,9 @@ function FullyDraco()
 								UsedualFlock()
 								ClickM1(R)
 								if Settings["Select Weapon"] == "Blox Fruit" then
-									toTarget(R.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+									toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 								else
-									toTarget(R.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+									toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 								end
 							until not IsMobAlive(R) or not Settings["Fully Trial Draco"]
 						end
@@ -24457,9 +24434,9 @@ function FullyDraco()
 										UsedualFlock()
 										ClickM1(R)
 										if Settings["Select Weapon"] == "Blox Fruit" then
-											toTarget(R.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+											toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 										else
-											toTarget(R.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+											toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 										end
 									until not IsMobAlive(R) or not Settings["Fully Trial Draco"] or g
 								end
@@ -24489,9 +24466,9 @@ function FullyDraco()
 										UsedualFlock()
 										ClickM1(R)
 										if Settings["Select Weapon"] == "Blox Fruit" then
-											toTarget(R.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+											toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 										else
-											toTarget(R.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+											toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 										end
 									until not IsMobAlive(R) or not Settings["Fully Trial Draco"] or g
 								end
@@ -24783,9 +24760,9 @@ function FullyDraco()
 				UsedualFlock()
 				ClickM1(g)
 				if Settings["Select Weapon"] == "Blox Fruit" then
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				end
 			until not IsMobAlive(g) or not Settings["Fully Trial Draco"]
 		elseif typeof(e) == "table" then
@@ -24887,9 +24864,9 @@ RaceDracoSection.CreateToggle(
 									UsedualFlock()
 									ClickM1(R)
 									if Settings["Select Weapon"] == "Blox Fruit" then
-										toTarget(R.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+										toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 									else
-										toTarget(R.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+										toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 									end
 								until not IsMobAlive(R) or not Settings["Auto Finish Train Draco Quest"]
 							elseif typeof(e) == "table" then
@@ -25157,9 +25134,9 @@ function UpgradeRaceV2AndV3()
 						UsedualFlock()
 						ClickM1(l)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(l.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(l.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(l.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(l.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 					until not IsMobAlive(l) or not Settings["Auto Upgrade Race V2-V3"]
 				end
@@ -25203,9 +25180,9 @@ function UpgradeRaceV2AndV3()
 						UsedualFlock()
 						ClickM1(S)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(S.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(S.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(S.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(S.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 					until not IsMobAlive(S)
 					if not table.find(BlBossHuman, m.Name) then
@@ -25485,9 +25462,9 @@ function GetCyborg()
 				UsedualFlock()
 				ClickM1(g)
 				if Settings["Select Weapon"] == "Blox Fruit" then
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				end
 			until not IsMobAlive(g) or not Settings["Auto Get Cyborg"]
 		elseif not DetectItemPlr("Microchip") and game.Players.LocalPlayer.Data.Fragments.Value >= 1000 then
@@ -25541,9 +25518,9 @@ function GetRaceGhoul()
 				UsedualFlock()
 				ClickM1(R)
 				if Settings["Select Weapon"] == "Blox Fruit" then
-					toTarget(R.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+					toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
-					toTarget(R.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+					toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				end
 			until not IsMobAlive(R) or not Settings["Auto Get Ghoul"]
 		elseif typeof(g) == "table" then
@@ -25626,9 +25603,9 @@ function GetRaceGhoul()
 				UsedualFlock()
 				ClickM1(g)
 				if Settings["Select Weapon"] == "Blox Fruit" then
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				end
 			until not IsMobAlive(g) or not Settings["Auto Get Ghoul"]
 			wait(5)
@@ -25942,9 +25919,9 @@ RaceV4Section.CreateToggle(
 								UsedualFlock()
 								ClickM1(l)
 								if Settings["Select Weapon"] == "Blox Fruit" then
-									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 								else
-									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 								end
 							until not IsMobAlive(l) or not Settings["Auto Finish Train Quest"] or not CheckGoTrain()
 						elseif typeof(e) == "table" then
@@ -26352,9 +26329,9 @@ function AutoTrialV4()
 							task.wait()
 							sizepart(m)
 							if Settings["Select Weapon"] == "Blox Fruit" then
-								toTarget(m.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+								toTarget(m.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 							else
-								toTarget(m.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+								toTarget(m.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 							end
 							ClickM1(m)
 							UsedualFlock()
@@ -26439,9 +26416,9 @@ function AutoTrialV4()
 							task.wait()
 							sizepart(m)
 							if Settings["Select Weapon"] == "Blox Fruit" then
-								toTarget(m.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+								toTarget(m.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 							else
-								toTarget(m.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+								toTarget(m.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 							end
 							UsedualFlock()
 							ClickM1(m)
@@ -26705,9 +26682,9 @@ function GetRainBowHaki()
 				task.wait()
 				sizepart(g)
 				if Settings["Select Weapon"] == "Blox Fruit" then
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				end
 				ClickM1(g)
 				UsedualFlock()
@@ -26810,9 +26787,9 @@ function GuitarPuzzleProgress()
 						UsedualFlock()
 						ClickM1(g)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 					until not IsMobAlive(g)
 				until CountZombie() == 0
@@ -26927,9 +26904,9 @@ function AutoSoulGuitar()
 						task.wait()
 						sizepart(g)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 						UsedualFlock()
 						ClickM1(g)
@@ -27032,9 +27009,9 @@ function AutoSoulGuitar()
 					UsedualFlock()
 					ClickM1(R)
 					if Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(R.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(R.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 				until not IsMobAlive(R) or not Settings["Auto Soul Guitar"]
 			elseif typeof(g) == "table" then
@@ -27126,9 +27103,9 @@ function QuestGood4()
 				sizepart(g)
 				ClickM1(g)
 				if Settings["Select Weapon"] == "Blox Fruit" then
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				end
 			until not IsMobAlive(g)
 		else
@@ -27201,7 +27178,7 @@ function Questgood5()
 				local g = DetectMobHell()
 				sizepart(g)
 				equiptool(NameWeapon("Sword"))
-				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				getgenv().ClickM1(g)
 			until not DetectMobCDK()
 		else
@@ -27238,9 +27215,9 @@ function Questgood5()
 			equiptool(NameWeapon("Sword"))
 			ClickM1(g)
 			if Settings["Select Weapon"] == "Blox Fruit" then
-				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 			else
-				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 			end
 		until not IsMobAlive(g) or not Settings["Auto CDK"]
 		TweenManager.CancelCurrent()
@@ -27303,9 +27280,9 @@ function QuestEvil4()
 			equiptool(NameWeapon("Sword"))
 			ClickM1(g)
 			if Settings["Select Weapon"] == "Blox Fruit" then
-				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 			else
-				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 			end
 		until not g or not g.Parent or g.Humanoid.Health == 0
 	else
@@ -27334,9 +27311,9 @@ function QuestEvil5()
 						equiptool(NameWeapon("Sword"))
 						ClickM1(g)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 					until not IsMobAlive(g) or not Settings["Auto CDK"]
 				elseif typeof(e) == "table" then
@@ -27414,7 +27391,7 @@ function QuestEvil5()
 				task.wait()
 				local g = DetectMobHell()
 				sizepart(g)
-				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				equiptool(NameWeapon("Sword"))
 				getgenv().ClickM1(g)
 			until not DetectMobCDK()
@@ -27514,9 +27491,9 @@ function GetCDK()
 								equiptool(NameWeapon("Sword"))
 								ClickM1(l)
 								if Settings["Select Weapon"] == "Blox Fruit" then
-									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 								else
-									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 								end
 							until not l or not l.Parent or l.Humanoid.Health <= 0
 						end
@@ -27588,9 +27565,9 @@ function GetYama()
 				task.wait()
 				sizepart(g)
 				if Settings["Select Weapon"] == "Blox Fruit" then
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				end
 				UsedualFlock()
 				ClickM1(g)
@@ -27619,9 +27596,9 @@ function GetYama()
 					UsedualFlock()
 					ClickM1(g)
 					if Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 				until not IsMobAlive(g) or not Settings["Auto Yama"]
 			end
@@ -27682,9 +27659,9 @@ function GetTushita()
 					task.wait()
 					sizepart(R)
 					if Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(R.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(R.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 					UsedualFlock()
 					ClickM1(R)
@@ -27764,9 +27741,9 @@ GetItemsSection.CreateToggle({ Title = "Auto TTK", Desc = nil, Default = Setting
 							equiptool(NameWeapon("Sword"))
 							ClickM1(R)
 							if Settings["Select Weapon"] == "Blox Fruit" then
-								toTarget(R.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+								toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 							else
-								toTarget(R.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+								toTarget(R.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 							end
 						until not IsMobAlive(R) or not Settings["Auto TTK"]
 					elseif typeof(e) == "table" then
@@ -27956,9 +27933,9 @@ function SaberSword()
 							task.wait()
 							sizepart(g)
 							if Settings["Select Weapon"] == "Blox Fruit" then
-								toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+								toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 							else
-								toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+								toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 							end
 							UsedualFlock()
 							ClickM1(g)
@@ -28078,9 +28055,9 @@ function SaberSword()
 					task.wait()
 					sizepart(g)
 					if Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 					UsedualFlock()
 					ClickM1(g)
@@ -28169,9 +28146,9 @@ function AutoYorumini()
 			task.wait()
 			sizepart(g)
 			if Settings["Select Weapon"] == "Blox Fruit" then
-				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 			else
-				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+				toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 			end
 			UsedualFlock()
 			ClickM1(g)
@@ -28188,9 +28165,9 @@ function AutoYorumini()
 						task.wait()
 						sizepart(g)
 						if Settings["Select Weapon"] == "Blox Fruit" then
-							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 						else
-							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+							toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 						end
 						UsedualFlock()
 						ClickM1(g)
@@ -28612,9 +28589,9 @@ function AutoUpgradeWeapon(R)
 				UsedualFlock()
 				ClickM1(g)
 				if Settings["Select Weapon"] == "Blox Fruit" then
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
-					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+					toTarget(g.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				end
 			until not IsMobAlive(g)
 				or not Settings["Auto Upgrade Sword Inventory"] and not Settings["Auto Upgrade Gun Inventory"]
@@ -28733,9 +28710,9 @@ function AutoCraftinMagnetVol()
 					UsedualFlock()
 					ClickM1(f)
 					if Settings["Select Weapon"] == "Blox Fruit" then
-						toTarget(f.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+						toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 					else
-						toTarget(f.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					end
 				until not IsMobAlive(f) or not Settings["Auto Crafting Volcanic Magnet"]
 			end
@@ -28798,9 +28775,9 @@ function AutoCraftinMagnetVol()
 							UsedualFlock()
 							ClickM1(f)
 							if Settings["Select Weapon"] == "Blox Fruit" then
-								toTarget(f.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+								toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 							else
-								toTarget(f.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+								toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 							end
 						until not IsMobAlive(f) or not Settings["Auto Crafting Volcanic Magnet"] or g
 					end
@@ -28829,9 +28806,9 @@ function AutoCraftinMagnetVol()
 							UsedualFlock()
 							ClickM1(f)
 							if Settings["Select Weapon"] == "Blox Fruit" then
-								toTarget(f.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+								toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 							else
-								toTarget(f.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+								toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 							end
 						until not IsMobAlive(f) or not Settings["Auto Crafting Volcanic Magnet"] or g
 					end
@@ -29262,7 +29239,7 @@ function FullyEventVolcano()
 						BringMob(f)
 						UsedualFlock()
 						ClickM1(f)
-						toTarget(f.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+						toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 					until not IsMobAlive(f) or not Settings["Fully Event Prehistoric Island"]
 				end
 				return
@@ -29324,9 +29301,9 @@ function FullyEventVolcano()
 								UsedualFlock()
 								ClickM1(f)
 								if Settings["Select Weapon"] == "Blox Fruit" then
-									toTarget(f.HumanoidRootPart.CFrame * CFrame.new(-7, FruitFarmY(), 0))
+									toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 								else
-									toTarget(f.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+									toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 								end
 							until not IsMobAlive(f) or not Settings["Fully Event Prehistoric Island"] or g
 						end
@@ -29354,7 +29331,7 @@ function FullyEventVolcano()
 								BringMob(f)
 								UsedualFlock()
 								ClickM1(f)
-								toTarget(f.HumanoidRootPart.CFrame * CFrame.new(7, BuddhaFarmY(), 0))
+								toTarget(f.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 							until not IsMobAlive(f) or not Settings["Fully Event Prehistoric Island"] or g
 						end
 					elseif string.find(getgenv().QuestHunterDragon, "trees") then
@@ -30823,16 +30800,11 @@ a.CreateButton({ Title = "Copy Config" }, function()
 	A.CreateNoti({ Title = "Banana Cat Hub", Desc = "Successfully Copy Config", ShowTime = 5 })
 end)
 a.CreateBind({ Title = "Toggle GUI", Key = Enum.KeyCode.LeftAlt }, function()
-	if getgenv().UIToggled == nil then
-		getgenv().UIToggled = true
-	end
-	getgenv().UIToggled = not getgenv().UIToggled
-	if game.CoreGui:FindFirstChild("Nousigi Hub GUI") then
-		for T, T in ipairs(game.CoreGui:GetChildren()) do
-			if T.Name == "Nousigi Hub GUI" then
-				T.Enabled = getgenv().UIToggled
-			end
-		end
+	-- TopiUI: phim an/hien do cua so tu xu ly qua Window.MinimizeKey (adapter dat tu o Toggle GUI)
+	if A.Window then
+		pcall(function()
+			A.Window:Minimize()
+		end)
 	end
 end)
 spawn(function()
