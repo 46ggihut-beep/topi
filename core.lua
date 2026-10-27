@@ -1402,7 +1402,7 @@ local A = (function()
 		local Window = Library:CreateWindow({
 			Title = "Topi Hub",
 			SubTitle = "Blox Fruit by wzarii",
-			Size = UDim2.fromOffset(620, 460),
+			Size = UDim2.fromOffset(500, 400),
 			TabWidth = 180,
 			MinimizeKey = Enum.KeyCode.LeftControl,
 			ToggleImage = LOGO,
@@ -31221,7 +31221,7 @@ end
 -- hiện 1 lần sau khi load (chỉ khi đang có toggle farm bật), tự xóa sau 20s
 -- Có: tắt hết toggle farm 1 lần (bật lại bình thường) | Không / X / hết 20s: xóa notify, không làm gì
 task.spawn(function()
-	task.wait(3) -- chờ toggle đã lưu bật xong
+	task.wait(0.2) -- chờ toggle đã lưu bật xong
 	pcall(function()
 		local Lib = A.Library
 		if not Lib or type(Lib.NotifyYesNo) ~= "function" then
