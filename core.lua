@@ -1,5 +1,176 @@
-if getgenv().__BF_LOADED == game.JobId then
-	return getgenv().__BF_RESULT
+-- ===================== [BF SESSION] chay lai script = xoa UI cu + dung het logic cu =====================
+do
+	local g = getgenv()
+	if type(g.__BF_Shutdown) == "function" then
+		pcall(g.__BF_Shutdown)
+	end
+	local realEnv = (getfenv and getfenv(1)) or _G
+	local realTask = task
+	local rt = { alive = true, ui = {}, conns = {}, threads = setmetatable({}, { __mode = "k" }), main = coroutine.running() }
+	g.__BF_RT = rt
+	function rt.track(c)
+		if c then
+			rt.conns[#rt.conns + 1] = c
+		end
+		return c
+	end
+	g.__BF_Track = rt.track
+
+	local STALE = {
+		"BananaCatMainLoop", "__DSAuraRunning", "__SeaEventDSAuraRunning", "__KillAuraRaidRunning",
+		"LoadScript", "LoadScriptJob", "LoadScriptAt", "__BF_LOADED", "__BF_RESULT", "TopiHub", "QuestTrainer",
+		"QuestHunterDragon", "QuestDraco", "KilledTerroshark", "DesIdk", "DesIdk2", "DaBringMob", "KillMobRaid",
+		"GoCollectChest", "PathSeaBeast", "PathTerrorshark", "PathSpinBoat", "AimPos", "noclip",
+		"BuddhaRemoteHold", "Sky3Climbing", "FarmingTabActive", "DodgeSkillMobActive", "DodgeCakePrinceMob",
+		"RepairShipHoldUntil", "ReadyToDodge", "Doding", "__BF_TELEPORTING",
+	}
+
+	local function destroyGuis()
+		local names = { TopiHubStatusUI = true, BananaCatStatusUI = true, TopiDiscordCard = true, SB_UI = true, ScreenGuiFly = true, SCGUI = true }
+		local parents = {}
+		pcall(function() parents[#parents + 1] = game:GetService("CoreGui") end)
+		pcall(function() parents[#parents + 1] = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui") end)
+		pcall(function() if gethui then parents[#parents + 1] = gethui() end end)
+		for _, p in ipairs(parents) do
+			pcall(function()
+				for _, c in ipairs(p:GetChildren()) do
+					if names[c.Name] then
+						c:Destroy()
+					end
+				end
+			end)
+		end
+	end
+
+	local function shutdown()
+		if not rt.alive then
+			return
+		end
+		rt.alive = false
+		if g.__BF_Shutdown == shutdown then
+			g.__BF_Shutdown = nil
+		end
+		if g.__BF_RT == rt then
+			g.__BF_RT = nil
+		end
+		-- tween
+		for _, k in ipairs({ "TweenBoat", "TweenBoatBack", "TweenBoatToFrozen" }) do
+			pcall(function()
+				if g[k] then
+					g[k]:Pause()
+					g[k]:Cancel()
+				end
+				g[k] = nil
+			end)
+		end
+		pcall(function() g.BoatTween.Reset() end)
+		pcall(function() g.TweenManager.CancelTweenOnly() end)
+		-- connections
+		for _, c in ipairs(rt.conns) do
+			pcall(function() c:Disconnect() end)
+		end
+		rt.conns = {}
+		for _, k in ipairs({ "__BF_MainConn", "__NOCLIP_STEPPED" }) do
+			pcall(function()
+				if g[k] then
+					g[k]:Disconnect()
+				end
+				g[k] = nil
+			end)
+		end
+		-- globals cu
+		for _, k in ipairs(STALE) do
+			g[k] = nil
+			pcall(function() realEnv[k] = nil end)
+		end
+		-- nhan vat
+		pcall(function()
+			local lp = game:GetService("Players").LocalPlayer
+			local char = lp.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			local hum = char and char:FindFirstChildOfClass("Humanoid")
+			if hrp then
+				local ff = hrp:FindFirstChild("FloatForce")
+				if ff then ff:Destroy() end
+				hrp.Anchored = false
+				hrp.AssemblyLinearVelocity = Vector3.zero
+				hrp.AssemblyAngularVelocity = Vector3.zero
+				pcall(function() game:GetService("CollectionService"):RemoveTag(hrp, "Teleporting") end)
+			end
+			if hum then
+				hum.PlatformStand = false
+			end
+			if char then
+				for _, p in ipairs(char:GetDescendants()) do
+					if p:IsA("BasePart") then
+						p.CanCollide = true
+					end
+				end
+			end
+			local ww = workspace:FindFirstChild("WaterWalk")
+			if ww then ww:Destroy() end
+		end)
+		pcall(function() game:GetService("RunService"):Set3dRenderingEnabled(true) end)
+		pcall(function() if cleardrawcache then cleardrawcache() end end)
+		-- UI
+		pcall(function()
+			local L = rt.ui.Library
+			if L then
+				if type(L.Unload) == "function" then
+					L:Unload()
+				elseif type(L.Destroy) == "function" then
+					L:Destroy()
+				end
+			end
+		end)
+		pcall(function() if rt.ui.Gui then rt.ui.Gui:Destroy() end end)
+		destroyGuis()
+		-- thread (cuoi cung, bo qua thread dang chay shutdown)
+		local me = coroutine.running()
+		for th in pairs(rt.threads) do
+			if th ~= me then
+				pcall(realTask.cancel, th)
+			end
+		end
+		if rt.main and rt.main ~= me then
+			pcall(realTask.cancel, rt.main)
+		end
+	end
+	rt.shutdown = shutdown
+	g.__BF_Shutdown = shutdown
+
+	-- shim: moi task.spawn/defer/delay/spawn/delay cua script deu duoc theo doi va dung khi shutdown
+	if setfenv then
+		local function wrap(f, ...)
+			if type(f) ~= "function" then
+				return f, ...
+			end
+			return function(...)
+				if rt.alive then
+					return f(...)
+				end
+			end, ...
+		end
+		local function track(th)
+			if type(th) == "thread" then
+				rt.threads[th] = true
+			end
+			return th
+		end
+		local shimTask = setmetatable({
+			spawn = function(f, ...) if not rt.alive then return end return track(realTask.spawn(wrap(f, ...))) end,
+			defer = function(f, ...) if not rt.alive then return end return track(realTask.defer(wrap(f, ...))) end,
+			delay = function(t, f, ...) if not rt.alive then return end return track(realTask.delay(t, wrap(f, ...))) end,
+		}, { __index = realTask })
+		local shim = setmetatable({
+			task = shimTask,
+			spawn = shimTask.spawn,
+			delay = shimTask.delay,
+		}, { __index = realEnv, __newindex = realEnv })
+		setfenv(1, shim)
+	else
+		warn("[BF] executor khong co setfenv: logic cu co the khong dung het khi xoa UI")
+	end
 end
 
 repeat
@@ -468,15 +639,6 @@ getgenv().ExploitReq = (syn and syn.request)
 	or request
 	or requests
 getgenv().request = getgenv().request or getgenv().ExploitReq
-do
-	local g = getgenv()
-	local sameJob = g.LoadScriptJob == nil or g.LoadScriptJob == game.JobId
-	-- Chi coi la "Double UI" khi CUNG server va ban truoc con dang load / da load xong.
-	-- Neu ban truoc chet giua chung (qua 45s ma chua xong) hoac da sang server moi -> cho chay lai.
-	if g.LoadScript and sameJob and (g.__BF_LOADED == game.JobId or tick() - (g.LoadScriptAt or 0) < 45) then
-		return print("Double UI")
-	end
-end
 
 task.spawn(function()
 	pcall(function()
@@ -616,11 +778,11 @@ getgenv().getupvalues = debug.getupvalues
 wOrigin = game:GetService("Workspace"):WaitForChild("_WorldOrigin")
 CommF = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_")
 vu = game:GetService("VirtualUser")
-game:GetService("Players").LocalPlayer.Idled:connect(function()
+getgenv().__BF_Track(game:GetService("Players").LocalPlayer.Idled:Connect(function()
 	vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
 	wait(1)
 	vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-end)
+end))
 function BF_LoadUILibrary()
 	local URL = "https://raw.githubusercontent.com/46ggihut-beep/TopiUI/refs/heads/main/TopiUI_Lib.lua"
 	local CACHE = "Banana Cat Hub/topiui_lib_cache.lua"
@@ -689,6 +851,7 @@ function BF_LoadUILibrary()
 end
 local A = (function()
 	local Library = BF_LoadUILibrary()
+	pcall(function() getgenv().__BF_RT.ui.Library = Library end)
 	local UIS = game:GetService("UserInputService")
 	local API = { Options = {} }
 	local Options = API.Options
@@ -1248,6 +1411,32 @@ local A = (function()
 		API.Window = Window
 		pcall(function()
 			API.Gui = Window.Main:FindFirstAncestorWhichIsA("ScreenGui")
+		end)
+		pcall(function()
+			local rt = getgenv().__BF_RT
+			if not rt then return end
+			rt.ui.Library, rt.ui.Gui = Library, API.Gui
+			if API.Gui then
+				rt.track(API.Gui.Destroying:Connect(function()
+					rt.shutdown()
+				end))
+			end
+			-- watchdog: UI bi xoa/unload (nut dong, Library:Unload) -> dung toan bo logic
+			task.spawn(function()
+				while rt.alive do
+					task.wait(0.5)
+					local gone = false
+					if Library.Unloaded == true then
+						gone = true
+					elseif API.Gui and not API.Gui.Parent then
+						gone = true
+					end
+					if gone then
+						rt.shutdown()
+						break
+					end
+				end
+			end)
 		end)
 
 		task.delay(1, function()
@@ -5516,6 +5705,8 @@ local function B(Z, C, J, F, skipBoat)
 		end
 	end
 
+	-- chi tween vi tri, giu nguyen huong hien tai cua nguoi choi
+	C = CFrame.new(C.Position) * (Z.CFrame - Z.CFrame.Position)
 	k.LastTP, k.LastCF = tick(), C
 
 	local dist = (C.Position - Z.Position).Magnitude
@@ -7072,7 +7263,7 @@ function toTarget(P, e)
 		local mobHRP = AttackingMob and AttackingMob.Parent and AttackingMob:FindFirstChild("HumanoidRootPart")
 		local basePos = mobHRP and mobHRP.Position or P.Position
 		local dodgePos = Vector3.new(basePos.X, basePos.Y + dodgeOffsetY, basePos.Z)
-		local dodgeCF = CFrame.new(dodgePos) -- luôn thẳng đứng, không xoay theo mob
+		local dodgeCF = CFrame.new(dodgePos) * (H.CFrame - H.CFrame.Position) -- giữ nguyên hướng
 		if (dodgePos - H.Position).Magnitude < 3 then
 			TweenManager.CancelTweenOnly()
 			H.CFrame = dodgeCF
@@ -8262,9 +8453,9 @@ do
 		TR.Stop()
 		local myId = TR.Id
 		TR.Delay, TR.S, TR.D, TR.WinStart = 0.15, 0, 0, tick()
-		TR.Conn = game:GetService("RunService").Heartbeat:Connect(function()
+		TR.Conn = getgenv().__BF_Track(game:GetService("RunService").Heartbeat:Connect(function()
 			pcall(TR.Monitor)
-		end)
+		end))
 		task.spawn(function()
 			while Settings["Aura T-rex"] and TR.Id == myId do
 				local ok, fired = pcall(TR.Fire)
@@ -30907,7 +31098,7 @@ if not getgenv().BananaCatMainLoop then
 	getgenv().BananaCatMainLoop = true
 	lastHopTick = tick()
 	lastFruitTick = tick()
-	x.RenderStepped:Connect(function()
+	getgenv().__BF_MainConn = x.RenderStepped:Connect(function()
 		if getgenv().__BF_TELEPORTING then
 			return
 		end
