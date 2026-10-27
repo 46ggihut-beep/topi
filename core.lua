@@ -31217,4 +31217,88 @@ if not getgenv().BananaCatMainLoop then
 		end
 	end)
 end
+-- NOTIFY CÓ/KHÔNG: "Dừng all farm"
+-- hiện 1 lần sau khi load (chỉ khi đang có toggle farm bật), tự xóa sau 20s
+-- Có: tắt hết toggle farm 1 lần (bật lại bình thường) | Không / X / hết 20s: xóa notify, không làm gì
+task.spawn(function()
+	task.wait(3) -- chờ toggle đã lưu bật xong
+	pcall(function()
+		local Lib = A.Library
+		if not Lib or type(Lib.NotifyYesNo) ~= "function" then
+			warn("[TopiFix] UI lib chưa có NotifyYesNo, bỏ qua notify dừng farm")
+			return
+		end
+
+		-- page nào tính là farm: true = cả page, table = chỉ các section liệt kê
+		local FARM_PAGES = {
+			["Farming"] = true,
+			["Stack Farming"] = true,
+			["Farming Other"] = true,
+			["Upgrade Race"] = true,
+			["Get and Upgrade Items"] = true,
+			["Fruit and Raid, Dungeon"] = { ["Raids"] = true, ["Multi Raid"] = true, ["Join Dungeon"] = true, ["Dungeon"] = true },
+			["Sea Event"] = { ["Farming"] = true, ["Kitsune Event"] = true, ["Leviathan Event"] = true },
+			["Volcano Event"] = { ["Farming Volcano"] = true, ["Fully Volcano"] = true },
+		}
+		-- toggle chỉ là tùy chọn, không phải farm -> không tắt
+		local SKIP_TITLE = {
+			["Just Use Skill when Player Active Ken"] = true,
+			["Change Size Reel"] = true,
+			["No Frog"] = true,
+		}
+		local SKIP_PATTERN = { "^Use ", "^Ignore ", "^Account " }
+
+		local function isFarm(title, o)
+			if type(o) ~= "table" or o.type ~= "toggle" then
+				return false
+			end
+			local p = FARM_PAGES[o.Page_Name]
+			if not p or (p ~= true and not p[o.Section_Name]) then
+				return false
+			end
+			if SKIP_TITLE[title] then
+				return false
+			end
+			for _, pat in ipairs(SKIP_PATTERN) do
+				if title:find(pat) then
+					return false
+				end
+			end
+			return true
+		end
+
+		local function farmsOn()
+			local list = {}
+			for title, o in pairs(A.Options) do
+				if isFarm(title, o) and o.value == true and o.FunctionCreate then
+					list[#list + 1] = o
+				end
+			end
+			return list
+		end
+
+		if #farmsOn() == 0 then
+			return
+		end
+
+		Lib:NotifyYesNo({
+			Title = "Topi Hub",
+			Content = "Dừng all farm",
+			YesText = "Có",
+			NoText = "Không",
+			Duration = 20,
+			Callback = function(yes)
+				if yes ~= true then
+					return
+				end
+				local n = 0
+				for _, o in ipairs(farmsOn()) do
+					n = n + 1
+					task.spawn(pcall, o.FunctionCreate.SetStage, false)
+				end
+				A.CreateNoti({ Title = "Topi Hub", Desc = "Đã tắt " .. n .. " toggle farm", ShowTime = 5 })
+			end,
+		})
+	end)
+end)
 getgenv().__BF_LOADED = game.JobId
