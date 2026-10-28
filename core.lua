@@ -8164,32 +8164,30 @@ local function __FreezeMobLocally(mob)
 	end
 end
 
--- Pull system: BringMob chi dang ky mob can keo, Heartbeat keo bang van toc (khong teleport).
+-- Pull system: BringMob chi dang ky mob can keo, Heartbeat keo tung buoc nho theo dt (khong teleport).
 -- Mob da du gan diem keo thi dung keo, xa hon thi keo lai. Dang ky het han sau 0.3s neu BringMob khong goi lai.
 __BringPull = __BringPull or setmetatable({}, { __mode = "k" })
-function __BringPullStep()
+function __BringPullStep(dt)
 	local STOP_DIST = 8 -- (stud, mat phang ngang) du gan thi khong keo nua
+	local PULL_SPEED = 300 -- stud/giay
+	dt = math.clamp(tonumber(dt) or 1 / 60, 1 / 240, 1 / 20)
 	local now = tick()
 	for mob, d in pairs(__BringPull) do
 		local mobRoot = mob and mob.Parent and mob:FindFirstChild("HumanoidRootPart")
 		local mobHum = mob and mob.Parent and mob:FindFirstChildOfClass("Humanoid")
 		if not mobRoot or not mobHum or mobHum.Health <= 0 or now - d.t > 0.3 or not Settings["Bring Mob"] then
 			__BringPull[mob] = nil
-			if mobRoot then
-				local v = mobRoot.AssemblyLinearVelocity
-				mobRoot.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
-			end
 		else
 			local delta = d.pos - mobRoot.Position
 			local flat = Vector3.new(delta.X, 0, delta.Z)
 			local dist = flat.Magnitude
 			local v = mobRoot.AssemblyLinearVelocity
-			if dist <= STOP_DIST then
-				mobRoot.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
-			else
-				local dir = flat.Unit * math.clamp(dist * 10, 60, 300)
-				mobRoot.AssemblyLinearVelocity = Vector3.new(dir.X, v.Y, dir.Z)
+			if dist > STOP_DIST then
+				local step = math.min(PULL_SPEED * dt, dist - STOP_DIST * 0.5)
+				mobRoot.CFrame = mobRoot.CFrame + flat.Unit * step
 			end
+			-- triet van toc de AI/humanoid cua mob khong keo nguoc lai
+			mobRoot.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
 			mobRoot.AssemblyAngularVelocity = Vector3.zero
 		end
 	end
@@ -8198,8 +8196,8 @@ if getgenv().__BF_BringConn then
 	pcall(function() getgenv().__BF_BringConn:Disconnect() end)
 end
 getgenv().__BF_BringConn = (getgenv().__BF_Track or function(c) return c end)(
-	game:GetService("RunService").Heartbeat:Connect(function()
-		pcall(__BringPullStep)
+	game:GetService("RunService").Heartbeat:Connect(function(dt)
+		pcall(__BringPullStep, dt)
 	end)
 )
 
@@ -8251,7 +8249,8 @@ function BringMob(Q)
 	-- bring tat ca mob trong pham vi (khong con loc cung ten), uu tien mob gan diem keo, toi da maxCount
 	local cands = {}
 	for _, mob in ipairs(workspace.Enemies:GetChildren()) do
-		if mob ~= Q and not mob:FindFirstChild("Ignored") and IsMobAlive(mob) then
+		if mob ~= Q and mob.Name ~= "PropHitboxPlaceholder" and mob.Name ~= "Blank Buddy"
+			and not mob:FindFirstChild("Ignored") and IsMobAlive(mob) then
 			local mobRoot = mob:FindFirstChild("HumanoidRootPart")
 			if mobRoot then
 				local dist = (mobRoot.Position - l.Position).Magnitude
@@ -8282,7 +8281,12 @@ function BringMob(Q)
 				local canControl = true
 				pcall(function() canControl = isnetworkowner2(mobRoot) end)
 				if canControl then
-					__BringPull[mob] = { pos = l.Position, t = tick() }
+					local entry = __BringPull[mob]
+					if entry then
+						entry.pos, entry.t = l.Position, tick()
+					else
+						__BringPull[mob] = { pos = l.Position, t = tick() }
+					end
 					__FreezeMobLocally(mob)
 				end
 			end
@@ -20836,9 +20840,9 @@ DungeonSection.CreateToggle(
 							end
 							sizepart(E)
 							if y == "Blox Fruit" then
-								toTarget(E.HumanoidRootPart.CFrame * CFrame.new(-7, 12, 0))
+								toTarget(E.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 							else
-								toTarget(E.HumanoidRootPart.CFrame * CFrame.new(10, 20, 0))
+								toTarget(E.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 							end
 						until t.Character.Humanoid.Health <= 0
 					else
@@ -20865,10 +20869,11 @@ DungeonSection.CreateToggle(
 								ClickM1Dungeon(l)
 							end
 							sizepart(l)
+							BringMob(l)
 							if E == "Blox Fruit" then
-								toTarget(l.HumanoidRootPart.CFrame * CFrame.new(-7, 12, 0))
+								toTarget(l.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 							else
-								toTarget(l.HumanoidRootPart.CFrame * CFrame.new(10, 20, 0))
+								toTarget(l.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 							end
 						until t.Character.Humanoid.Health <= 0 or (DetectPropHitboxPlaceholder())
 					end
