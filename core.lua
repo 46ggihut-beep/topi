@@ -162,9 +162,16 @@ do
 			defer = function(f, ...) if not rt.alive then return end return track(realTask.defer(wrap(f, ...))) end,
 			delay = function(t, f, ...) if not rt.alive then return end return track(realTask.delay(t, wrap(f, ...))) end,
 		}, { __index = realTask })
+		-- spawn() kieu cu (legacy) chay tre 1 frame, KHONG chay ngay nhu task.spawn.
+		-- Rat nhieu toggle goi spawn(vong lap while Settings[x]) truoc SaveSettings(x, true);
+		-- neu chay ngay thi Settings[x] con false -> vong lap thoat luon -> bat toggle ma khong farm.
+		local function legacySpawn(f, ...)
+			if not rt.alive then return end
+			return track(realTask.delay(0, wrap(f, ...)))
+		end
 		local shim = setmetatable({
 			task = shimTask,
-			spawn = shimTask.spawn,
+			spawn = legacySpawn,
 			delay = shimTask.delay,
 		}, { __index = realEnv, __newindex = realEnv })
 		setfenv(1, shim)
@@ -1141,7 +1148,26 @@ local A = (function()
 					end
 				end
 			else
+				local picked, hasDefault = {}, false
+				if type(s.Default) == "table" then
+					if #s.Default > 0 then
+						for _, n in ipairs(s.Default) do
+							picked[tostring(n)] = true
+							hasDefault = true
+						end
+					else
+						for k, v in pairs(s.Default) do
+							hasDefault = true
+							if v == true then
+								picked[tostring(k)] = true
+							end
+						end
+					end
+				end
 				for _, n in ipairs(names) do
+					if hasDefault then
+						states[n] = picked[n] == true
+					end
 					if states[n] then
 						init[#init + 1] = n
 					end
@@ -19953,6 +19979,41 @@ getgenv().CheckIsplayingRaid = function()
 	end
 end
 getgenv().buychip = true
+-- Mua Special Microchip: uu tien BELI (100k). Chi dung trai trong inventory khi beli khong du
+-- (toggle "Get Fruit In Inventory Low Beli"). Neu dang cam trai thi server tru trai thay vi beli
+-- nen thu tool dang cam truoc khi mua bang beli (tru khi dang bat Hop Sever Raid, can trai that).
+function BuyRaidChip(raid)
+	local CF = game:GetService("ReplicatedStorage").Remotes.CommF_
+	local beli = 0
+	pcall(function()
+		beli = t.Data.Beli.Value
+	end)
+	if beli >= 100000 then
+		if not Settings["Hop Sever Raid"] then
+			pcall(function()
+				local ch = t.Character
+				local hum = ch and ch:FindFirstChildOfClass("Humanoid")
+				if hum then
+					for _, v in ipairs(ch:GetChildren()) do
+						if v:IsA("Tool") and string.find(v.Name, "Fruit") then
+							hum:UnequipTools()
+							break
+						end
+					end
+				end
+			end)
+		end
+	elseif Settings["Get Fruit In Inventory Low Beli"] and not CheckFruitplr() and TakeFruitInventory(true) then
+		pcall(function()
+			CF:InvokeServer("LoadFruit", TakeFruitInventory(true))
+		end)
+	end
+	pcall(function()
+		CF:InvokeServer("RaidsNpc", "Check")
+		CF:InvokeServer("RaidsNpc", "Select", raid or "Flame")
+	end)
+	wait(1)
+end
 function IsRaidKillAuraActive()
 	if not Settings["Kill Aura Raid"] then
 		return false
@@ -20023,13 +20084,13 @@ RaidsSection.CreateToggle({ Title = "Auto Raid", Desc = nil, Default = Settings[
 								UsedualFlock()
 								ClickM1(l)
 								sizepart(l)
-								BringMobRaid(l)
+								BringMob(l)
 								if Settings["Select Weapon"] == "Blox Fruit" then
 									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 								else
-									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(10, 20, 0))
+									toTarget(l.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 								end
-							until not IsMobAlive(l)
+							until not IsMobAlive(l) or not Settings["Auto Raid"]
 						else
 							local y = GetLastRaidIsland()
 							if y then
@@ -20062,21 +20123,7 @@ RaidsSection.CreateToggle({ Title = "Auto Raid", Desc = nil, Default = Settings[
 								return
 							end
 						end
-						if
-							not CheckFruitplr()
-							and (TakeFruitInventory(true))
-							and Settings["Get Fruit In Inventory Low Beli"]
-						then
-							game:GetService("ReplicatedStorage").Remotes.CommF_
-								:InvokeServer("LoadFruit", TakeFruitInventory(true))
-						end
-						game.ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Check")
-						game.ReplicatedStorage.Remotes.CommF_:InvokeServer(
-							"RaidsNpc",
-							"Select",
-							Settings["Select Raid"] or "Flame"
-						)
-						wait(1)
+						BuyRaidChip(Settings["Select Raid"])
 					end
 				end)
 				if E then
@@ -20254,12 +20301,14 @@ function Multiraid(b)
 				task.wait()
 				UsedualFlock()
 				ClickM1(E)
+				sizepart(E)
+				BringMob(E)
 				if Settings["Select Weapon"] == "Blox Fruit" then
 					toTarget(E.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
 				else
-					toTarget(E.HumanoidRootPart.CFrame * CFrame.new(10, 20, 0))
+					toTarget(E.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
 				end
-			until not IsMobAlive(E)
+			until not IsMobAlive(E) or not Settings["Auto Multi Raid"]
 		else
 			local E = GetLastRaidIsland()
 			if E then
@@ -20280,12 +20329,7 @@ function Multiraid(b)
 		and not DetectItemPlr("Special Microchip")
 		and not CheckInRaid()
 	then
-		if not CheckFruitplr() and (TakeFruitInventory(true)) and Settings["Get Fruit In Inventory Low Beli"] then
-			game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("LoadFruit", TakeFruitInventory(true))
-		end
-		game.ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Check")
-		game.ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Select", b or "Flame")
-		wait(1)
+		BuyRaidChip(b)
 	end
 end
 MultiRaidsSection.CreateToggle(
