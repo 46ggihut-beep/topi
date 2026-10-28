@@ -5974,7 +5974,7 @@ getgenv().BoatTween = (function()
 			return false
 		end
 
-		local pspeed = math.max(tonumber(Settings["Speed Tween "]) or 300, 1)
+		local pspeed = math.max(tonumber(Settings["Speed Tween "]) or 190, 1)
 		local bspeed = math.max(tonumber(Settings["Value Speed Tween Boat"]) or 350, 1)
 		local boat = st.session or myBoat(hp, REUSE_DIST)
 		local bseat = boat and boat:FindFirstChild("VehicleSeat")
@@ -6081,7 +6081,7 @@ do
 	end
 
 	local function flyTo(H, pos)
-		B(H, CFrame.new(pos), tonumber(Settings["Speed Tween "]) or 300, 8)
+		B(H, CFrame.new(pos), tonumber(Settings["Speed Tween "]) or 190, 8)
 	end
 
 	local function cloudPos(obj)
@@ -6361,7 +6361,7 @@ do
 	local V3 = Vector3.new
 
 	getgenv().ShortcutWorth = function(direct, viaFly, overheadSec)
-		local speed = tonumber(Settings["Speed Tween "]) or 300
+		local speed = tonumber(Settings["Speed Tween "]) or 190
 		local margin = tonumber(getgenv().Sea3RouteMargin) or 0
 		return viaFly + (overheadSec or 0) * speed + margin < direct
 	end
@@ -6546,7 +6546,7 @@ do
 				return true
 			end
 			alive()
-			B(hrp, CFrame.new(pos), tonumber(Settings["Speed Tween "]) or 300, 8)
+			B(hrp, CFrame.new(pos), tonumber(Settings["Speed Tween "]) or 190, 8)
 			task.wait(0.15)
 		end
 		dbg("flyTo timeout/huỷ", pos)
@@ -6859,7 +6859,7 @@ do
 					break
 				end
 				alive()
-				B(hrp, CFrame.new(NPC), tonumber(Settings["Speed Tween "]) or 300, 8)
+				B(hrp, CFrame.new(NPC), tonumber(Settings["Speed Tween "]) or 190, 8)
 				task.wait(0.15)
 			end
 			if not arrived then
@@ -7278,7 +7278,7 @@ function toTarget(P, e)
 	Z = (function() if ReadyToDodge then return (CFrame.new(0, 200, 0)) else return (function() if G then return (CFrame.new(0, Settings["Distance Teleport Y"] or 800, 0)) else return Z end end)() end end)()
 	if ReadyToDodge then getgenv().DodgeDescend = true end
 	local dodgeSpd = (ReadyToDodge or getgenv().DodgeDescend) and not G and 1000 or nil
-	Y, e = dodgeSpd or Settings["Speed Tween "] or 300, P * Z
+	Y, e = dodgeSpd or Settings["Speed Tween "] or 190, P * Z
 	B(H, e, Y)
 end
 getgenv().BackupTween = toTarget
@@ -8162,14 +8162,46 @@ local function __FreezeMobLocally(mob)
 			end
 		end)
 	end
-	local root = mob:FindFirstChild("HumanoidRootPart")
-	if root then
-		pcall(function()
-			root.AssemblyLinearVelocity = Vector3.zero
-			root.AssemblyAngularVelocity = Vector3.zero
-		end)
+end
+
+-- Pull system: BringMob chi dang ky mob can keo, Heartbeat keo bang van toc (khong teleport).
+-- Mob da du gan diem keo thi dung keo, xa hon thi keo lai. Dang ky het han sau 0.3s neu BringMob khong goi lai.
+__BringPull = __BringPull or setmetatable({}, { __mode = "k" })
+function __BringPullStep()
+	local STOP_DIST = 8 -- (stud, mat phang ngang) du gan thi khong keo nua
+	local now = tick()
+	for mob, d in pairs(__BringPull) do
+		local mobRoot = mob and mob.Parent and mob:FindFirstChild("HumanoidRootPart")
+		local mobHum = mob and mob.Parent and mob:FindFirstChildOfClass("Humanoid")
+		if not mobRoot or not mobHum or mobHum.Health <= 0 or now - d.t > 0.3 or not Settings["Bring Mob"] then
+			__BringPull[mob] = nil
+			if mobRoot then
+				local v = mobRoot.AssemblyLinearVelocity
+				mobRoot.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
+			end
+		else
+			local delta = d.pos - mobRoot.Position
+			local flat = Vector3.new(delta.X, 0, delta.Z)
+			local dist = flat.Magnitude
+			local v = mobRoot.AssemblyLinearVelocity
+			if dist <= STOP_DIST then
+				mobRoot.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
+			else
+				local dir = flat.Unit * math.clamp(dist * 10, 60, 300)
+				mobRoot.AssemblyLinearVelocity = Vector3.new(dir.X, v.Y, dir.Z)
+			end
+			mobRoot.AssemblyAngularVelocity = Vector3.zero
+		end
 	end
 end
+if getgenv().__BF_BringConn then
+	pcall(function() getgenv().__BF_BringConn:Disconnect() end)
+end
+getgenv().__BF_BringConn = (getgenv().__BF_Track or function(c) return c end)(
+	game:GetService("RunService").Heartbeat:Connect(function()
+		pcall(__BringPullStep)
+	end)
+)
 
 function BringMob(Q)
 	if not Settings["Bring Mob"] or not Q or not Q.Parent then
@@ -8208,25 +8240,35 @@ function BringMob(Q)
 	end
 
 	local buddhaFarm = BuddhaFarmOn() or TRexAuraOn()
-	local maxCount = buddhaFarm and math.huge or math.max(2, tonumber(Settings["Bring Mob Count"]) or 2)
-	local range = buddhaFarm and 500 or (maxCount > 2 and 350 or 200)
+	local maxCount = buddhaFarm and math.huge or math.max(2, tonumber(Settings["Bring Mob Count"]) or 6)
+	local range = buddhaFarm and 500 or math.clamp(tonumber(Settings["Bring Mob Distance"]) or 300, 100, 500)
 	local targets = {}
 
 	if not Q:FindFirstChild("Ignored") then
 		table.insert(targets, Q)
 	end
 
+	-- bring tat ca mob trong pham vi (khong con loc cung ten), uu tien mob gan diem keo, toi da maxCount
+	local cands = {}
 	for _, mob in ipairs(workspace.Enemies:GetChildren()) do
-		if #targets >= maxCount then break end
-		if mob ~= Q and mob.Name == Q.Name and not mob:FindFirstChild("Ignored") and IsMobAlive(mob) then
+		if mob ~= Q and not mob:FindFirstChild("Ignored") and IsMobAlive(mob) then
 			local mobRoot = mob:FindFirstChild("HumanoidRootPart")
-			if mobRoot and (mobRoot.Position - l.Position).Magnitude <= range then
-				table.insert(targets, mob)
+			if mobRoot then
+				local dist = (mobRoot.Position - l.Position).Magnitude
+				if dist <= range then
+					cands[#cands + 1] = { mob = mob, dist = dist }
+				end
 			end
 		end
 	end
+	table.sort(cands, function(a, b) return a.dist < b.dist end)
+	for _, c in ipairs(cands) do
+		if #targets >= maxCount then break end
+		table.insert(targets, c.mob)
+	end
 
-	if #targets < 2 or (playerRoot.Position - root.Position).Magnitude > 300 then
+	-- khong co mob nao khac trong pham vi thi khong bring
+	if #cands == 0 or (playerRoot.Position - root.Position).Magnitude > 300 then
 		return
 	end
 
@@ -8240,11 +8282,7 @@ function BringMob(Q)
 				local canControl = true
 				pcall(function() canControl = isnetworkowner2(mobRoot) end)
 				if canControl then
-					pcall(function()
-						mobRoot.CFrame = l * CFrame.new(0, math.random(0, 2), 0)
-						mobRoot.AssemblyLinearVelocity = Vector3.zero
-						mobRoot.AssemblyAngularVelocity = Vector3.zero
-					end)
+					__BringPull[mob] = { pos = l.Position, t = tick() }
 					__FreezeMobLocally(mob)
 				end
 			end
@@ -8712,9 +8750,15 @@ SettingFarmMainSection.CreateToggle(
 	end
 )
 SettingFarmMainSection.CreateSlider(
-	{ Title = "Bring Mob Count", Min = 2, Max = 6, Default = Settings["Bring Mob Count"] or 2, Precise = true },
+	{ Title = "Bring Mob Count", Min = 2, Max = 10, Default = Settings["Bring Mob Count"] or 6, Precise = true },
 	function(I)
 		SaveSettings("Bring Mob Count", I)
+	end
+)
+SettingFarmMainSection.CreateSlider(
+	{ Title = "Bring Mob Distance", Min = 100, Max = 500, Default = Settings["Bring Mob Distance"] or 300, Precise = true },
+	function(I)
+		SaveSettings("Bring Mob Distance", I)
 	end
 )
 SettingFarmMainSection.CreateToggle(
@@ -8749,7 +8793,7 @@ SettingFarmMainSection.CreateToggle(
 	end
 )
 SettingFarmMainSection.CreateSlider(
-	{ Title = "Speed Tween ", Min = 0, Max = 1000, Default = Settings["Speed Tween "] or 300, Precise = true },
+	{ Title = "Speed Tween ", Min = 0, Max = 1000, Default = Settings["Speed Tween "] or 190, Precise = true },
 	function(I)
 		SaveSettings("Speed Tween ", I)
 	end
