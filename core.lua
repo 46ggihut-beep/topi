@@ -491,10 +491,7 @@ function TRexAuraOn()
 	return Settings ~= nil and Settings["Aura T-rex"] == true
 end
 function FruitFarmY()
-	if TRexAuraOn() then
-		return 15
-	end
-	return getgenv().YPosFruit or 25
+	return 15
 end
 function BuddhaFarmY()
 	if TRexAuraOn() then
@@ -7385,7 +7382,8 @@ function NameWeapon(g, G)
 			end
 		end
 	end
-	return m(t.Backpack) or (m(t.Character))
+	local bp = t:FindFirstChild("Backpack")
+	return (bp and m(bp)) or (t.Character and m(t.Character))
 end
 local g, G, m, E =
 	require(game:GetService("ReplicatedStorage").Mouse),
@@ -7523,7 +7521,8 @@ function attackMelee(m)
 end
 AttackFunction = function(G)
 	LPH_ATTRIBUTES(VM(NONE))
-	if t.Character.Stun.Value ~= 0 then
+	local stunV = t.Character and t.Character:FindFirstChild("Stun")
+	if not stunV or stunV.Value ~= 0 then
 		return
 	end
 	if not Settings["Attack No Animation "] then
@@ -7540,7 +7539,8 @@ AttackFunction = function(G)
 end
 getgenv().AttackFunctionnhungSuperTrial = function()
 	LPH_ATTRIBUTES(VM(NONE))
-	if t.Character.Stun.Value ~= 0 then
+	local stunV = t.Character and t.Character:FindFirstChild("Stun")
+	if not stunV or stunV.Value ~= 0 then
 		return
 	end
 	local G = AttackAOE(80, true)
@@ -7947,14 +7947,29 @@ getgenv().FireHumanoidTap = function(pos)
 end
 function ShootM1(E)
 	spawn(function()
-		if
-			not require(game:GetService("ReplicatedStorage").Modules.CombatUtil):IsGunReloading(
-				t.Character[NameWeapon("Gun")]
-			)
-		then
-			if NameWeapon("Gun") ~= "Skull Guitar" then
-				local l =
-					getupvalues(require(game:GetService("ReplicatedStorage").Controllers.CombatController).Attack)[9]
+		local gunName = NameWeapon("Gun")
+		local char = t.Character
+		local gun = gunName and char and char:FindFirstChild(gunName)
+		local hrp = E and E:FindFirstChild("HumanoidRootPart")
+		if not gun or not hrp then
+			return
+		end
+		local okCU, CombatUtil = pcall(function()
+			return require(game:GetService("ReplicatedStorage").Modules.CombatUtil)
+		end)
+		if not okCU or not CombatUtil or CombatUtil:IsGunReloading(gun) then
+			return
+		end
+		local function gunCooldown()
+			local cd = gun:FindFirstChild("Cooldown")
+			return cd and cd.Value or 0.3
+		end
+		if gunName ~= "Skull Guitar" then
+			pcall(function()
+				local l = getupvalues(require(game:GetService("ReplicatedStorage").Controllers.CombatController).Attack)[9]
+				if type(l) ~= "function" then
+					return
+				end
 				local Q, d, I, _, o, V, N =
 					debug.getupvalue(l, 15),
 					debug.getupvalue(l, 13),
@@ -7963,11 +7978,22 @@ function ShootM1(E)
 					debug.getupvalue(l, 14),
 					debug.getupvalue(l, 12),
 					debug.getupvalue(l, 18)
+				if
+					type(Q) ~= "number"
+					or type(d) ~= "number"
+					or type(I) ~= "number"
+					or type(_) ~= "number"
+					or type(o) ~= "number"
+					or type(V) ~= "number"
+					or type(N) ~= "number"
+				then
+					return
+				end
 				local y = V * d
 				local P = ((o * d + V * Q) % I * I + y) % _
 				o = math.floor(P / I)
 				V = P - o * I
-				N = N + (1)
+				N = N + 1
 				debug.setupvalue(l, 15, Q)
 				debug.setupvalue(l, 13, d)
 				debug.setupvalue(l, 16, I)
@@ -7976,25 +8002,25 @@ function ShootM1(E)
 				debug.setupvalue(l, 12, V)
 				debug.setupvalue(l, 18, N)
 				game.ReplicatedStorage.Remotes.Validator2:FireServer(math.floor(P / _ * 16777215), N)
-				if NameWeapon("Gun") == "Cannon" then
-					game:GetService("ReplicatedStorage").Modules.Net
-						:FindFirstChild("RE/ShootGunEvent")
-						:FireServer(unpack({ [1] = E }))
-				else
-					_ = { [1] = E.HumanoidRootPart.Position, [2] = { [1] = E.HumanoidRootPart } }
-					game:GetService("ReplicatedStorage").Modules.Net
-						:FindFirstChild("RE/ShootGunEvent")
-						:FireServer(unpack(_))
-				end
-				task.wait(t.Character[NameWeapon("Gun")].Cooldown.Value)
+			end)
+			if gunName == "Cannon" then
+				game:GetService("ReplicatedStorage").Modules.Net
+					:FindFirstChild("RE/ShootGunEvent")
+					:FireServer(unpack({ [1] = E }))
 			else
-				local l = { [1] = "TAP", [2] = E.HumanoidRootPart.Position }
-				game:GetService("Players").LocalPlayer.Character
-					:FindFirstChild("Skull Guitar").RemoteEvent
-					:FireServer(unpack(l))
-				FireHumanoidTap(E.HumanoidRootPart.Position)
-				task.wait(t.Character[NameWeapon("Gun")].Cooldown.Value)
+				local args = { [1] = hrp.Position, [2] = { [1] = hrp } }
+				game:GetService("ReplicatedStorage").Modules.Net
+					:FindFirstChild("RE/ShootGunEvent")
+					:FireServer(unpack(args))
 			end
+			task.wait(gunCooldown())
+		else
+			local re = gun:FindFirstChild("RemoteEvent")
+			if re then
+				re:FireServer("TAP", hrp.Position)
+			end
+			FireHumanoidTap(hrp.Position)
+			task.wait(gunCooldown())
 		end
 	end)
 end
@@ -8029,7 +8055,8 @@ local function m(E, l)
 	return nil
 end
 function DetectItemPlr(E)
-	if t.Character:FindFirstChild(E) or (t.Backpack:FindFirstChild(E)) then
+	local bp = t:FindFirstChild("Backpack")
+	if (t.Character and t.Character:FindFirstChild(E)) or (bp and bp:FindFirstChild(E)) then
 		return true
 	end
 end
@@ -8193,9 +8220,14 @@ end
 -- Pull system: BringMob chi dang ky mob can keo, Heartbeat keo tung buoc nho theo dt (khong teleport).
 -- Mob da du gan diem keo thi dung keo, xa hon thi keo lai. Dang ky het han sau 0.3s neu BringMob khong goi lai.
 __BringPull = __BringPull or setmetatable({}, { __mode = "k" })
+-- mob bi server giat lai (rubber-band) thi khong bring mob do nua (theo tung mob, het khi mob chet/respawn)
+__BringBlock = __BringBlock or setmetatable({}, { __mode = "k" })
+__BringSnap = __BringSnap or setmetatable({}, { __mode = "k" })
 function __BringPullStep(dt)
 	local STOP_DIST = 8 -- (stud, mat phang ngang) du gan thi khong keo nua
 	local PULL_SPEED = 300 -- stud/giay
+	local SNAP_DIST = 8 -- mob tu nhay xa hon the so voi cho minh vua dat = bi giat lai
+	local SNAP_LIMIT = 2 -- so lan bi giat (trong 2s) de ngung bring mob do
 	dt = math.clamp(tonumber(dt) or 1 / 60, 1 / 240, 1 / 20)
 	local now = tick()
 	for mob, d in pairs(__BringPull) do
@@ -8203,6 +8235,31 @@ function __BringPullStep(dt)
 		local mobHum = mob and mob.Parent and mob:FindFirstChildOfClass("Humanoid")
 		if not mobRoot or not mobHum or mobHum.Health <= 0 or now - d.t > 0.3 or not Settings["Bring Mob"] then
 			__BringPull[mob] = nil
+		elseif __BringBlock[mob] then
+			__BringPull[mob] = nil
+		elseif d.last and (mobRoot.Position - d.last).Magnitude > SNAP_DIST then
+			-- mob bi giat lai cho cu: dem, du SNAP_LIMIT lan thi bo qua mob nay
+			local sn = __BringSnap[mob]
+			if not sn or now - sn.t > 2 then
+				sn = { n = 0, t = now }
+				__BringSnap[mob] = sn
+			end
+			sn.n = sn.n + 1
+			d.last = mobRoot.Position
+			if sn.n >= SNAP_LIMIT then
+				__BringBlock[mob] = true
+				__BringPull[mob] = nil
+				local st = __BringFreezeState[mobHum]
+				if st then
+					pcall(function()
+						mobHum.WalkSpeed = st.WalkSpeed
+						mobHum.JumpPower = st.JumpPower
+						mobHum.JumpHeight = st.JumpHeight
+						mobHum.AutoRotate = st.AutoRotate
+					end)
+					__BringFreezeState[mobHum] = nil
+				end
+			end
 		else
 			local delta = d.pos - mobRoot.Position
 			local flat = Vector3.new(delta.X, 0, delta.Z)
@@ -8215,6 +8272,7 @@ function __BringPullStep(dt)
 			-- triet van toc de AI/humanoid cua mob khong keo nguoc lai
 			mobRoot.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
 			mobRoot.AssemblyAngularVelocity = Vector3.zero
+			d.last = mobRoot.Position
 		end
 	end
 end
@@ -8268,7 +8326,7 @@ function BringMob(Q)
 	local range = buddhaFarm and 500 or math.clamp(tonumber(Settings["Bring Mob Distance"]) or 300, 100, 500)
 	local targets = {}
 
-	if not Q:FindFirstChild("Ignored") then
+	if not Q:FindFirstChild("Ignored") and not __BringBlock[Q] then
 		table.insert(targets, Q)
 	end
 
@@ -8276,7 +8334,7 @@ function BringMob(Q)
 	local cands = {}
 	for _, mob in ipairs(workspace.Enemies:GetChildren()) do
 		if mob ~= Q and mob.Name ~= "PropHitboxPlaceholder" and mob.Name ~= "Blank Buddy"
-			and not mob:FindFirstChild("Ignored") and IsMobAlive(mob) then
+			and not __BringBlock[mob] and not mob:FindFirstChild("Ignored") and IsMobAlive(mob) then
 			local mobRoot = mob:FindFirstChild("HumanoidRootPart")
 			if mobRoot then
 				local dist = (mobRoot.Position - l.Position).Magnitude
@@ -8298,7 +8356,7 @@ function BringMob(Q)
 	end
 
 	for _, mob in ipairs(targets) do
-		if mob.Parent and IsMobAlive(mob) then
+		if mob.Parent and not __BringBlock[mob] and IsMobAlive(mob) then
 			local mobRoot = mob:FindFirstChild("HumanoidRootPart")
 			if mobRoot then
 				sizepart(mob)
@@ -9777,7 +9835,7 @@ function DetectMobAura()
 	return H
 end
 getgenv().StackFarm = true
-getgenv().YPosFruit = 20
+getgenv().YPosFruit = 15
 function CheckCDSkillTransformation(V, H)
 	local B, C, J = next, game:GetService("Players").LocalPlayer.PlayerGui.Main.Skills[V.Name]:GetChildren()
 	for F, F in B, C, J do
@@ -12591,7 +12649,7 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		HiddenDodge.untilTime = 0
 	end
 
-	GetHiddenFarmCFrame = function(c)local n,L=c.HumanoidRootPart,Settings["Select Weapon"]=="Blox Fruit";local U=HiddenEvent.farmHeight or(TRexAuraOn()and 15)or L and(getgenv().YPosFruit or 20)or 20;return n.CFrame*CFrame.new(L and-7 or 7,(function() if IsHiddenDodging() then return U+(IsHiddenBoss(c)and 40 or 25) else return U end end)(),0);end
+	GetHiddenFarmCFrame = function(c)local n,L=c.HumanoidRootPart,Settings["Select Weapon"]=="Blox Fruit";local U=HiddenEvent.farmHeight or(TRexAuraOn()and 15)or L and 15 or 20;return n.CFrame*CFrame.new(L and-7 or 7,(function() if IsHiddenDodging() then return U+(IsHiddenBoss(c)and 40 or 25) else return U end end)(),0);end
 
 	KillHiddenEnemy = function(fighting)
 		local now = tick()
