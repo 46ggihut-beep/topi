@@ -8445,7 +8445,6 @@ SettingFarmMainSection.CreateToggle(
 )
 do
 	local TR = {
-		Name = "T-Rex-T-Rex",
 		Range = 60,
 		HoldTime = 0.01,
 		Vec = Vector3.new(0.01, -0.8, 0.01),
@@ -8469,14 +8468,52 @@ do
 		return c and c:FindFirstChild("HumanoidRootPart")
 	end
 
+	-- lay fruit bat ky dang cam/co (ToolTip == "Blox Fruit"), uu tien cai dang cam tren tay
 	function TR.GetFruit()
 		local c = TR.Plr.Character
-		local tool = c and c:FindFirstChild(TR.Name)
-		if tool then
-			return tool
+		if c then
+			for _, tool in ipairs(c:GetChildren()) do
+				if tool:IsA("Tool") and tool.ToolTip == "Blox Fruit" then
+					return tool
+				end
+			end
 		end
 		local bp = TR.Plr:FindFirstChild("Backpack")
-		return bp and bp:FindFirstChild(TR.Name)
+		if bp then
+			for _, tool in ipairs(bp:GetChildren()) do
+				if tool:IsA("Tool") and tool.ToolTip == "Blox Fruit" then
+					return tool
+				end
+			end
+		end
+		return nil
+	end
+
+	-- mob song gan nhat trong tam, tra ve huong ngang tu minh toi mob
+	function TR.AimDir()
+		local root, enemies = TR.Root(), workspace:FindFirstChild("Enemies")
+		if not (root and enemies) then
+			return nil
+		end
+		local best, bestD
+		for _, mob in ipairs(enemies:GetChildren()) do
+			local mr = mob:FindFirstChild("HumanoidRootPart")
+			local hum = mr and TR.GetHum(mob)
+			if hum and hum.Health > 0 then
+				local d = (mr.Position - root.Position).Magnitude
+				if d <= TR.Range and (not bestD or d < bestD) then
+					best, bestD = mr, d
+				end
+			end
+		end
+		if not best then
+			return nil
+		end
+		local flat = (best.Position - root.Position) * Vector3.new(1, 0, 1)
+		if flat.Magnitude < 0.01 then
+			return TR.Vec
+		end
+		return flat.Unit
 	end
 
 	function TR.GetHum(mob)
@@ -8538,14 +8575,28 @@ do
 		if not fruit then
 			return false
 		end
-		local remote = fruit:FindFirstChild("LeftClickRemote")
-		if not remote or not TR.HasTarget() then
+		if not TR.HasTarget() then
 			return false
 		end
-		remote:FireServer(TR.Vec, 1)
-		task.wait(TR.HoldTime)
-		remote:FireServer(false)
-		return true
+		local remote = fruit:FindFirstChild("LeftClickRemote")
+		if remote then
+			remote:FireServer(TR.AimDir() or TR.Vec, 1)
+			task.wait(TR.HoldTime)
+			remote:FireServer(false)
+			return true
+		end
+		-- fruit khong co LeftClickRemote (kieu TAP)
+		local rf, re = fruit:FindFirstChild("RemoteFunction"), fruit:FindFirstChild("RemoteEvent")
+		if rf then
+			if re then
+				local root = TR.Root()
+				local dir = TR.AimDir()
+				re:FireServer(root and dir and (root.Position + dir * 10) or nil)
+			end
+			rf:InvokeServer("TAP")
+			return true
+		end
+		return false
 	end
 
 	-- chỉnh delay theo tỉ lệ (xung server nhận / phát bắn) trong mỗi cửa sổ 1s
@@ -8599,7 +8650,7 @@ do
 	end
 
 	SettingFarmMainSection.CreateToggle(
-		{ Title = "Aura T-rex", Desc = nil, Default = Settings["Aura T-rex"] or false },
+		{ Title = "Aura Fruit", Desc = "Auto M1 fruit dang co (moi loai fruit)", Default = Settings["Aura T-rex"] or false },
 		function(I)
 			SaveSettings("Aura T-rex", I)
 			if I then
