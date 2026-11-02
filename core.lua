@@ -11719,6 +11719,669 @@ do
 end
 
 
+HalloweenSection = FarmotherMain.CreateSection("Halloween")
+do
+	local HW_KEY = "Auto Farm Pumpkin Hunt"
+	local PUMPKIN_BEHIND = 1
+	local JACK_RANGE = 200
+	local HW_MOBS = { jackolantern = true, pumpkinsnowman = true }
+
+	local function normName(s)
+		return (string.lower(tostring(s or "")):gsub("[^%w]", ""))
+	end
+
+	local function getHRP()
+		local ch = game.Players.LocalPlayer.Character
+		return ch and ch:FindFirstChild("HumanoidRootPart")
+	end
+
+	local function pivotOf(o)
+		if not o or not o.Parent then
+			return nil
+		end
+		if o:IsA("Model") then
+			return o:GetPivot()
+		elseif o:IsA("BasePart") then
+			return o.CFrame
+		end
+		return nil
+	end
+
+	local function collectPumpkins()
+		local list = {}
+		local root = workspace:FindFirstChild("PumpkinHunt")
+		if not root then
+			return list
+		end
+		for _, c in ipairs(root:GetChildren()) do
+			if c:IsA("Model") or c:IsA("BasePart") then
+				table.insert(list, c)
+			elseif c:IsA("Folder") then
+				for _, cc in ipairs(c:GetChildren()) do
+					if cc:IsA("Model") or cc:IsA("BasePart") then
+						table.insert(list, cc)
+					end
+				end
+			end
+		end
+		return list
+	end
+
+	local function nearestPumpkin()
+		local hrp = getHRP()
+		if not hrp then
+			return nil
+		end
+		local best, bestD = nil, math.huge
+		for _, p in ipairs(collectPumpkins()) do
+			local cf = pivotOf(p)
+			if cf then
+				local d = (cf.Position - hrp.Position).Magnitude
+				if d < bestD then
+					best, bestD = p, d
+				end
+			end
+		end
+		return best
+	end
+
+	-- chỉ lấy Jack O' Lantern / Pumpkin Snowman trong JACK_RANGE stud quanh player
+	local function findJackMob()
+		local hrp = getHRP()
+		if not hrp then
+			return nil
+		end
+		local best, bestD = nil, JACK_RANGE
+		local enemies = workspace:FindFirstChild("Enemies")
+		if enemies then
+			for _, m in ipairs(enemies:GetChildren()) do
+				if HW_MOBS[normName(m.Name)] and IsMobAlive(m) then
+					local d = (m.HumanoidRootPart.Position - hrp.Position).Magnitude
+					if d <= bestD then
+						best, bestD = m, d
+					end
+				end
+			end
+		end
+		return best
+	end
+
+	-- equip melee giống logic phá mây
+	local lastEquip = 0
+	local function equipMelee()
+		if tick() - lastEquip < 0.3 then
+			return
+		end
+		lastEquip = tick()
+		pcall(function()
+			local lp = game:GetService("Players").LocalPlayer
+			local char = lp.Character
+			local hum = char and char:FindFirstChildOfClass("Humanoid")
+			local tool = NameWeapon and NameWeapon("Melee", true)
+			if hum and tool and not hum.Sit and tool.Parent ~= char then
+				hum:EquipTool(tool)
+			end
+		end)
+	end
+
+	-- click y hệt logic phá mây (VirtualInputManager)
+	local CLICK_UDIM = UDim2.new(0.15, 0, 0.15, 0)
+	local function doClick()
+		local vim = game:GetService("VirtualInputManager")
+		local vp = workspace.CurrentCamera.ViewportSize
+		local x = vp.X * CLICK_UDIM.X.Scale + CLICK_UDIM.X.Offset
+		local y = vp.Y * CLICK_UDIM.Y.Scale + CLICK_UDIM.Y.Offset
+		vim:SendMouseButtonEvent(x, y, 0, true, game, 1)
+		vim:SendMouseButtonEvent(x, y, 0, false, game, 1)
+	end
+
+	local function stackOk()
+		return StackFarmOther ~= false
+	end
+
+	local function farmJackMob(mob)
+		repeat
+			task.wait()
+			if not Settings[HW_KEY] or not stackOk() then
+				return
+			end
+			local hrp = getHRP()
+			if not hrp or (mob:FindFirstChild("HumanoidRootPart") and (mob.HumanoidRootPart.Position - hrp.Position).Magnitude > JACK_RANGE) then
+				return
+			end
+			pcall(function()
+				UsedualFlock()
+				ClickM1(mob)
+				if Settings["Select Weapon"] == "Blox Fruit" then
+					toTarget(mob.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
+				else
+					toTarget(mob.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
+				end
+			end)
+		until not IsMobAlive(mob)
+	end
+
+	local function farmPumpkin(p)
+		local startT = tick()
+		repeat
+			task.wait()
+			if not Settings[HW_KEY] or not stackOk() then
+				return
+			end
+			if findJackMob() then
+				return
+			end
+			local hrp = getHRP()
+			local cf = pivotOf(p)
+			if not hrp or not cf then
+				return
+			end
+			equipMelee()
+			local pos = cf * CFrame.new(0, 0, PUMPKIN_BEHIND)
+			local stand = CFrame.lookAt(pos.Position, cf.Position)
+			pcall(function()
+				toTarget(stand)
+			end)
+			if (hrp.Position - stand.Position).Magnitude <= 8 then
+				pcall(doClick)
+			end
+		until not p.Parent or tick() - startT > 12
+	end
+
+	HalloweenSection.CreateToggle(
+		{ Title = "Auto Farm Pumpkin Hunt", Desc = "Fly to nearest pumpkin, then kill Jack O' Lantern / Pumpkin Snowman (200 studs)", Default = Settings[HW_KEY] or false },
+		function(state)
+			SaveSettings(HW_KEY, state)
+			if not state then
+				return
+			end
+			spawn(function()
+				while Settings[HW_KEY] and task.wait() do
+					local ok, err = pcall(function()
+						if not stackOk() then
+							return
+						end
+						local mob = findJackMob()
+						if mob then
+							farmJackMob(mob)
+							return
+						end
+						local p = nearestPumpkin()
+						if p then
+							farmPumpkin(p)
+						end
+					end)
+					if not ok then
+						warn("[PumpkinHunt] " .. tostring(err))
+					end
+				end
+			end)
+		end
+	)
+
+	-- ===== Auto Trick Or Treat =====
+	local TT_KEY = "Auto Trick Or Treat"
+	local TT_REVISIT = 120
+	local ttVisited = {}
+	getgenv().__TrickTreatToken = getgenv().__TrickTreatToken or 0
+	local ttBusyAt = 0
+
+	-- bắt thông báo skip door: "still busy with another door" / "nobody is home" (mỗi lần spam E tạo 1 label mới)
+	local TT_SKIP_TEXTS = { "still busy with another door", "nobody is home" }
+	local function ttIsBusyText(txt)
+		if type(txt) ~= "string" then
+			return false
+		end
+		local low = string.lower(txt)
+		for _, pat in ipairs(TT_SKIP_TEXTS) do
+			if string.find(low, pat, 1, true) then
+				return true
+			end
+		end
+		return false
+	end
+	local function ttHookLabel(o)
+		if not o:IsA("TextLabel") then
+			return
+		end
+		if ttIsBusyText(o.Text) then
+			ttBusyAt = tick()
+		end
+		o:GetPropertyChangedSignal("Text"):Connect(function()
+			if ttIsBusyText(o.Text) then
+				ttBusyAt = tick()
+			end
+		end)
+	end
+	local function ttEnsureBusyHook()
+		if getgenv().__TrickTreatBusyConn then
+			pcall(function()
+				getgenv().__TrickTreatBusyConn:Disconnect()
+			end)
+		end
+		local pg = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+		getgenv().__TrickTreatBusyConn = pg.DescendantAdded:Connect(function(o)
+			pcall(ttHookLabel, o)
+		end)
+	end
+
+	local function collectDoors()
+		local list = {}
+		local map = workspace:FindFirstChild("Map")
+		if not map then
+			return list
+		end
+		for _, island in ipairs(map:GetChildren()) do
+			local decor = island:FindFirstChild("HalloweenDecor")
+			if decor then
+				for _, d in ipairs(decor:GetDescendants()) do
+					if d.Name == "HalloweenDoor" and (d:IsA("Model") or d:IsA("BasePart")) then
+						table.insert(list, d)
+					end
+				end
+			end
+		end
+		return list
+	end
+
+	local function nearestDoor()
+		local hrp = getHRP()
+		if not hrp then
+			return nil
+		end
+		local best, bestD = nil, math.huge
+		for _, d in ipairs(collectDoors()) do
+			if (ttVisited[d] or 0) < tick() then
+				local cf = pivotOf(d)
+				if cf then
+					local dist = (cf.Position - hrp.Position).Magnitude
+					if dist < bestD then
+						best, bestD = d, dist
+					end
+				end
+			end
+		end
+		return best
+	end
+
+	local function pressE(door)
+		local vim = game:GetService("VirtualInputManager")
+		local prompt = door:FindFirstChildWhichIsA("ProximityPrompt", true)
+		local hold = prompt and prompt.HoldDuration or 0
+		vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+		task.wait(0.05 + hold)
+		vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+	end
+
+	-- trả về scroller, option1 (option1 có thể nil nếu chưa load)
+	local function getDialogue()
+		local pg = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+		local dg = pg and pg:FindFirstChild("DialogueGui")
+		if not dg or (dg:IsA("ScreenGui") and not dg.Enabled) then
+			return nil
+		end
+		local ol = dg:FindFirstChild("optionsList", true)
+		local sc = ol and ol:FindFirstChild("scroller")
+		if not sc then
+			return nil
+		end
+		for _, o in ipairs(sc:GetChildren()) do
+			if o:IsA("GuiObject") and string.find(o.Name, "option1", 1, true) then
+				return sc, o
+			end
+		end
+		return sc, nil
+	end
+
+	-- click VirtualInputManager (cùng cách với logic phá mây) nhưng ở tâm option
+	local function clickGui(o)
+		local vim = game:GetService("VirtualInputManager")
+		local pos = o.AbsolutePosition + o.AbsoluteSize / 2
+		local sg = o:FindFirstAncestorWhichIsA("ScreenGui")
+		if sg and not sg.IgnoreGuiInset then
+			pos = pos + (game:GetService("GuiService"):GetGuiInset())
+		end
+		vim:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
+		vim:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
+	end
+
+	-- sự kiện chỉ có từ phút 00 đến 09 của mỗi giờ tròn (giờ ngoài đời)
+	local TT_WINDOW_MIN = 10
+	local ttWinCache, ttWinAt = true, 0
+	local function ttInWindow(fresh)
+		if fresh or tick() - ttWinAt > 1 then
+			ttWinAt = tick()
+			ttWinCache = (tonumber(os.date("%M")) or 0) < TT_WINDOW_MIN
+		end
+		return ttWinCache
+	end
+
+	local ttToggleObj
+	local ttOffPending = false
+	local function ttForceOff()
+		if ttOffPending then
+			return
+		end
+		ttOffPending = true
+		getgenv().__TrickTreatToken = getgenv().__TrickTreatToken + 1
+		SaveSettings(TT_KEY, false)
+		A.CreateNoti({
+			Title = "Banana Cat Hub",
+			Desc = "Sự kiện Halloween chưa xuất hiện (chỉ có từ xx:00 đến xx:09 mỗi giờ)",
+			ShowTime = 5,
+		})
+		task.spawn(function()
+			local t0 = tick()
+			while not ttToggleObj and tick() - t0 < 3 do
+				task.wait(0.1)
+			end
+			if ttToggleObj then
+				pcall(ttToggleObj.SetStage, false)
+			end
+			ttOffPending = false
+		end)
+	end
+
+	local function ttValid(tok)
+		return Settings[TT_KEY] and getgenv().__TrickTreatToken == tok and stackOk() and ttInWindow()
+	end
+
+	-- mob bất kỳ trong TT_MOB_RANGE stud quanh player: phải farm xong mới làm tiếp trick or treat
+	local TT_MOB_RANGE = 200
+	local TT_MOB_TIMEOUT = 60
+	local ttIgnoreMob = setmetatable({}, { __mode = "k" })
+
+	local function findAnyMob()
+		local hrp = getHRP()
+		local enemies = workspace:FindFirstChild("Enemies")
+		if not hrp or not enemies then
+			return nil
+		end
+		local best, bestD = nil, TT_MOB_RANGE
+		for _, m in ipairs(enemies:GetChildren()) do
+			if (ttIgnoreMob[m] or 0) < tick() and IsMobAlive(m) then
+				local d = (m.HumanoidRootPart.Position - hrp.Position).Magnitude
+				if d <= bestD then
+					best, bestD = m, d
+				end
+			end
+		end
+		return best
+	end
+
+	local function farmTTMob(mob, tok)
+		local startT = tick()
+		repeat
+			task.wait()
+			if not ttValid(tok) then
+				return
+			end
+			if tick() - startT > TT_MOB_TIMEOUT then
+				ttIgnoreMob[mob] = tick() + 30
+				return
+			end
+			local hrp = getHRP()
+			if not hrp or not mob:FindFirstChild("HumanoidRootPart") then
+				return
+			end
+			if (mob.HumanoidRootPart.Position - hrp.Position).Magnitude > TT_MOB_RANGE then
+				return
+			end
+			pcall(function()
+				UsedualFlock()
+				ClickM1(mob)
+				if Settings["Select Weapon"] == "Blox Fruit" then
+					toTarget(mob.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
+				else
+					toTarget(mob.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
+				end
+			end)
+		until not IsMobAlive(mob)
+	end
+
+	local function runDoor(door, tok)
+		local t0 = tick()
+		local stand, arrived, goneAt
+		local sawDialogue = false
+		local lastE, lastClick, lastScreen = 0, 0, 0
+		while ttValid(tok) do
+			task.wait()
+			local hrp = getHRP()
+			-- đứng gõ cửa ở LeftDoor, không có thì RightDoor, không có nữa thì dùng cả door
+			local cf = pivotOf(door:FindFirstChild("LeftDoor"))
+				or pivotOf(door:FindFirstChild("RightDoor"))
+				or pivotOf(door)
+			if not hrp or not cf then
+				return
+			end
+			local mob = findAnyMob()
+			if mob then
+				farmTTMob(mob, tok)
+				t0, arrived = tick(), nil
+				continue
+			end
+			local sc, opt = getDialogue()
+			if sc then
+				sawDialogue, goneAt = true, nil
+				if opt and tick() - lastClick >= 0.3 then
+					lastClick = tick()
+					pcall(clickGui, opt)
+				end
+			elseif sawDialogue then
+				goneAt = goneAt or tick()
+				if tick() - goneAt > 1.5 then
+					local w0 = tick()
+					while ttValid(tok) and tick() - w0 < 3 and not door:FindFirstChild("SceneWindow") do
+						task.wait(0.1)
+					end
+					return
+				end
+			else
+				if not stand then
+					local dir = hrp.Position - cf.Position
+					dir = Vector3.new(dir.X, 0, dir.Z)
+					dir = dir.Magnitude > 0.1 and dir.Unit or Vector3.new(0, 0, 1)
+					stand = CFrame.lookAt(cf.Position + dir * 3, cf.Position)
+				end
+				pcall(toTarget, stand)
+				if (hrp.Position - stand.Position).Magnitude <= 8 then
+					arrived = arrived or tick()
+					if ttBusyAt >= arrived then
+						return -- door đang bận / không tương tác được, sang door tiếp
+					end
+					if tick() - lastE >= 0.3 then
+						lastE = tick()
+						task.spawn(pcall, pressE, door)
+					end
+					if tick() - lastScreen >= 0.1 then
+						lastScreen = tick()
+						pcall(doClick)
+					end
+					if tick() - arrived > 10 then
+						return
+					end
+				elseif tick() - t0 > 40 then
+					return
+				end
+			end
+		end
+	end
+
+	-- ===== SceneWindow: vào không gian đánh boss =====
+	local TT_SCENE_FAR = 500 -- cách tọa độ cũ > số này stud = đã bị teleport vào scene
+	local TT_SCENE_KNOCK = 6 -- gõ cửa SceneWindow bao lâu mà chưa teleport thì fly về chỗ cũ làm lại
+	local TT_SCENE_RETRY = 6
+	local ttSceneSkip = setmetatable({}, { __mode = "k" })
+
+	local function findSceneDoor()
+		for _, d in ipairs(collectDoors()) do
+			local sw = d:FindFirstChild("SceneWindow")
+			if sw and (ttSceneSkip[d] or 0) < tick() and pivotOf(sw) then
+				return d, sw
+			end
+		end
+		return nil
+	end
+
+	local function flyBack(pos, tok)
+		local t0 = tick()
+		while ttValid(tok) and tick() - t0 < 15 do
+			task.wait()
+			local hrp = getHRP()
+			if not hrp or (hrp.Position - pos).Magnitude <= 8 then
+				return
+			end
+			pcall(toTarget, CFrame.new(pos))
+		end
+	end
+
+	-- đã vào scene: có mob thì farm, không có thì đứng im; về lại gần tọa độ cũ thì kết thúc
+	local function sceneFight(oldPos, tok)
+		while ttValid(tok) do
+			task.wait(0.1)
+			local hrp = getHRP()
+			if hrp then
+				if (hrp.Position - oldPos).Magnitude < TT_SCENE_FAR then
+					return
+				end
+				local mob = findAnyMob()
+				if mob then
+					farmTTMob(mob, tok)
+				end
+			end
+		end
+	end
+
+	local function runScene(door, sw, tok)
+		local hrp = getHRP()
+		local swCf = pivotOf(sw)
+		if not hrp or not swCf then
+			return
+		end
+		local oldPos = hrp.Position -- tọa độ trước khi fly tới SceneWindow
+		if getgenv().DebugTrickTreat then
+			print("[TrickOrTreat] SceneWindow pos =", swCf.Position, "| oldPos =", oldPos)
+		end
+		local pressTarget = sw:FindFirstChildWhichIsA("ProximityPrompt", true) and sw or door
+		for attempt = 1, TT_SCENE_RETRY do
+			if not ttValid(tok) then
+				return
+			end
+			local teleported = false
+			local t0, arrived = tick(), nil
+			local lastE, lastScreen = 0, 0
+			local stand
+			while ttValid(tok) do
+				task.wait()
+				local h = getHRP()
+				local cf = pivotOf(sw)
+				if not h then
+					break
+				end
+				if (h.Position - oldPos).Magnitude > TT_SCENE_FAR then
+					teleported = true
+					break
+				end
+				if not cf then
+					break -- SceneWindow biến mất
+				end
+				local mob = findAnyMob()
+				if mob then
+					farmTTMob(mob, tok)
+					t0, arrived = tick(), nil
+					continue
+				end
+				if not stand then
+					local dir = h.Position - cf.Position
+					dir = Vector3.new(dir.X, 0, dir.Z)
+					dir = dir.Magnitude > 0.1 and dir.Unit or Vector3.new(0, 0, 1)
+					stand = CFrame.lookAt(cf.Position + dir * 3, cf.Position)
+				end
+				pcall(toTarget, stand)
+				if (h.Position - stand.Position).Magnitude <= 8 then
+					arrived = arrived or tick()
+					if ttBusyAt >= arrived then
+						break
+					end
+					if tick() - lastE >= 0.3 then
+						lastE = tick()
+						task.spawn(pcall, pressE, pressTarget)
+					end
+					if tick() - lastScreen >= 0.1 then
+						lastScreen = tick()
+						pcall(doClick)
+					end
+					if tick() - arrived > TT_SCENE_KNOCK then
+						break -- vẫn ở gần tọa độ cũ: game chưa load, làm lại
+					end
+				elseif tick() - t0 > 40 then
+					break
+				end
+			end
+			if teleported then
+				sceneFight(oldPos, tok)
+				ttSceneSkip[door] = tick() + TT_REVISIT
+				return
+			end
+			if not pivotOf(sw) then
+				return
+			end
+			flyBack(oldPos, tok) -- fly về tọa độ cũ rồi vòng sau fly lại tới SceneWindow
+		end
+		ttSceneSkip[door] = tick() + TT_REVISIT
+	end
+
+	ttToggleObj = HalloweenSection.CreateToggle(
+		{ Title = "Auto Trick Or Treat", Desc = "Fly to nearest HalloweenDoor, spam E, click option1", Default = Settings[TT_KEY] or false },
+		function(state)
+			SaveSettings(TT_KEY, state)
+			getgenv().__TrickTreatToken = getgenv().__TrickTreatToken + 1
+			if not state then
+				return
+			end
+			if not ttInWindow(true) then
+				ttForceOff()
+				return
+			end
+			local tok = getgenv().__TrickTreatToken
+			pcall(ttEnsureBusyHook)
+			spawn(function()
+				while ttValid(tok) or (Settings[TT_KEY] and getgenv().__TrickTreatToken == tok) do
+					task.wait(0.1)
+					local ok, err = pcall(function()
+						if not ttInWindow(true) then
+							ttForceOff()
+							return
+						end
+						if not stackOk() then
+							return
+						end
+						local mob = findAnyMob()
+						if mob then
+							farmTTMob(mob, tok)
+							return
+						end
+						local sceneDoor, sceneWin = findSceneDoor()
+						if sceneDoor then
+							runScene(sceneDoor, sceneWin, tok)
+							return
+						end
+						local door = nearestDoor()
+						if door then
+							ttVisited[door] = tick() + TT_REVISIT
+							runDoor(door, tok)
+						else
+							task.wait(2)
+						end
+					end)
+					if not ok then
+						warn("[TrickOrTreat] " .. tostring(err))
+					end
+				end
+			end)
+		end
+	)
+end
 HiddenEventSection = FarmotherMain.CreateSection("Secret Quest")
 StatusHiddenProgress = HiddenEventSection.CreateLabel({ Title = "Secret Quest : 0/39 Quests" })
 StatusHiddenQuest = HiddenEventSection.CreateLabel({ Title = "Title Quest : ..." })
@@ -19900,10 +20563,53 @@ AutoKillBossSection.CreateToggle(
 )
 DFRaidMain = Main.CreatePage({ Page_Name = "Fruit and Raid, Dungeon", Page_Title = "Fruit and Raid and Dungeon Tab" })
 DevilFruitSection = DFRaidMain.CreateSection("Devil Fruit")
+GACHA_INTERVAL = 300
+GachaPurchase = function(boxName)
+	local ok, res = pcall(function()
+		return game:GetService("ReplicatedStorage").Modules.Net["RF/GachaNetworkRF"]:InvokeServer({
+			Context = "Purchase",
+			BoxName = boxName,
+		})
+	end)
+	if getgenv().DebugGacha then
+		print("[Gacha]", boxName, "ok=", ok, "res=", typeof(res), tostring(res))
+	end
+	return ok and res ~= nil and res ~= false
+end
+getgenv().__GachaLoopToken = getgenv().__GachaLoopToken or {}
+GachaStartLoop = function(key, boxName)
+	local tok = (getgenv().__GachaLoopToken[key] or 0) + 1
+	getgenv().__GachaLoopToken[key] = tok
+	task.spawn(function()
+		while Settings[key] and getgenv().__GachaLoopToken[key] == tok do
+			pcall(GachaPurchase, boxName)
+			local t0 = tick()
+			while tick() - t0 < GACHA_INTERVAL and Settings[key] and getgenv().__GachaLoopToken[key] == tok do
+				task.wait(1)
+			end
+		end
+	end)
+end
 DevilFruitSection.CreateToggle(
-	{ Title = "Random Devil Fruit", Desc = nil, Default = Settings["Random Devil Fruit"] or false },
+	{ Title = "Random Devil Fruit", Desc = "Buy every 5 minutes", Default = Settings["Random Devil Fruit"] or false },
 	function(y)
 		SaveSettings("Random Devil Fruit", y)
+		if y then
+			GachaStartLoop("Random Devil Fruit", "ZiolesGacha")
+		else
+			getgenv().__GachaLoopToken["Random Devil Fruit"] = (getgenv().__GachaLoopToken["Random Devil Fruit"] or 0) + 1
+		end
+	end
+)
+DevilFruitSection.CreateToggle(
+	{ Title = "Random Halloween Gacha", Desc = "Buy every 5 minutes", Default = Settings["Random Halloween Gacha"] or false },
+	function(y)
+		SaveSettings("Random Halloween Gacha", y)
+		if y then
+			GachaStartLoop("Random Halloween Gacha", "Halloween26Gacha")
+		else
+			getgenv().__GachaLoopToken["Random Halloween Gacha"] = (getgenv().__GachaLoopToken["Random Halloween Gacha"] or 0) + 1
+		end
 	end
 )
 DevilFruitSection.CreateToggle(
@@ -20468,16 +21174,7 @@ local function E()
 	return "DLCBoxData", nil
 end
 local function b()
-	local ok, res = pcall(function()
-		return game:GetService("ReplicatedStorage").Modules.Net["RF/GachaNetworkRF"]:InvokeServer({
-			Context = "Purchase",
-			BoxName = "ZiolesGacha",
-		})
-	end)
-	if getgenv().DebugGacha then
-		print("[Gacha] Purchase ok=", ok, "res=", typeof(res), tostring(res))
-	end
-	return ok and res ~= nil and res ~= false
+	return GachaPurchase("ZiolesGacha")
 end
 function RandomFruit()
 	b()
@@ -31364,20 +32061,9 @@ if not getgenv().BananaCatMainLoop then
 		if tick() - lastFruitTick >= 0.5 then
 			lastFruitTick = tick()
 			local T, T = pcall(function()
-				if Settings["Random Devil Fruit"] then
-					if getgenv().DebugGacha then
-						local sw = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("SpinnerWindow")
-						print("[Gacha] vòng lặp: toggle bật, SpinnerWindow =", sw ~= nil, sw and sw.Enabled)
-					end
-					if
-						not game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("SpinnerWindow")
-						or not game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("SpinnerWindow").Enabled
-					then
-						RandomFruit()
-					elseif
-						game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("SpinnerWindow").Enabled
-						and game:GetService("Players").LocalPlayer.PlayerGui.SpinnerWindow.AboveSpinner.Navigation.CloseButton.Visible
-					then
+				if Settings["Random Devil Fruit"] or Settings["Random Halloween Gacha"] then
+					local sw = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("SpinnerWindow")
+					if sw and sw.Enabled and sw.AboveSpinner.Navigation.CloseButton.Visible then
 						Spinner:Close()
 					end
 				end
