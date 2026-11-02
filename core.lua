@@ -11722,7 +11722,7 @@ end
 HalloweenSection = FarmotherMain.CreateSection("Halloween")
 do
 	local HW_KEY = "Auto Farm Pumpkin Hunt"
-	local PUMPKIN_BEHIND = 1
+	local PUMPKIN_BEHIND = 3
 	local JACK_RANGE = 200
 	local HW_MOBS = { jackolantern = true, pumpkinsnowman = true }
 
@@ -11836,6 +11836,18 @@ do
 		vim:SendMouseButtonEvent(x, y, 0, false, game, 1)
 	end
 
+	-- click vào vị trí pumpkin trên màn hình (fallback: điểm cố định nếu pumpkin ngoài màn hình)
+	local function clickAtWorld(worldPos)
+		local cam = workspace.CurrentCamera
+		local vim = game:GetService("VirtualInputManager")
+		local v, onScreen = cam:WorldToViewportPoint(worldPos)
+		if not onScreen or v.Z <= 0 then
+			return doClick()
+		end
+		vim:SendMouseButtonEvent(v.X, v.Y, 0, true, game, 1)
+		vim:SendMouseButtonEvent(v.X, v.Y, 0, false, game, 1)
+	end
+
 	local function stackOk()
 		return StackFarmOther ~= false
 	end
@@ -11886,7 +11898,7 @@ do
 			end)
 			if (hrp.Position - stand.Position).Magnitude <= 8 and tick() - lastPumpClick >= HW_CLICK_DELAY then
 				lastPumpClick = tick()
-				pcall(doClick)
+				pcall(clickAtWorld, cf.Position)
 			end
 		until not p.Parent or tick() - startT > 12
 	end
