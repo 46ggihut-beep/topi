@@ -11942,6 +11942,174 @@ do
 		end
 	)
 
+	-- ===== Auto Farm Pumpkin Snowman (chỉ PumpkinPatch + mob Pumpkin Snowman) =====
+	local SN_KEY = "Auto Farm Pumpkin Snowman"
+	local SNHOP_KEY = "Auto Hop Find Pumpkin Patch"
+	local SN_GRACE = 6 -- không thấy patch/snowman liên tục bấy nhiêu giây mới hop (tránh hop nhầm khi map chưa stream xong)
+	getgenv().__PSnowToken = getgenv().__PSnowToken or 0
+	getgenv().__PSnowHopToken = getgenv().__PSnowHopToken or 0
+
+	local function findPatch()
+		local root = workspace:FindFirstChild("PumpkinHunt")
+		local p = root and root:FindFirstChild("PumpkinPatch")
+		if p and pivotOf(p) then
+			return p
+		end
+		return nil
+	end
+
+	-- chỉ Pumpkin Snowman, trong JACK_RANGE stud quanh player
+	local function findSnowMob()
+		local hrp = getHRP()
+		local enemies = workspace:FindFirstChild("Enemies")
+		if not hrp or not enemies then
+			return nil
+		end
+		local best, bestD = nil, JACK_RANGE
+		for _, m in ipairs(enemies:GetChildren()) do
+			if normName(m.Name) == "pumpkinsnowman" and IsMobAlive(m) then
+				local d = (m.HumanoidRootPart.Position - hrp.Position).Magnitude
+				if d <= bestD then
+					best, bestD = m, d
+				end
+			end
+		end
+		return best
+	end
+
+	local function snValid(tok)
+		return Settings[SN_KEY] and getgenv().__PSnowToken == tok and stackOk()
+	end
+
+	local function farmSnowMob(mob, tok)
+		repeat
+			task.wait()
+			if not snValid(tok) then
+				return
+			end
+			local hrp = getHRP()
+			if not hrp or not mob:FindFirstChild("HumanoidRootPart") or (mob.HumanoidRootPart.Position - hrp.Position).Magnitude > JACK_RANGE then
+				return
+			end
+			pcall(function()
+				UsedualFlock()
+				ClickM1(mob)
+				if Settings["Select Weapon"] == "Blox Fruit" then
+					toTarget(mob.HumanoidRootPart.CFrame * CFrame.new(0, FruitFarmY(), 0))
+				else
+					toTarget(mob.HumanoidRootPart.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
+				end
+			end)
+		until not IsMobAlive(mob)
+	end
+
+	local function farmPatch(p, tok)
+		local startT = tick()
+		local lastClick = 0
+		repeat
+			task.wait()
+			if not snValid(tok) then
+				return
+			end
+			if findSnowMob() then
+				return -- có Pumpkin Snowman thì ưu tiên đánh mob trước
+			end
+			local hrp = getHRP()
+			local cf = pivotOf(p)
+			if not hrp or not cf then
+				return
+			end
+			equipMelee()
+			local pos = cf * CFrame.new(0, 0, PUMPKIN_BEHIND)
+			local stand = CFrame.lookAt(pos.Position, cf.Position)
+			pcall(function()
+				toTarget(stand)
+			end)
+			if (hrp.Position - stand.Position).Magnitude <= 8 and tick() - lastClick >= HW_CLICK_DELAY then
+				lastClick = tick()
+				pcall(clickAtWorld, cf.Position)
+			end
+		until not p.Parent or tick() - startT > 12
+	end
+
+	HalloweenSection.CreateToggle(
+		{ Title = "Auto Farm Pumpkin Snowman", Desc = "Only fly to PumpkinHunt.PumpkinPatch and kill Pumpkin Snowman", Default = Settings[SN_KEY] or false },
+		function(state)
+			SaveSettings(SN_KEY, state)
+			getgenv().__PSnowToken = getgenv().__PSnowToken + 1
+			if not state then
+				return
+			end
+			local tok = getgenv().__PSnowToken
+			spawn(function()
+				while snValid(tok) or (Settings[SN_KEY] and getgenv().__PSnowToken == tok) do
+					task.wait()
+					local ok, err = pcall(function()
+						if not stackOk() then
+							return
+						end
+						local mob = findSnowMob()
+						if mob then
+							farmSnowMob(mob, tok)
+							return
+						end
+						local patch = findPatch()
+						if patch then
+							farmPatch(patch, tok)
+						end
+					end)
+					if not ok then
+						warn("[PumpkinSnowman] " .. tostring(err))
+					end
+				end
+			end)
+		end
+	)
+
+	-- hop chỉ chạy khi đang bật Auto Farm Pumpkin Snowman; chỉ hop khi server không có cả PumpkinPatch lẫn Pumpkin Snowman
+	HalloweenSection.CreateToggle(
+		{ Title = "Auto Hop Find Pumpkin Patch", Desc = "Needs Auto Farm Pumpkin Snowman. Hop server when no PumpkinPatch and no Pumpkin Snowman", Default = Settings[SNHOP_KEY] or false },
+		function(state)
+			SaveSettings(SNHOP_KEY, state)
+			getgenv().__PSnowHopToken = getgenv().__PSnowHopToken + 1
+			if not state then
+				return
+			end
+			local tok = getgenv().__PSnowHopToken
+			local function hasTarget()
+				return (findPatch() or findSnowMob()) ~= nil
+			end
+			spawn(function()
+				local missingSince
+				while Settings[SNHOP_KEY] and getgenv().__PSnowHopToken == tok do
+					task.wait(0.5)
+					local ok, err = pcall(function()
+						if not Settings[SN_KEY] or not stackOk() or not game:IsLoaded() or not getHRP() then
+							missingSince = nil
+							return
+						end
+						if hasTarget() then
+							missingSince = nil
+							return
+						end
+						missingSince = missingSince or tick()
+						if tick() - missingSince < SN_GRACE then
+							return
+						end
+						HopServer(nil, function()
+							return not Settings[SNHOP_KEY] or not Settings[SN_KEY] or getgenv().__PSnowHopToken ~= tok
+								or not stackOk() or hasTarget()
+						end)
+						missingSince = nil
+					end)
+					if not ok then
+						warn("[PumpkinPatchHop] " .. tostring(err))
+					end
+				end
+			end)
+		end
+	)
+
 	-- ===== Auto Trick Or Treat =====
 	local TT_KEY = "Auto Trick Or Treat"
 	local TT_REVISIT = 120
