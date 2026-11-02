@@ -11731,7 +11731,7 @@ HalloweenSection = FarmotherMain.CreateSection("Halloween")
 do
 	local HW_KEY = "Auto Farm Pumpkin Hunt"
 	local PUMPKIN_BEHIND = 3
-	local JACK_RANGE = 200
+	local JACK_RANGE = 800 -- giới hạn khoảng cách tìm/đánh mob (Pumpkin Hunt + Pumpkin Snowman)
 	local HW_MOBS = { jackolantern = true, pumpkinsnowman = true }
 
 	local function normName(s)
@@ -11912,7 +11912,7 @@ do
 	end
 
 	HalloweenSection.CreateToggle(
-		{ Title = "Auto Farm Pumpkin Hunt", Desc = "Fly to nearest pumpkin, then kill Jack O' Lantern / Pumpkin Snowman (200 studs)", Default = Settings[HW_KEY] or false },
+		{ Title = "Auto Farm Pumpkin Hunt", Desc = "Fly to nearest pumpkin, then kill Jack O' Lantern / Pumpkin Snowman (800 studs)", Default = Settings[HW_KEY] or false },
 		function(state)
 			SaveSettings(HW_KEY, state)
 			if not state then
