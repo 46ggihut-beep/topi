@@ -12169,7 +12169,7 @@ do
 
 	local function runDoor(door, tok)
 		local t0 = tick()
-		local stand, arrived, goneAt
+		local stand, standDir, arrived, goneAt
 		local sawDialogue = false
 		local lastE, lastClick, lastScreen = 0, 0, 0
 		while ttValid(tok) do
@@ -12186,9 +12186,17 @@ do
 				t0, arrived = tick(), nil
 				continue
 			end
+			-- luôn bám theo HalloweenDoor: hướng đứng cố định, vị trí đứng cập nhật theo door mỗi frame
+			if not standDir then
+				local dir = hrp.Position - cf.Position
+				dir = Vector3.new(dir.X, 0, dir.Z)
+				standDir = dir.Magnitude > 0.1 and dir.Unit or Vector3.new(0, 0, 1)
+			end
+			stand = CFrame.lookAt(cf.Position + standDir * 3, cf.Position)
 			local sc, opt = getDialogue()
 			if sc then
 				sawDialogue, goneAt = true, nil
+				pcall(toTarget, stand) -- đang hội thoại vẫn giữ bám door
 				if opt and tick() - lastClick >= HW_CLICK_DELAY then
 					lastClick = tick()
 					pcall(clickGui, opt)
@@ -12203,12 +12211,6 @@ do
 					return
 				end
 			else
-				if not stand then
-					local dir = hrp.Position - cf.Position
-					dir = Vector3.new(dir.X, 0, dir.Z)
-					dir = dir.Magnitude > 0.1 and dir.Unit or Vector3.new(0, 0, 1)
-					stand = CFrame.lookAt(cf.Position + dir * 3, cf.Position)
-				end
 				pcall(toTarget, stand)
 				if (hrp.Position - stand.Position).Magnitude <= 8 then
 					arrived = arrived or tick()
@@ -12226,8 +12228,8 @@ do
 					if tick() - arrived > 10 then
 						return
 					end
-				elseif tick() - t0 > 40 then
-					return
+				else
+					arrived = nil -- bị đẩy ra xa door thì fly lại, không bỏ cuộc
 				end
 			end
 		end
