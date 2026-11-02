@@ -11824,6 +11824,7 @@ do
 		end)
 	end
 
+	local HW_CLICK_DELAY = 0.3 -- delay giữa mỗi lần click (giây)
 	-- click y hệt logic phá mây (VirtualInputManager)
 	local CLICK_UDIM = UDim2.new(0.15, 0, 0.15, 0)
 	local function doClick()
@@ -11863,6 +11864,7 @@ do
 
 	local function farmPumpkin(p)
 		local startT = tick()
+		local lastPumpClick = 0
 		repeat
 			task.wait()
 			if not Settings[HW_KEY] or not stackOk() then
@@ -11882,7 +11884,8 @@ do
 			pcall(function()
 				toTarget(stand)
 			end)
-			if (hrp.Position - stand.Position).Magnitude <= 8 then
+			if (hrp.Position - stand.Position).Magnitude <= 8 and tick() - lastPumpClick >= HW_CLICK_DELAY then
+				lastPumpClick = tick()
 				pcall(doClick)
 			end
 		until not p.Parent or tick() - startT > 12
@@ -12163,7 +12166,7 @@ do
 			local sc, opt = getDialogue()
 			if sc then
 				sawDialogue, goneAt = true, nil
-				if opt and tick() - lastClick >= 0.3 then
+				if opt and tick() - lastClick >= HW_CLICK_DELAY then
 					lastClick = tick()
 					pcall(clickGui, opt)
 				end
@@ -12189,11 +12192,11 @@ do
 					if ttBusyAt >= arrived then
 						return -- door đang bận / không tương tác được, sang door tiếp
 					end
-					if tick() - lastE >= 0.3 then
+					if tick() - lastE >= HW_CLICK_DELAY then
 						lastE = tick()
 						task.spawn(pcall, pressE, door)
 					end
-					if tick() - lastScreen >= 0.1 then
+					if tick() - lastScreen >= HW_CLICK_DELAY then
 						lastScreen = tick()
 						pcall(doClick)
 					end
@@ -12303,11 +12306,11 @@ do
 					if ttBusyAt >= arrived then
 						break
 					end
-					if tick() - lastE >= 0.3 then
+					if tick() - lastE >= HW_CLICK_DELAY then
 						lastE = tick()
 						task.spawn(pcall, pressE, pressTarget)
 					end
-					if tick() - lastScreen >= 0.1 then
+					if tick() - lastScreen >= HW_CLICK_DELAY then
 						lastScreen = tick()
 						pcall(doClick)
 					end
