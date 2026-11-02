@@ -2262,6 +2262,7 @@ do
 	end
 
 	local CHAIN = {
+		"Auto Trick Or Treat",
 		"Auto New World",
 		"Collect Chest When Server Spawn God's Chalice or Fist of Darkness",
 		"Auto Third World", "Attack Darkbeard", "Summon Darkbeard",
@@ -10983,6 +10984,13 @@ getgenv().ValueCollectChestSpawnGod = 0
 task.spawn(function()
 	while task.wait() do
 		local V, V = pcall(function()
+			-- Trick Or Treat: có sự kiện (đang trong khung giờ + còn door) thì dừng toàn bộ farm stack để đi gõ cửa
+			if getgenv().__TrickTreatActive then
+				StackFarm = false
+				StackFarmOther = false
+				BananaOwner("Auto Trick Or Treat")
+				return
+			end
 			if Settings["Auto New World"] then
 				if game.PlaceId == getgenv().CheckPlaceId3 and t.Data.Level.Value >= 700 then
 					StackFarm = false
@@ -12019,10 +12027,74 @@ do
 		return best
 	end
 
+	-- chọn phía đứng: ưu tiên phía ngoài nhà (không có mái phía trên, không bị tường chắn giữa player và door)
+	local TT_STAND_DIST = 3
+	local TT_SIDE_SWITCH = 3 -- đứng 1 phía quá số giây này mà chưa mở được dialogue thì đổi phía khác
+	local function ttPickStandDirs(door, cf, hrp)
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { game:GetService("Players").LocalPlayer.Character, door }
+		params.IgnoreWater = true
+		local raw = { cf.LookVector, -cf.LookVector, cf.RightVector, -cf.RightVector }
+		local cands = {}
+		for _, v in ipairs(raw) do
+			local d = Vector3.new(v.X, 0, v.Z)
+			if d.Magnitude > 0.1 then
+				d = d.Unit
+				local dup = false
+				for _, c in ipairs(cands) do
+					if c.dir:Dot(d) > 0.99 then
+						dup = true
+						break
+					end
+				end
+				if not dup then
+					local pos = cf.Position + d * TT_STAND_DIST
+					local score = 0
+					pcall(function()
+						-- có mái/trần phía trên = đang ở trong nhà
+						local up = workspace:Raycast(pos + Vector3.new(0, 2, 0), Vector3.new(0, 60, 0), params)
+						if up and up.Instance.Transparency < 1 then
+							score = score + 2
+						end
+						-- có vật chắn (tường) giữa chỗ đứng và door
+						local toDoor = (cf.Position - pos) * 0.8
+						if workspace:Raycast(pos, toDoor, params) then
+							score = score + 3
+						end
+					end)
+					-- hoà điểm thì ưu tiên phía gần player
+					score = score + (hrp.Position - pos).Magnitude * 0.001
+					table.insert(cands, { dir = d, score = score })
+				end
+			end
+		end
+		table.sort(cands, function(a, b)
+			return a.score < b.score
+		end)
+		local out = {}
+		for _, c in ipairs(cands) do
+			table.insert(out, c.dir)
+		end
+		if #out == 0 then
+			out[1] = Vector3.new(0, 0, 1)
+		end
+		return out
+	end
+
 	local function pressE(door)
 		local vim = game:GetService("VirtualInputManager")
 		local prompt = door:FindFirstChildWhichIsA("ProximityPrompt", true)
 		local hold = prompt and prompt.HoldDuration or 0
+		if prompt then
+			-- tường chắn thì prompt bị ẩn (không hiện nút E): tắt check line-of-sight phía client
+			pcall(function()
+				prompt.RequiresLineOfSight = false
+			end)
+			if fireproximityprompt and prompt.Enabled then
+				pcall(fireproximityprompt, prompt, hold > 0 and (hold + 0.1) or 1)
+			end
+		end
 		vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
 		task.wait(0.05 + hold)
 		vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
@@ -12071,34 +12143,18 @@ do
 		return ttWinCache
 	end
 
-	local ttToggleObj
-	local ttOffPending = false
-	local function ttForceOff()
-		if ttOffPending then
-			return
+	-- cờ cho chain loop: true = đang có sự kiện và còn door để làm => dừng farm stack
+	local function ttSetActive(v)
+		if v then
+			StackFarm = false
+			StackFarmOther = false
+			pcall(BananaOwner, TT_KEY)
 		end
-		ttOffPending = true
-		getgenv().__TrickTreatToken = getgenv().__TrickTreatToken + 1
-		SaveSettings(TT_KEY, false)
-		A.CreateNoti({
-			Title = "Banana Cat Hub",
-			Desc = "Sự kiện Halloween chưa xuất hiện (chỉ có từ xx:00 đến xx:09 mỗi giờ)",
-			ShowTime = 5,
-		})
-		task.spawn(function()
-			local t0 = tick()
-			while not ttToggleObj and tick() - t0 < 3 do
-				task.wait(0.1)
-			end
-			if ttToggleObj then
-				pcall(ttToggleObj.SetStage, false)
-			end
-			ttOffPending = false
-		end)
+		getgenv().__TrickTreatActive = v and true or nil
 	end
 
 	local function ttValid(tok)
-		return Settings[TT_KEY] and getgenv().__TrickTreatToken == tok and stackOk() and ttInWindow()
+		return Settings[TT_KEY] and getgenv().__TrickTreatToken == tok and ttInWindow()
 	end
 
 	-- mob bất kỳ trong TT_MOB_RANGE stud quanh player: phải farm xong mới làm tiếp trick or treat
@@ -12169,7 +12225,7 @@ do
 
 	local function runDoor(door, tok)
 		local t0 = tick()
-		local stand, standDir, arrived, goneAt
+		local stand, standList, standIdx, switches, arrived, goneAt
 		local sawDialogue = false
 		local lastE, lastClick, lastScreen = 0, 0, 0
 		while ttValid(tok) do
@@ -12187,12 +12243,10 @@ do
 				continue
 			end
 			-- luôn bám theo HalloweenDoor: hướng đứng cố định, vị trí đứng cập nhật theo door mỗi frame
-			if not standDir then
-				local dir = hrp.Position - cf.Position
-				dir = Vector3.new(dir.X, 0, dir.Z)
-				standDir = dir.Magnitude > 0.1 and dir.Unit or Vector3.new(0, 0, 1)
+			if not standList then
+				standList, standIdx, switches = ttPickStandDirs(door, cf, hrp), 1, 0
 			end
-			stand = CFrame.lookAt(cf.Position + standDir * 3, cf.Position)
+			stand = CFrame.lookAt(cf.Position + standList[standIdx] * TT_STAND_DIST, cf.Position)
 			local sc, opt = getDialogue()
 			if sc then
 				sawDialogue, goneAt = true, nil
@@ -12225,8 +12279,14 @@ do
 						lastScreen = tick()
 						pcall(doClick)
 					end
-					if tick() - arrived > 10 then
-						return
+					-- đứng mãi không mở được dialogue (vd bị kẹt trong nhà): đổi sang phía khác của door
+					if tick() - arrived > TT_SIDE_SWITCH then
+						switches = switches + 1
+						if switches >= #standList then
+							return -- thử hết các phía rồi, sang door tiếp
+						end
+						standIdx = standIdx % #standList + 1
+						arrived = nil
 					end
 				else
 					arrived = nil -- bị đẩy ra xa door thì fly lại, không bỏ cuộc
@@ -12359,53 +12419,53 @@ do
 		ttSceneSkip[door] = tick() + TT_REVISIT
 	end
 
-	ttToggleObj = HalloweenSection.CreateToggle(
+	HalloweenSection.CreateToggle(
 		{ Title = "Auto Trick Or Treat", Desc = "Fly to nearest HalloweenDoor, spam E, click option1", Default = Settings[TT_KEY] or false },
 		function(state)
 			SaveSettings(TT_KEY, state)
 			getgenv().__TrickTreatToken = getgenv().__TrickTreatToken + 1
+			ttSetActive(false)
 			if not state then
-				return
-			end
-			if not ttInWindow(true) then
-				ttForceOff()
 				return
 			end
 			local tok = getgenv().__TrickTreatToken
 			pcall(ttEnsureBusyHook)
 			spawn(function()
-				while ttValid(tok) or (Settings[TT_KEY] and getgenv().__TrickTreatToken == tok) do
+				while Settings[TT_KEY] and getgenv().__TrickTreatToken == tok do
 					task.wait(0.1)
 					local ok, err = pcall(function()
+						-- chưa có sự kiện: không làm gì, trả quyền cho các farm đang bật
 						if not ttInWindow(true) then
-							ttForceOff()
+							ttSetActive(false)
+							task.wait(1)
 							return
 						end
-						if not stackOk() then
+						local sceneDoor, sceneWin = findSceneDoor()
+						local door = (not sceneDoor) and nearestDoor() or nil
+						if not sceneDoor and not door then
+							-- không còn door nào để làm: trả quyền cho farm
+							ttSetActive(false)
+							task.wait(2)
 							return
 						end
+						ttSetActive(true)
 						local mob = findAnyMob()
 						if mob then
 							farmTTMob(mob, tok)
 							return
 						end
-						local sceneDoor, sceneWin = findSceneDoor()
 						if sceneDoor then
 							runScene(sceneDoor, sceneWin, tok)
 							return
 						end
-						local door = nearestDoor()
-						if door then
-							ttVisited[door] = tick() + TT_REVISIT
-							runDoor(door, tok)
-						else
-							task.wait(2)
-						end
+						ttVisited[door] = tick() + TT_REVISIT
+						runDoor(door, tok)
 					end)
 					if not ok then
 						warn("[TrickOrTreat] " .. tostring(err))
 					end
 				end
+				ttSetActive(false)
 			end)
 		end
 	)
