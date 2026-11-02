@@ -12124,12 +12124,25 @@ do
 		return best
 	end
 
-	local function farmTTMob(mob, tok)
+	local TT_SPACE_DELAY = 0.1 -- spam space mỗi 0.1s khi đánh boss trong scene
+	local function pressSpace()
+		local vim = game:GetService("VirtualInputManager")
+		vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+		task.wait(0.03)
+		vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+	end
+
+	local function farmTTMob(mob, tok, spamSpace)
 		local startT = tick()
+		local lastSpace = 0
 		repeat
 			task.wait()
 			if not ttValid(tok) then
 				return
+			end
+			if spamSpace and tick() - lastSpace >= TT_SPACE_DELAY then
+				lastSpace = tick()
+				task.spawn(pcall, pressSpace)
 			end
 			if tick() - startT > TT_MOB_TIMEOUT then
 				ttIgnoreMob[mob] = tick() + 30
@@ -12162,10 +12175,8 @@ do
 		while ttValid(tok) do
 			task.wait()
 			local hrp = getHRP()
-			-- đứng gõ cửa ở LeftDoor, không có thì RightDoor, không có nữa thì dùng cả door
-			local cf = pivotOf(door:FindFirstChild("LeftDoor"))
-				or pivotOf(door:FindFirstChild("RightDoor"))
-				or pivotOf(door)
+			-- fly tới đúng HalloweenDoor (không dùng LeftDoor/RightDoor nữa)
+			local cf = pivotOf(door)
 			if not hrp or not cf then
 				return
 			end
@@ -12261,7 +12272,7 @@ do
 				end
 				local mob = findAnyMob()
 				if mob then
-					farmTTMob(mob, tok)
+					farmTTMob(mob, tok, true)
 				end
 			end
 		end
