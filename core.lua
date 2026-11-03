@@ -13220,11 +13220,12 @@ do
 		until not IsMobAlive(boss)
 	end
 
-	-- nhặt kẹo sau khi boss chết: đợi model xuất hiện trong workspace.CandySpillFx rồi cứ 0.01s đổi sang model kẹo khác
+	-- nhặt kẹo sau khi boss chết: FIX - phải fly tới model chạm được mới đổi model khác (không đổi mỗi 0.01s)
 	local DJ_CANDY_WAIT = 10 -- đợi candy xuất hiện tối đa bấy nhiêu giây
-	local DJ_CANDY_SWITCH = 0.01 -- cứ mỗi bấy nhiêu giây là đổi sang model kẹo khác (không đợi model biến mất)
 	local DJ_CANDY_TIMEOUT = 90 -- tổng thời gian nhặt tối đa
 	local DJ_CANDY_IDLE = 1.5 -- hết candy liên tục bấy nhiêu giây thì kết thúc
+	local DJ_CANDY_REACH_DIST = 6 -- tới trong khoảng này coi là đã chạm model
+	local DJ_CANDY_PER_MODEL_TIMEOUT = 10 -- fly tới 1 model tối đa bấy nhiêu giây
 
 	local function djCandyItems(skip)
 		local list = {}
@@ -13278,15 +13279,33 @@ do
 				djHold()
 			else
 				lastSeen = tick()
-				visited[best] = true
+				-- FIX: phải bay tới khi chạm model hoặc model biến mất mới đổi
 				local t1 = tick()
-				while valid() and best.Parent and tick() - t1 < DJ_CANDY_SWITCH do
+				local reached = false
+				while valid() and best.Parent and tick() - t1 < DJ_CANDY_PER_MODEL_TIMEOUT do
 					local cf = pivotOf(best)
-					if not getHRP() or not cf then
+					local curHrp = getHRP()
+					if not curHrp or not cf then
+						break
+					end
+					local dist = (cf.Position - curHrp.Position).Magnitude
+					if dist <= DJ_CANDY_REACH_DIST then
+						reached = true
 						break
 					end
 					pcall(toTarget, CFrame.new(cf.Position))
 					task.wait()
+				end
+				-- nếu đã chạm hoặc model đã biến mất (đã nhặt) thì mới đánh dấu visited, nếu timeout mà chưa chạm thì bỏ qua tạm thời để tránh kẹt
+				if reached or not best.Parent then
+					visited[best] = true
+				else
+					-- timeout nhưng chưa chạm: đánh dấu visited tạm 5s để thử model khác, tránh spam đổi liên tục
+					visited[best] = true
+					-- sau 5s cho phép quay lại nếu vẫn còn
+					task.delay(5, function()
+						if visited then visited[best] = nil end
+					end)
 				end
 			end
 		end
