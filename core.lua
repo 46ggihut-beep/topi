@@ -12335,6 +12335,165 @@ do
 	-- chọn phía đứng: ưu tiên phía ngoài nhà (không có mái phía trên, không bị tường chắn giữa player và door)
 	local TT_STAND_DIST = 3
 	local TT_SIDE_SWITCH = 3 -- đứng 1 phía quá số giây này mà chưa mở được dialogue thì đổi phía khác
+	-- ===== GHOST CHASE LOGIC (yêu cầu mới) =====
+	local TT_GHOST_FLEE_DIST = 80
+	local TT_GHOST_FOLLOW_H = 12
+	local ttGhostIdx = 1
+	local function getGhostChaseCFrames()
+		local gc = workspace:FindFirstChild("GhostChase")
+		if not gc then return nil end
+		local list = {}
+		for _, inst in ipairs(gc:GetDescendants()) do
+			if inst:IsA("BasePart") then
+				table.insert(list, inst.CFrame)
+			elseif inst:IsA("Model") then
+				local cf = nil
+				pcall(function() cf = inst:GetPivot() end)
+				if not cf and inst.PrimaryPart then cf = inst.PrimaryPart.CFrame end
+				if cf then table.insert(list, cf) end
+			end
+		end
+		if #list == 0 then
+			for _, child in ipairs(gc:GetChildren()) do
+				if child:IsA("Model") then
+					local cf = pivotOf(child)
+					if cf then table.insert(list, cf) end
+				end
+			end
+		end
+		return #list > 0 and list or nil
+	end
+	local function isGhostChaseActive()
+		return workspace:FindFirstChild("GhostChase") ~= nil
+	end
+	local function getGhostThreatDist(hrpPos)
+		local gc = workspace:FindFirstChild("GhostChase")
+		if not gc or not hrpPos then return math.huge end
+		local minD = math.huge
+		for _, inst in ipairs(gc:GetDescendants()) do
+			local pos = nil
+			if inst:IsA("BasePart") then pos = inst.Position
+			elseif inst:IsA("Model") then
+				local cf = pivotOf(inst)
+				if cf then pos = cf.Position end
+			end
+			if pos then
+				local d = (pos - hrpPos).Magnitude
+				if d < minD then minD = d end
+			end
+		end
+		return minD
+	end
+	local function flyGhostChasePath(tok, doorCf)
+		local pts = getGhostChaseCFrames()
+		if not pts then return false end
+		local hrp = getHRP()
+		local hrpPos = hrp and hrp.Position or (doorCf and doorCf.Position)
+		if not hrpPos then return false end
+		table.sort(pts, function(a,b)
+			return (a.Position - hrpPos).Magnitude < (b.Position - hrpPos).Magnitude
+		end)
+		local bestCf = pts[1]
+		local bestScore = -1
+		for _, cf in ipairs(pts) do
+			local distToGhost = 0
+			local gc = workspace:FindFirstChild("GhostChase")
+			if gc then
+				for _, g in ipairs(gc:GetChildren()) do
+					local gcf = pivotOf(g)
+					if gcf then distToGhost = distToGhost + (gcf.Position - cf.Position).Magnitude end
+				end
+			end
+			local keepNearDoor = doorCf and (cf.Position - doorCf.Position).Magnitude < 200
+			local score = distToGhost + (keepNearDoor and 1000 or 0)
+			if score > bestScore then bestScore = score bestCf = cf end
+		end
+		ttGhostIdx = ttGhostIdx % #pts + 1
+		local targetCf = pts[ttGhostIdx]
+		if bestScore > 0 and math.random() < 0.5 then targetCf = bestCf end
+		if ttValid(tok) then
+			pcall(toTarget, CFrame.new(targetCf.Position + Vector3.new(0, TT_GHOST_FOLLOW_H, 0)))
+		end
+		return true
+	end
+	
+	-- ===== SWEET RIDE LOGIC (yêu cầu mới) =====
+	local function isSweetRideActive()
+		return workspace:FindFirstChild("SweetRide") ~= nil
+	end
+	local function getSweetRideParts()
+		local sr = workspace:FindFirstChild("SweetRide")
+		if not sr then return nil, nil end
+		local fr = sr:FindFirstChild("FR")
+		local emitter = sr:FindFirstChild("SweetRideEmitter")
+		if not fr then fr = sr:FindFirstChild("FR", true) end
+		if not emitter then emitter = sr:FindFirstChild("SweetRideEmitter", true) end
+		return fr, emitter
+	end
+	local function pivotOfAny(inst)
+		if not inst then return nil end
+		if inst:IsA("BasePart") then return inst.CFrame end
+		if inst:IsA("Model") then
+			local cf = nil
+			pcall(function() cf = inst:GetPivot() end)
+			if not cf and inst.PrimaryPart then cf = inst.PrimaryPart.CFrame end
+			return cf or pivotOf(inst)
+		end
+		return nil
+	end
+	local function walkToPosition(pos, timeout, checkValid)
+		local char = game:GetService("Players").LocalPlayer.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if not hum then return false end
+		timeout = timeout or 15
+		local t0 = tick()
+		pcall(function()
+			if playerModule and playerModule.GetClickToMoveController then
+				playerModule:GetClickToMoveController():MoveTo(pos, false, false)
+			end
+		end)
+		pcall(function() hum:MoveTo(pos) end)
+		while tick() - t0 < timeout do
+			task.wait(0.1)
+			if checkValid and not checkValid() then return false end
+			local curHrp = getHRP()
+			local curHum = game:GetService("Players").LocalPlayer.Character and game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+			if not curHrp or not curHum then break end
+			if (curHrp.Position - pos).Magnitude <= 6 then return true end
+			if tick() - t0 > 2 and curHum.MoveDirection.Magnitude < 0.2 then
+				pcall(function() curHum:MoveTo(pos) end)
+			end
+		end
+		return (getHRP().Position - pos).Magnitude <= 12
+	end
+	local function handleSweetRide(tok, doorCf)
+		if not isSweetRideActive() then return false end
+		local fr, emitter = getSweetRideParts()
+		if not fr and not emitter then return false end
+		if fr then
+			local frCf = pivotOfAny(fr)
+			if frCf and ttValid(tok) then
+				local t0 = tick()
+				while ttValid(tok) and tick() - t0 < 15 do
+					task.wait()
+					if not isSweetRideActive() then break end
+					local hrp = getHRP()
+					if not hrp then break end
+					if (hrp.Position - frCf.Position).Magnitude <= 10 then break end
+					pcall(toTarget, frCf)
+				end
+			end
+		end
+		if emitter then
+			local emCf = pivotOfAny(emitter)
+			if emCf and ttValid(tok) then
+				walkToPosition(emCf.Position, 20, function() return isSweetRideActive() and ttValid(tok) end)
+			end
+		end
+		return true
+	end
+
+
 	local function ttPickStandDirs(door, cf, hrp)
 		local params = RaycastParams.new()
 		params.FilterType = Enum.RaycastFilterType.Exclude
@@ -12439,23 +12598,35 @@ do
 	end
 
 	-- trả về scroller, option1 (option1 có thể nil nếu chưa load)
+	-- DialogueGui có thể còn các frame "table: 0x..." cũ (đã ẩn): duyệt tất cả optionsList, ưu tiên cái có option1 đang hiện
 	local function getDialogue()
 		local pg = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
 		local dg = pg and pg:FindFirstChild("DialogueGui")
 		if not dg or (dg:IsA("ScreenGui") and not dg.Enabled) then
 			return nil
 		end
-		local ol = dg:FindFirstChild("optionsList", true)
-		local sc = ol and ol:FindFirstChild("scroller")
-		if not sc then
-			return nil
-		end
-		for _, o in ipairs(sc:GetChildren()) do
-			if o:IsA("GuiObject") and string.find(o.Name, "option1", 1, true) then
-				return sc, o
+		local fallbackSc
+		for _, ol in ipairs(dg:GetDescendants()) do
+			if ol.Name == "optionsList" then
+				local sc = ol:FindFirstChild("scroller")
+				if sc then
+					fallbackSc = fallbackSc or sc
+					for _, o in ipairs(sc:GetChildren()) do
+						if
+							o:IsA("GuiObject")
+							and string.find(o.Name, "option1", 1, true)
+							and not string.find(o.Name, "option1%d")
+							and o.Visible
+							and o.AbsoluteSize.X > 0
+							and o.AbsoluteSize.Y > 0
+						then
+							return sc, o
+						end
+					end
+				end
 			end
 		end
-		return sc, nil
+		return fallbackSc, nil
 	end
 
 	-- DialogueGui["table: 0x..."]: thấy frame này thì mới click màn hình liên tục
@@ -12473,8 +12644,16 @@ do
 		return nil
 	end
 
-	-- click VirtualInputManager (cùng cách với logic phá mây) nhưng ở tâm option
+	-- click option: kích hoạt trực tiếp nút (firesignal) + click chuột ảo ở tâm option
 	local function clickGui(o)
+		local btn = o:IsA("GuiButton") and o or o:FindFirstChildWhichIsA("GuiButton", true)
+		if btn and firesignal then
+			for _, sig in ipairs({ "MouseButton1Click", "Activated" }) do
+				pcall(function()
+					firesignal(btn[sig])
+				end)
+			end
+		end
 		local vim = game:GetService("VirtualInputManager")
 		local pos = o.AbsolutePosition + o.AbsoluteSize / 2
 		local sg = o:FindFirstAncestorWhichIsA("ScreenGui")
@@ -12594,6 +12773,29 @@ do
 				farmTTMob(mob, tok)
 				t0, arrived = tick(), nil
 				continue
+			end
+			-- ===== GHOST CHASE: khi đang gõ cửa mà có workspace.GhostChase thì fly theo model trong đó =====
+			if isSweetRideActive() then
+				handleSweetRide(tok, cf)
+				task.wait(0.1)
+				continue
+			end
+			if isGhostChaseActive() then
+				local threat = getGhostThreatDist(hrp.Position)
+				if threat < TT_GHOST_FLEE_DIST then
+					flyGhostChasePath(tok, cf)
+					local sc2, opt2 = getDialogue()
+					if getDialogueFrame() and tick() - lastScreen >= HW_CLICK_DELAY then
+						lastScreen = tick()
+						pcall(doClick)
+					end
+					if sc2 and opt2 and tick() - lastClick >= HW_CLICK_DELAY then
+						lastClick = tick()
+						pcall(clickGui, opt2)
+					end
+					task.wait(0.05)
+					continue
+				end
 			end
 			-- luôn bám theo HalloweenDoor: hướng đứng cố định, vị trí đứng cập nhật theo door mỗi frame
 			if not standList then
@@ -12729,8 +12931,22 @@ do
 				local mob = findAnyMob()
 				if mob then
 					farmTTMob(mob, tok)
-					t0, arrived = tick(), nil
+						t0, arrived = tick(), nil
+						continue
+				end
+				-- GhostChase khi đang gõ SceneWindow: fly theo model để né
+				if isSweetRideActive() then
+					handleSweetRide(tok, cf)
+					task.wait(0.1)
 					continue
+				end
+				if isGhostChaseActive() then
+					local hrp2 = getHRP()
+					if hrp2 and getGhostThreatDist(hrp2.Position) < TT_GHOST_FLEE_DIST then
+						flyGhostChasePath(tok, cf)
+						task.wait(0.05)
+						continue
+					end
 				end
 				if not stand then
 					local dir = h.Position - cf.Position
@@ -12822,6 +13038,414 @@ do
 			end)
 		end
 	)
+
+	-- ===== Auto Summon + Farm Boss (Witch -> Summon -> GreatPumpkinCompass -> farm boss) =====
+	-- (gói trong function riêng vì scope Halloween đã chạm giới hạn 200 local của Lua)
+	xpcall(function()
+	local DJ_KEY = "Auto Summon + Farm Boss"
+	local DJ_SUMMON_WAIT = 15 -- delay sau Summon rồi mới fly tới compass
+	local DJ_HOLD_E = 1 -- nhấn giữ E ở compass (giây)
+	local DJ_BOSS_WAIT = 90 -- đợi boss spawn tối đa bấy nhiêu giây, quá thì làm lại từ đầu
+	local DJ_ARRIVE = 8 -- tới trong khoảng này của Witch coi là đã tới
+	local DJ_COMPASS_ARRIVE = 6 -- tới trong khoảng này của compass coi là đã tới
+	local DJ_ISLAND_ARRIVE = 40 -- tới trong khoảng này của đảo thì đứng chờ game load NPC
+	getgenv().__DJToken = getgenv().__DJToken or 0
+
+	-- đảo theo từng sea để game load NPC Witch: Sea 1 = đảo trung tâm, Sea 2 = Cafe, Sea 3 = Mansion
+	local function djIslandCF()
+		if game.PlaceId == getgenv().CheckPlaceId3 then
+			return CFrame.new(-703.16748, 9.55188751, 1575.1864)
+		elseif game.PlaceId == getgenv().CheckPlaceId2 then
+			return CFrame.new(-385.250916, 73.0458984, 297.388397)
+		elseif game.PlaceId == getgenv().CheckPlaceId then
+			return CFrame.new(-12548, 337, -7481)
+		end
+		return nil
+	end
+
+	-- chỉ farm đúng boss workspace.Enemies["Dapper Jack"]
+	local DJ_BOSS_NAME = "Dapper Jack"
+	local function djFindBoss()
+		local enemies = workspace:FindFirstChild("Enemies")
+		local m = enemies and enemies:FindFirstChild(DJ_BOSS_NAME)
+		if m and IsMobAlive(m) then
+			return m
+		end
+		return nil
+	end
+
+	-- đứng im tại chỗ nhưng vẫn giữ float + noclip (gọi mỗi frame)
+	local function djHold()
+		local hrp = getHRP()
+		if hrp then
+			pcall(toTarget, hrp.CFrame)
+		end
+	end
+
+	local function djWait(sec, valid)
+		local t0 = tick()
+		while tick() - t0 < sec and valid() do
+			djHold()
+			task.wait()
+		end
+		return valid()
+	end
+
+	-- fly tới Witch; chưa thấy NPC thì fly tới đảo của sea hiện tại, đứng chờ game load
+	local function djReachWitch(valid)
+		local deadline = tick() + 180
+		while valid() and tick() < deadline do
+			task.wait()
+			local hrp = getHRP()
+			if not hrp then
+				return false
+			end
+			local npcs = workspace:FindFirstChild("NPCs")
+			local w = npcs and npcs:FindFirstChild("Witch")
+			local wcf = w and pivotOf(w)
+			if wcf then
+				if (hrp.Position - wcf.Position).Magnitude <= DJ_ARRIVE then
+					djHold()
+					return true
+				end
+				pcall(toTarget, CFrame.new(wcf.Position))
+			else
+				local icf = djIslandCF()
+				if not icf then
+					return false
+				end
+				if (hrp.Position - icf.Position).Magnitude <= DJ_ISLAND_ARRIVE then
+					djHold()
+				else
+					pcall(toTarget, icf)
+				end
+			end
+		end
+		return false
+	end
+
+	local function djSummon()
+		return pcall(function()
+			return game:GetService("ReplicatedStorage").Remotes.DapperJackRitual:InvokeServer("Summon")
+		end)
+	end
+
+	-- fly tới workspace.GreatPumpkinCompass (đợi tối đa 10s cho compass xuất hiện)
+	local function djReachCompass(valid)
+		local t0 = tick()
+		while valid() and tick() - t0 < 60 do
+			task.wait()
+			local hrp = getHRP()
+			if not hrp then
+				return nil
+			end
+			local c = workspace:FindFirstChild("GreatPumpkinCompass")
+			local cf = c and pivotOf(c)
+			if cf then
+				if (hrp.Position - cf.Position).Magnitude <= DJ_COMPASS_ARRIVE then
+					djHold()
+					return c
+				end
+				pcall(toTarget, CFrame.new(cf.Position))
+			else
+				djHold()
+				if tick() - t0 > 10 then
+					return nil
+				end
+			end
+		end
+		return nil
+	end
+
+	local function djHoldE(obj, valid)
+		local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+		local hold = prompt and prompt.HoldDuration or 0
+		local dur = math.max(DJ_HOLD_E, hold + 0.1)
+		local vim = game:GetService("VirtualInputManager")
+		if prompt then
+			pcall(function()
+				prompt.RequiresLineOfSight = false
+			end)
+			pcall(function()
+				prompt:InputHoldBegin()
+			end)
+		end
+		vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+		local t0 = tick()
+		while tick() - t0 < dur and valid() do
+			djHold()
+			task.wait()
+		end
+		vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+		if prompt then
+			pcall(function()
+				prompt:InputHoldEnd()
+			end)
+		end
+	end
+
+	local function djWaitBoss(valid, maxSec)
+		local t0 = tick()
+		while valid() and tick() - t0 < (maxSec or DJ_BOSS_WAIT) do
+			local b = djFindBoss()
+			if b then
+				return b
+			end
+			djHold()
+			task.wait()
+		end
+		return nil
+	end
+
+	local function djFarmBoss(boss, valid)
+		repeat
+			task.wait()
+			if not valid() then
+				return
+			end
+			local hrp = getHRP()
+			local r = boss:FindFirstChild("HumanoidRootPart")
+			if not hrp or not r then
+				return
+			end
+			pcall(function()
+				UsedualFlock()
+				ClickM1(boss)
+				if Settings["Select Weapon"] == "Blox Fruit" then
+					toTarget(r.CFrame * CFrame.new(0, FruitFarmY(), 0))
+				else
+					toTarget(r.CFrame * CFrame.new(0, BuddhaFarmY(), 0))
+				end
+			end)
+		until not IsMobAlive(boss)
+	end
+
+	-- nhặt kẹo sau khi boss chết: đợi model xuất hiện trong workspace.CandySpillFx rồi cứ 0.01s đổi sang model kẹo khác
+	local DJ_CANDY_WAIT = 10 -- đợi candy xuất hiện tối đa bấy nhiêu giây
+	local DJ_CANDY_SWITCH = 0.01 -- cứ mỗi bấy nhiêu giây là đổi sang model kẹo khác (không đợi model biến mất)
+	local DJ_CANDY_TIMEOUT = 90 -- tổng thời gian nhặt tối đa
+	local DJ_CANDY_IDLE = 1.5 -- hết candy liên tục bấy nhiêu giây thì kết thúc
+
+	local function djCandyItems(skip)
+		local list = {}
+		local root = workspace:FindFirstChild("CandySpillFx")
+		if root then
+			for _, c in ipairs(root:GetChildren()) do
+				if (c:IsA("Model") or c:IsA("BasePart")) and (skip[c] or 0) < tick() then
+					table.insert(list, c)
+				end
+			end
+		end
+		return list
+	end
+
+	local function djCollectCandy(valid)
+		local visited = setmetatable({}, { __mode = "k" }) -- model đã ghé trong lượt hiện tại
+		local t0 = tick()
+		while valid() and tick() - t0 < DJ_CANDY_WAIT and #djCandyItems({}) == 0 do
+			djHold()
+			task.wait()
+		end
+		local startT, lastSeen = tick(), tick()
+		while valid() and tick() - startT < DJ_CANDY_TIMEOUT do
+			task.wait()
+			local hrp = getHRP()
+			if not hrp then
+				return
+			end
+			local items = djCandyItems({})
+			-- chọn model gần nhất chưa ghé; ghé hết rồi thì bắt đầu lượt mới
+			local best, bestD
+			for pass = 1, 2 do
+				for _, c in ipairs(items) do
+					local cf = not visited[c] and pivotOf(c)
+					if cf then
+						local d = (cf.Position - hrp.Position).Magnitude
+						if not bestD or d < bestD then
+							best, bestD = c, d
+						end
+					end
+				end
+				if best or #items == 0 then
+					break
+				end
+				table.clear(visited)
+			end
+			if not best then
+				if tick() - lastSeen > DJ_CANDY_IDLE then
+					return
+				end
+				djHold()
+			else
+				lastSeen = tick()
+				visited[best] = true
+				local t1 = tick()
+				while valid() and best.Parent and tick() - t1 < DJ_CANDY_SWITCH do
+					local cf = pivotOf(best)
+					if not getHRP() or not cf then
+						break
+					end
+					pcall(toTarget, CFrame.new(cf.Position))
+					task.wait()
+				end
+			end
+		end
+	end
+
+	-- hết kẹo: fly tới workspace.Map.DapperJackArena.ExitPortal để thoát arena
+	local DJ_EXIT_TIMEOUT = 20 -- tối đa bấy nhiêu giây cho bước này
+	local DJ_EXIT_NEAR = 4 -- tới trong khoảng này của portal coi là đã chạm
+	local DJ_EXIT_STAY = 3 -- chạm rồi mà sau bấy nhiêu giây vẫn chưa bị đưa đi thì thôi, tránh kẹt
+
+	local function djFindExitPortal()
+		local map = workspace:FindFirstChild("Map")
+		local arena = map and map:FindFirstChild("DapperJackArena")
+		local portal = arena and arena:FindFirstChild("ExitPortal")
+		if not portal then
+			return nil
+		end
+		local cf = pivotOf(portal)
+		if not cf then
+			local part = portal:FindFirstChildWhichIsA("BasePart", true)
+			cf = part and part.CFrame
+		end
+		return cf
+	end
+
+	local function djExitPortal(valid)
+		local t0, reachedAt = tick(), nil
+		while valid() and tick() - t0 < DJ_EXIT_TIMEOUT do
+			task.wait()
+			local hrp = getHRP()
+			local cf = djFindExitPortal()
+			if not hrp or not cf then
+				return -- không có portal (đã thoát arena / arena biến mất)
+			end
+			local d = (hrp.Position - cf.Position).Magnitude
+			if reachedAt and d > 150 then
+				return -- đã bị đưa đi xa portal = đã thoát
+			end
+			if d <= DJ_EXIT_NEAR then
+				reachedAt = reachedAt or tick()
+				if tick() - reachedAt > DJ_EXIT_STAY then
+					return
+				end
+			end
+			pcall(toTarget, CFrame.new(cf.Position))
+		end
+	end
+
+	-- player đang ở trong khu đánh boss workspace.Map.DapperJackArena (kiểm tra theo bounding box + margin)
+	local DJ_ARENA_MARGIN = Vector3.new(20, 80, 20)
+	local function djInArena()
+		local hrp = getHRP()
+		local map = workspace:FindFirstChild("Map")
+		local arena = map and map:FindFirstChild("DapperJackArena")
+		if not hrp or not arena then
+			return false
+		end
+		local ok, inside = pcall(function()
+			local cf, size
+			if arena:IsA("Model") then
+				cf, size = arena:GetBoundingBox()
+			else
+				local mn, mx
+				for _, d in ipairs(arena:GetDescendants()) do
+					if d:IsA("BasePart") then
+						local lo, hi = d.Position - d.Size / 2, d.Position + d.Size / 2
+						mn = mn and Vector3.new(math.min(mn.X, lo.X), math.min(mn.Y, lo.Y), math.min(mn.Z, lo.Z)) or lo
+						mx = mx and Vector3.new(math.max(mx.X, hi.X), math.max(mx.Y, hi.Y), math.max(mx.Z, hi.Z)) or hi
+					end
+				end
+				if not mn then
+					return false
+				end
+				cf, size = CFrame.new((mn + mx) / 2), mx - mn
+			end
+			local rel = cf:PointToObjectSpace(hrp.Position)
+			return math.abs(rel.X) <= size.X / 2 + DJ_ARENA_MARGIN.X
+				and math.abs(rel.Y) <= size.Y / 2 + DJ_ARENA_MARGIN.Y
+				and math.abs(rel.Z) <= size.Z / 2 + DJ_ARENA_MARGIN.Z
+		end)
+		return ok and inside == true
+	end
+
+	-- 1 vòng đầy đủ:
+	-- chưa có compass -> Witch -> Summon -> đợi 15s -> fly compass -> giữ E -> chờ boss -> đánh boss
+	-- -> nhặt kẹo (CandySpillFx) -> hết kẹo -> ExitPortal -> lặp lại
+	-- đã có compass: fly thẳng tới compass, không cần Witch. Đang trong arena: không cần Witch / compass.
+	local function djRound(valid)
+		local boss = djFindBoss()
+		local inArena = djInArena()
+		if not boss and inArena and #djCandyItems({}) > 0 then
+			djCollectCandy(valid)
+			djExitPortal(valid)
+			return
+		end
+		if not boss and not inArena then
+			if not workspace:FindFirstChild("GreatPumpkinCompass") then
+				if not djReachWitch(valid) then
+					return
+				end
+				djSummon()
+				if not djWait(DJ_SUMMON_WAIT, valid) then
+					return
+				end
+			end
+			local compass = djReachCompass(valid)
+			if not compass then
+				task.wait(3)
+				return
+			end
+			djHoldE(compass, valid)
+		end
+		if not boss then
+			-- trong arena mà không có boss lẫn kẹo (trạng thái dư): chỉ đợi ngắn rồi thoát để làm lại
+			boss = djWaitBoss(valid, inArena and 15 or nil)
+			if not boss then
+				if valid() and djInArena() then
+					djExitPortal(valid)
+				end
+				return
+			end
+		end
+		djFarmBoss(boss, valid)
+		if valid() and not IsMobAlive(boss) then
+			djCollectCandy(valid)
+			djExitPortal(valid)
+		end
+	end
+
+	HalloweenSection.CreateToggle(
+		{ Title = "Auto Summon + Farm Boss", Desc = "Witch > Summon > wait 15s > GreatPumpkinCompass (hold E) > kill Dapper Jack > collect CandySpillFx > ExitPortal", Default = Settings[DJ_KEY] or false },
+		function(state)
+			SaveSettings(DJ_KEY, state)
+			getgenv().__DJToken = getgenv().__DJToken + 1
+			if not state then
+				return
+			end
+			local tok = getgenv().__DJToken
+			local function valid()
+				return Settings[DJ_KEY] and getgenv().__DJToken == tok and stackOk()
+			end
+			spawn(function()
+				while Settings[DJ_KEY] and getgenv().__DJToken == tok and task.wait() do
+					local ok, err = pcall(function()
+						if not stackOk() then
+							return
+						end
+						djRound(valid)
+					end)
+					if not ok then
+						warn("[SummonBoss] " .. tostring(err))
+					end
+				end
+			end)
+		end
+	)
+	end, function(e)
+		warn("[SummonBoss] init: " .. tostring(e))
+	end)
 end
 HiddenEventSection = FarmotherMain.CreateSection("Secret Quest")
 StatusHiddenProgress = HiddenEventSection.CreateLabel({ Title = "Secret Quest : 0/39 Quests" })
