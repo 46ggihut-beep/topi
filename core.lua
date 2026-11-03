@@ -12335,6 +12335,23 @@ do
 	-- chọn phía đứng: ưu tiên phía ngoài nhà (không có mái phía trên, không bị tường chắn giữa player và door)
 	local TT_STAND_DIST = 3
 	local TT_SIDE_SWITCH = 3 -- đứng 1 phía quá số giây này mà chưa mở được dialogue thì đổi phía khác
+	local TT_SEA3_OFFSET = 10 -- Sea 3 lùi xuống dưới model 10 stud
+	local function ttIsSea3()
+		-- check PlaceId Sea 3 (cũ 7449423635 và mới 100117331123089) + check map có Turtle = Sea3
+		local pid = game.PlaceId
+		if pid == 7449423635 or pid == 100117331123089 or pid == 1 then
+			return true
+		end
+		local map = workspace:FindFirstChild("Map")
+		if map and (map:FindFirstChild("Turtle") or map:FindFirstChild("Haunted Castle") or map:FindFirstChild("HauntedCastle") or map:FindFirstChild("SeaOfTreats")) then
+			return true
+		end
+		-- fallback: nếu đang ở CheckPlaceId (được gán = Sea3 trong file này)
+		if getgenv().CheckPlaceId and pid == getgenv().CheckPlaceId then
+			return true
+		end
+		return false
+	end
 	-- ===== GHOST CHASE LOGIC (yêu cầu mới) =====
 	local TT_GHOST_FLEE_DIST = 80
 	local TT_GHOST_FOLLOW_H = 12
@@ -12798,10 +12815,15 @@ do
 				end
 			end
 			-- luôn bám theo HalloweenDoor: hướng đứng cố định, vị trí đứng cập nhật theo door mỗi frame
+			-- FIX Sea3: model - 10 stud (đứng dưới model)
 			if not standList then
 				standList, standIdx, switches = ttPickStandDirs(door, cf, hrp), 1, 0
 			end
-			stand = CFrame.lookAt(cf.Position + standList[standIdx] * TT_STAND_DIST, cf.Position)
+			if ttIsSea3() then
+				stand = CFrame.lookAt(cf.Position + Vector3.new(0, -TT_SEA3_OFFSET, 0), cf.Position)
+			else
+				stand = CFrame.lookAt(cf.Position + standList[standIdx] * TT_STAND_DIST, cf.Position)
+			end
 			local sc, opt = getDialogue()
 			if getDialogueFrame() and tick() - lastScreen >= HW_CLICK_DELAY then
 				lastScreen = tick()
@@ -12834,9 +12856,9 @@ do
 						lastE = tick()
 						task.spawn(pcall, pressE, door)
 					end
-					-- đứng mãi không mở được dialogue (vd bị kẹt trong nhà): đổi sang phía khác của door
-					if tick() - arrived > TT_SIDE_SWITCH then
-						switches = switches + 1
+					-- đứng mãi không mở được dialogue (vd bị kẹt trong nhà): đổi sang phía khác của door (Sea3 thì không đổi, giữ -10 stud)
+					if not ttIsSea3() and tick() - arrived > TT_SIDE_SWITCH then
+						switches = (switches or 0) + 1
 						if switches >= #standList then
 							return -- thử hết các phía rồi, sang door tiếp
 						end
@@ -12949,10 +12971,14 @@ do
 					end
 				end
 				if not stand then
-					local dir = h.Position - cf.Position
-					dir = Vector3.new(dir.X, 0, dir.Z)
-					dir = dir.Magnitude > 0.1 and dir.Unit or Vector3.new(0, 0, 1)
-					stand = CFrame.lookAt(cf.Position + dir * 3, cf.Position)
+					if ttIsSea3() then
+						stand = CFrame.lookAt(cf.Position + Vector3.new(0, -TT_SEA3_OFFSET, 0), cf.Position)
+					else
+						local dir = h.Position - cf.Position
+						dir = Vector3.new(dir.X, 0, dir.Z)
+						dir = dir.Magnitude > 0.1 and dir.Unit or Vector3.new(0, 0, 1)
+						stand = CFrame.lookAt(cf.Position + dir * 3, cf.Position)
+					end
 				end
 				pcall(toTarget, stand)
 				if getDialogueFrame() and tick() - lastScreen >= HW_CLICK_DELAY then
