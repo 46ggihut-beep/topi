@@ -11770,8 +11770,8 @@ end
 HalloweenSection = FarmotherMain.CreateSection("Halloween")
 do
 	local HW_KEY = "Auto Farm Pumpkin Hunt"
-	local PUMPKIN_BEHIND = 6 -- đứng sau pumpkin 6 stud
-	local PUMPKIN_STAND_TOL = 12 -- trong khoảng này tính là đã vào vị trí đứng
+	local PUMPKIN_SIDE_DIST = 5 -- đứng cạnh pumpkin (song song, cùng độ cao) cách 5 stud
+	local PUMPKIN_HOLD_TOL = 3 -- tới trong khoảng này của điểm đứng thì giữ tween + float, đứng im tại chỗ
 	getgenv().__PumpkinHitRange = 40
 	local JACK_RANGE = 800 -- giới hạn khoảng cách tìm/đánh mob (Pumpkin Hunt + Pumpkin Snowman)
 	local HW_MOBS = { jackolantern = true, pumpkinsnowman = true }
@@ -11950,7 +11950,7 @@ do
 	end
 
 	local function stackOk()
-		return StackFarmOther ~= false
+		return StackFarmOther ~= false and not getgenv().__TrickTreatActive
 	end
 
 	local function farmJackMob(mob)
@@ -11977,6 +11977,7 @@ do
 
 	local function farmPumpkin(p)
 		local startT = tick()
+		local standDir
 		repeat
 			task.wait()
 			if not Settings[HW_KEY] or not stackOk() then
@@ -11995,14 +11996,25 @@ do
 				return
 			end
 			equipMelee()
-			local pos = cf * CFrame.new(0, 0, PUMPKIN_BEHIND)
-			local stand = CFrame.lookAt(pos.Position, cf.Position)
-			pcall(function()
-				toTarget(stand)
-			end)
-			if (hrp.Position - stand.Position).Magnitude <= PUMPKIN_STAND_TOL then
+			-- điểm đứng: cạnh pumpkin PUMPKIN_SIDE_DIST stud (mặt phẳng ngang, cùng Y với pumpkin), hướng chốt 1 lần theo phía player đang tới
+			if not standDir then
+				local d = hrp.Position - cf.Position
+				d = Vector3.new(d.X, 0, d.Z)
+				standDir = d.Magnitude > 0.1 and d.Unit or Vector3.new(0, 0, 1)
+			end
+			local stand = CFrame.new(cf.Position + standDir * PUMPKIN_SIDE_DIST)
+			if (hrp.Position - stand.Position).Magnitude <= PUMPKIN_HOLD_TOL then
+				-- tới điểm đứng: giữ float + noclip, đứng im tại chỗ (không bám theo nữa)
+				pcall(function()
+					toTarget(hrp.CFrame)
+				end)
 				getgenv().__PumpkinAttackAt = tick()
 				pcall(AttackFunction, 30)
+			else
+				-- chưa tới: fly tới điểm đứng
+				pcall(function()
+					toTarget(stand)
+				end)
 			end
 		until not p.Parent or tick() - startT > 12
 	end
@@ -12101,6 +12113,7 @@ do
 
 	local function farmPatch(p, tok)
 		local startT = tick()
+		local standDir
 		repeat
 			task.wait()
 			if not snValid(tok) then
@@ -12115,14 +12128,25 @@ do
 				return
 			end
 			equipMelee()
-			local pos = cf * CFrame.new(0, 0, PUMPKIN_BEHIND)
-			local stand = CFrame.lookAt(pos.Position, cf.Position)
-			pcall(function()
-				toTarget(stand)
-			end)
-			if (hrp.Position - stand.Position).Magnitude <= PUMPKIN_STAND_TOL then
+			-- điểm đứng: cạnh pumpkin PUMPKIN_SIDE_DIST stud (mặt phẳng ngang, cùng Y với pumpkin), hướng chốt 1 lần theo phía player đang tới
+			if not standDir then
+				local d = hrp.Position - cf.Position
+				d = Vector3.new(d.X, 0, d.Z)
+				standDir = d.Magnitude > 0.1 and d.Unit or Vector3.new(0, 0, 1)
+			end
+			local stand = CFrame.new(cf.Position + standDir * PUMPKIN_SIDE_DIST)
+			if (hrp.Position - stand.Position).Magnitude <= PUMPKIN_HOLD_TOL then
+				-- tới điểm đứng: giữ float + noclip, đứng im tại chỗ (không bám theo nữa)
+				pcall(function()
+					toTarget(hrp.CFrame)
+				end)
 				getgenv().__PumpkinAttackAt = tick()
 				pcall(AttackFunction, 30)
+			else
+				-- chưa tới: fly tới điểm đứng
+				pcall(function()
+					toTarget(stand)
+				end)
 			end
 		until not p.Parent or tick() - startT > 12
 	end
@@ -12345,6 +12369,39 @@ do
 		return out
 	end
 
+	-- theo dõi prompt đang hiện (nút E "Interact"): chỉ nhấn E khi prompt của door đang hiện
+	local PPS = game:GetService("ProximityPromptService")
+	local ttShownPrompts = getgenv().__TTShownPrompts
+	if not ttShownPrompts then
+		ttShownPrompts = setmetatable({}, { __mode = "k" })
+		getgenv().__TTShownPrompts = ttShownPrompts
+	end
+	for _, c in ipairs(getgenv().__TTPromptConns or {}) do
+		pcall(function()
+			c:Disconnect()
+		end)
+	end
+	getgenv().__TTPromptConns = {
+		PPS.PromptShown:Connect(function(pr)
+			ttShownPrompts[pr] = true
+		end),
+		PPS.PromptHidden:Connect(function(pr)
+			ttShownPrompts[pr] = nil
+		end),
+	}
+
+	local function promptShown(door)
+		local prompt = door and door:FindFirstChildWhichIsA("ProximityPrompt", true)
+		if not prompt then
+			return false
+		end
+		-- tường chắn thì prompt bị ẩn: tắt check line-of-sight phía client để nó hiện
+		pcall(function()
+			prompt.RequiresLineOfSight = false
+		end)
+		return ttShownPrompts[prompt] == true and prompt.Enabled
+	end
+
 	local function pressE(door)
 		local vim = game:GetService("VirtualInputManager")
 		local prompt = door:FindFirstChildWhichIsA("ProximityPrompt", true)
@@ -12381,6 +12438,21 @@ do
 			end
 		end
 		return sc, nil
+	end
+
+	-- DialogueGui["table: 0x..."]: thấy frame này thì mới click màn hình liên tục
+	local function getDialogueFrame()
+		local pg = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+		local dg = pg and pg:FindFirstChild("DialogueGui")
+		if not dg or (dg:IsA("ScreenGui") and not dg.Enabled) then
+			return nil
+		end
+		for _, c in ipairs(dg:GetChildren()) do
+			if string.sub(c.Name, 1, 6) == "table:" and (not c:IsA("GuiObject") or c.Visible) then
+				return c
+			end
+		end
+		return nil
 	end
 
 	-- click VirtualInputManager (cùng cách với logic phá mây) nhưng ở tâm option
@@ -12433,7 +12505,7 @@ do
 		end
 		local best, bestD = nil, TT_MOB_RANGE
 		for _, m in ipairs(enemies:GetChildren()) do
-			if (ttIgnoreMob[m] or 0) < tick() and IsMobAlive(m) then
+			if (ttIgnoreMob[m] or 0) < tick() and not HW_MOBS[normName(m.Name)] and IsMobAlive(m) then
 				local d = (m.HumanoidRootPart.Position - hrp.Position).Magnitude
 				if d <= bestD then
 					best, bestD = m, d
@@ -12511,6 +12583,10 @@ do
 			end
 			stand = CFrame.lookAt(cf.Position + standList[standIdx] * TT_STAND_DIST, cf.Position)
 			local sc, opt = getDialogue()
+			if getDialogueFrame() and tick() - lastScreen >= HW_CLICK_DELAY then
+				lastScreen = tick()
+				pcall(doClick)
+			end
 			if sc then
 				sawDialogue, goneAt = true, nil
 				pcall(toTarget, stand) -- đang hội thoại vẫn giữ bám door
@@ -12534,13 +12610,9 @@ do
 					if ttBusyAt >= arrived then
 						return -- door đang bận / không tương tác được, sang door tiếp
 					end
-					if tick() - lastE >= HW_CLICK_DELAY then
+					if tick() - lastE >= HW_CLICK_DELAY and promptShown(door) then
 						lastE = tick()
 						task.spawn(pcall, pressE, door)
-					end
-					if tick() - lastScreen >= HW_CLICK_DELAY then
-						lastScreen = tick()
-						pcall(doClick)
 					end
 					-- đứng mãi không mở được dialogue (vd bị kẹt trong nhà): đổi sang phía khác của door
 					if tick() - arrived > TT_SIDE_SWITCH then
@@ -12649,18 +12721,18 @@ do
 					stand = CFrame.lookAt(cf.Position + dir * 3, cf.Position)
 				end
 				pcall(toTarget, stand)
+				if getDialogueFrame() and tick() - lastScreen >= HW_CLICK_DELAY then
+					lastScreen = tick()
+					pcall(doClick)
+				end
 				if (h.Position - stand.Position).Magnitude <= 8 then
 					arrived = arrived or tick()
 					if ttBusyAt >= arrived then
 						break
 					end
-					if tick() - lastE >= HW_CLICK_DELAY then
+					if tick() - lastE >= HW_CLICK_DELAY and promptShown(pressTarget) then
 						lastE = tick()
 						task.spawn(pcall, pressE, pressTarget)
-					end
-					if tick() - lastScreen >= HW_CLICK_DELAY then
-						lastScreen = tick()
-						pcall(doClick)
 					end
 					if tick() - arrived > TT_SCENE_KNOCK then
 						break -- vẫn ở gần tọa độ cũ: game chưa load, làm lại
@@ -12683,7 +12755,7 @@ do
 	end
 
 	HalloweenSection.CreateToggle(
-		{ Title = "Auto Trick Or Treat", Desc = "Fly to nearest HalloweenDoor, spam E, click option1", Default = Settings[TT_KEY] or false },
+		{ Title = "Auto Trick Or Treat", Desc = "Fly to nearest HalloweenDoor, press E when prompt shows, click option1", Default = Settings[TT_KEY] or false },
 		function(state)
 			SaveSettings(TT_KEY, state)
 			getgenv().__TrickTreatToken = getgenv().__TrickTreatToken + 1
