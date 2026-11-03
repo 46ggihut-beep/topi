@@ -7471,6 +7471,46 @@ function AttackAOE(Q, d)
 			end
 		end
 	end
+	-- Pumpkin Hunt / Pumpkin Snowman: thêm model trong workspace.PumpkinHunt vào danh sách hit (chỉ khi farm pumpkin đang bật cờ)
+	local pOn = getgenv().__PumpkinAttackAt
+	if pOn and tick() - pOn < 0.5 then
+		pcall(function()
+			local root = workspace:FindFirstChild("PumpkinHunt")
+			local hrp = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
+			if not root or not hrp then
+				return
+			end
+			local range = getgenv().__PumpkinHitRange or 40
+			local function add(mdl)
+				local ok, cf = pcall(function()
+					return mdl:IsA("Model") and mdl:GetPivot() or mdl.CFrame
+				end)
+				if not ok or not cf or (cf.Position - hrp.Position).Magnitude > range then
+					return
+				end
+				local part
+				if mdl:IsA("BasePart") then
+					part = mdl
+				else
+					part = mdl.PrimaryPart or mdl:FindFirstChildWhichIsA("BasePart", true)
+				end
+				if part then
+					table.insert(I, { mdl, part })
+				end
+			end
+			for _, c in ipairs(root:GetChildren()) do
+				if c:IsA("Model") or c:IsA("BasePart") then
+					add(c)
+				elseif c:IsA("Folder") then
+					for _, cc in ipairs(c:GetChildren()) do
+						if cc:IsA("Model") or cc:IsA("BasePart") then
+							add(cc)
+						end
+					end
+				end
+			end
+		end)
+	end
 	return #I > 0 and I or nil
 end
 v_u_27 = 0
@@ -11730,7 +11770,9 @@ end
 HalloweenSection = FarmotherMain.CreateSection("Halloween")
 do
 	local HW_KEY = "Auto Farm Pumpkin Hunt"
-	local PUMPKIN_BEHIND = 3
+	local PUMPKIN_BEHIND = 6 -- đứng sau pumpkin 6 stud
+	local PUMPKIN_STAND_TOL = 12 -- trong khoảng này tính là đã vào vị trí đứng
+	getgenv().__PumpkinHitRange = 40
 	local JACK_RANGE = 800 -- giới hạn khoảng cách tìm/đánh mob (Pumpkin Hunt + Pumpkin Snowman)
 	local HW_MOBS = { jackolantern = true, pumpkinsnowman = true }
 
@@ -11775,14 +11817,65 @@ do
 		return list
 	end
 
+	-- ===== Phát hiện thông báo nhận Candy Corn / Pumpkin Bits => đổi pumpkin khác =====
+	local HWI = { got = 0, time = 60 }
+	HWI.skip = setmetatable({}, { __mode = "k" }) -- [pumpkin] = tick() hết hạn bỏ qua
+	function HWI.check(t)
+		if type(t) ~= "string" or t == "" then
+			return
+		end
+		t = t:gsub("<[^>]->", ""):gsub("{[^}]-}", ""):lower()
+		if t:find("obtained", 1, true) and (t:find("candy corn", 1, true) or t:find("pumpkin bits", 1, true)) then
+			HWI.got = tick()
+		end
+	end
+	function HWI.hook(o)
+		if not (o:IsA("TextLabel") or o:IsA("TextButton")) then
+			return
+		end
+		pcall(HWI.check, o.Text)
+		local c = o:GetPropertyChangedSignal("Text"):Connect(function()
+			pcall(HWI.check, o.Text)
+		end)
+		getgenv().__BF_Track(c)
+	end
+	pcall(function()
+		local pg = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui", 10)
+		if not pg then
+			return
+		end
+		if getgenv().__PumpkinItemConn then
+			pcall(function()
+				getgenv().__PumpkinItemConn:Disconnect()
+			end)
+		end
+		getgenv().__PumpkinItemConn = getgenv().__BF_Track(pg.DescendantAdded:Connect(function(o)
+			pcall(HWI.hook, o)
+		end))
+		-- label đã có sẵn: chỉ hook Text changed (không xét text cũ để tránh báo giả)
+		for _, o in ipairs(pg:GetDescendants()) do
+			if o:IsA("TextLabel") or o:IsA("TextButton") then
+				getgenv().__BF_Track(o:GetPropertyChangedSignal("Text"):Connect(function()
+					pcall(HWI.check, o.Text)
+				end))
+			end
+		end
+	end)
+
 	local function nearestPumpkin()
 		local hrp = getHRP()
 		if not hrp then
 			return nil
 		end
 		local best, bestD = nil, math.huge
+		local now = tick()
 		for _, p in ipairs(collectPumpkins()) do
-			local cf = pivotOf(p)
+			local skipUntil = HWI.skip[p]
+			if skipUntil and now >= skipUntil then
+				HWI.skip[p] = nil
+				skipUntil = nil
+			end
+			local cf = not skipUntil and pivotOf(p)
 			if cf then
 				local d = (cf.Position - hrp.Position).Magnitude
 				if d < bestD then
@@ -11884,10 +11977,13 @@ do
 
 	local function farmPumpkin(p)
 		local startT = tick()
-		local lastPumpClick = 0
 		repeat
 			task.wait()
 			if not Settings[HW_KEY] or not stackOk() then
+				return
+			end
+			if HWI.got >= startT then
+				HWI.skip[p] = tick() + HWI.time -- nhận item rồi => đổi pumpkin khác
 				return
 			end
 			if findJackMob() then
@@ -11904,9 +12000,9 @@ do
 			pcall(function()
 				toTarget(stand)
 			end)
-			if (hrp.Position - stand.Position).Magnitude <= 8 and tick() - lastPumpClick >= HW_CLICK_DELAY then
-				lastPumpClick = tick()
-				pcall(clickAtWorld, cf.Position)
+			if (hrp.Position - stand.Position).Magnitude <= PUMPKIN_STAND_TOL then
+				getgenv().__PumpkinAttackAt = tick()
+				pcall(AttackFunction, 30)
 			end
 		until not p.Parent or tick() - startT > 12
 	end
@@ -12005,7 +12101,6 @@ do
 
 	local function farmPatch(p, tok)
 		local startT = tick()
-		local lastClick = 0
 		repeat
 			task.wait()
 			if not snValid(tok) then
@@ -12025,9 +12120,9 @@ do
 			pcall(function()
 				toTarget(stand)
 			end)
-			if (hrp.Position - stand.Position).Magnitude <= 8 and tick() - lastClick >= HW_CLICK_DELAY then
-				lastClick = tick()
-				pcall(clickAtWorld, cf.Position)
+			if (hrp.Position - stand.Position).Magnitude <= PUMPKIN_STAND_TOL then
+				getgenv().__PumpkinAttackAt = tick()
+				pcall(AttackFunction, 30)
 			end
 		until not p.Parent or tick() - startT > 12
 	end
