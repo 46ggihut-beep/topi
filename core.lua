@@ -12537,11 +12537,17 @@ do
 	local TT_MOB_TIMEOUT = 60
 	local ttIgnoreMob = setmetatable({}, { __mode = "k" })
 
+	-- boss Hellfire Gas: không giới hạn khoảng cách, luôn ưu tiên đánh trước mob thường
+	-- (không khai báo thêm local vì scope này sát giới hạn 200 local)
 	local function findAnyMob()
 		local hrp = getHRP()
 		local enemies = workspace:FindFirstChild("Enemies")
 		if not hrp or not enemies then
 			return nil
+		end
+		local boss = enemies:FindFirstChild("Hellfire Gas")
+		if boss and IsMobAlive(boss) then
+			return boss
 		end
 		local best, bestD = nil, TT_MOB_RANGE
 		for _, m in ipairs(enemies:GetChildren()) do
@@ -12564,6 +12570,8 @@ do
 	end
 
 	local function farmTTMob(mob, tok, spamSpace, noRange)
+		local isBoss = mob.Name == "Hellfire Gas"
+		noRange = noRange or isBoss
 		local startT = tick()
 		local lastSpace = 0
 		repeat
@@ -12575,7 +12583,7 @@ do
 				lastSpace = tick()
 				task.spawn(pcall, pressSpace)
 			end
-			if tick() - startT > TT_MOB_TIMEOUT then
+			if not isBoss and tick() - startT > TT_MOB_TIMEOUT then
 				ttIgnoreMob[mob] = tick() + 30
 				return
 			end
@@ -12964,15 +12972,22 @@ do
 		return nil
 	end
 
-	-- chỉ farm đúng boss workspace.Enemies["Dapper Jack"]
+	-- boss: workspace.Enemies["Dapper Jack"] (đánh khi đã ở trong arena) và workspace.Enemies["Hellfire Gas"] (đánh ở bất kỳ đâu, không cần vào arena)
 	local DJ_BOSS_NAME = "Dapper Jack"
-	local function djFindBoss()
+	local DJ_GATE_BOSS = "Hellfire Gas"
+	local function djFindNamed(name)
 		local enemies = workspace:FindFirstChild("Enemies")
-		local m = enemies and enemies:FindFirstChild(DJ_BOSS_NAME)
+		local m = enemies and enemies:FindFirstChild(name)
 		if m and IsMobAlive(m) then
 			return m
 		end
 		return nil
+	end
+	local function djFindGateBoss()
+		return djFindNamed(DJ_GATE_BOSS)
+	end
+	local function djFindBoss()
+		return djFindNamed(DJ_BOSS_NAME) or djFindNamed(DJ_GATE_BOSS)
 	end
 
 	-- đứng im tại chỗ nhưng vẫn giữ float + noclip (gọi mỗi frame)
@@ -13263,10 +13278,14 @@ do
 		return ok and inside == true
 	end
 
-	-- đợi tới khi player đang ở trong workspace.Map.DapperJackArena VÀ boss đã xuất hiện
+	-- đợi: Hellfire Gas xuất hiện (bất kỳ đâu) HOẶC (player ở trong workspace.Map.DapperJackArena VÀ Dapper Jack xuất hiện)
 	local function djWaitArenaBoss(valid, maxSec)
 		local t0 = tick()
 		while valid() and tick() - t0 < (maxSec or DJ_BOSS_WAIT) do
+			local g = djFindGateBoss()
+			if g then
+				return g
+			end
 			if djInArena() then
 				local b = djFindBoss()
 				if b then
@@ -13279,23 +13298,38 @@ do
 		return nil
 	end
 
+	-- đánh boss; Dapper Jack chết thì nhặt kẹo + reset player. Hellfire Gas chết thì làm vòng tiếp luôn (không nhặt/reset)
+	local function djKill(boss, valid)
+		local isGate = boss.Name == DJ_GATE_BOSS
+		djFarmBoss(boss, valid)
+		if isGate then
+			return
+		end
+		if valid() and not IsMobAlive(boss) then
+			djCollectCandy(valid)
+			djResetPlayer(valid)
+		end
+	end
+
 	-- 1 vòng đầy đủ:
+	-- Hellfire Gas đang sống: đánh luôn
 	-- chưa có compass: fly Witch -> Summon -> đợi 15s -> fly compass -> delay 0.5 -> giữ E 1s
 	-- đã có compass:   fly compass -> delay 0.5 -> giữ E 1s
 	-- rồi: đợi (ở trong DapperJackArena + boss xuất hiện) -> đánh boss -> boss chết nhặt CandySpillFx -> hết kẹo reset player
 	-- đang trong arena thì bỏ qua bước Witch / compass.
 	local function djRound(valid)
+		local gate = djFindGateBoss()
+		if gate then
+			djKill(gate, valid)
+			return
+		end
 		local inArena = djInArena()
 		local boss = djFindBoss()
 
 		-- đang trong arena: có boss thì đánh luôn, hết boss mà còn kẹo thì nhặt luôn
 		if inArena then
 			if boss then
-				djFarmBoss(boss, valid)
-				if valid() and not IsMobAlive(boss) then
-					djCollectCandy(valid)
-					djResetPlayer(valid)
-				end
+				djKill(boss, valid)
 				return
 			end
 			if #djCandyItems({}) > 0 then
@@ -13303,7 +13337,7 @@ do
 				djResetPlayer(valid)
 				return
 			end
-			-- trong arena mà không có boss lẫn kẹo: đợi boss ngắn rồi thoát để làm lại
+			-- trong arena mà không có boss lẫn kẹo: đợi boss ngắn rồi reset để làm lại
 			boss = djWaitArenaBoss(valid, 15)
 			if not boss then
 				if valid() and djInArena() then
@@ -13346,11 +13380,7 @@ do
 			end
 		end
 
-		djFarmBoss(boss, valid)
-		if valid() and not IsMobAlive(boss) then
-			djCollectCandy(valid)
-			djResetPlayer(valid)
-		end
+		djKill(boss, valid)
 	end
 
 	HalloweenSection.CreateToggle(
