@@ -12291,6 +12291,24 @@ do
 				end
 			end
 		end
+		-- Sea 3 (Turtle/HalloweenHotel) + Sea 2 (Dressrosa): chỉ lấy đúng model tên "HalloweenDoor" (không lấy HalloweenDoor2 / Prop / ...)
+		local extraRoots = {
+			{ "Turtle", "IslandModel", "HalloweenHotel" },
+			{ "Dressrosa", "Dressrosa" },
+		}
+		for _, path in ipairs(extraRoots) do
+			local node = map
+			for _, name in ipairs(path) do
+				node = node and node:FindFirstChild(name)
+			end
+			if node then
+				for _, d in ipairs(node:GetChildren()) do
+					if d.Name == "HalloweenDoor" and (d:IsA("Model") or d:IsA("BasePart")) then
+						table.insert(list, d)
+					end
+				end
+			end
+		end
 		return list
 	end
 
