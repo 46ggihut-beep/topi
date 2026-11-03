@@ -11963,6 +11963,22 @@ do
 			if not hrp or (mob:FindFirstChild("HumanoidRootPart") and (mob.HumanoidRootPart.Position - hrp.Position).Magnitude > JACK_RANGE) then
 				return
 			end
+			-- Kill Aura Jack O' Lantern: dùng logic Kill Aura có sẵn (Humanoid:ChangeState(Dead), bán kính 300 stud như Kill Aura Raid)
+			if Settings["Kill Aura Jack O' Lantern"] and normName(mob.Name) == "jackolantern" then
+				pcall(function()
+					local enemies = workspace:FindFirstChild("Enemies")
+					if not enemies then
+						return
+					end
+					for _, m in ipairs(enemies:GetChildren()) do
+						local r = m:FindFirstChild("HumanoidRootPart")
+						local h = m:FindFirstChild("Humanoid")
+						if r and h and normName(m.Name) == "jackolantern" and IsMobAlive(m) and (r.Position - hrp.Position).Magnitude <= 300 then
+							h:ChangeState(Enum.HumanoidStateType.Dead)
+						end
+					end
+				end)
+			end
 			pcall(function()
 				UsedualFlock()
 				ClickM1(mob)
@@ -12047,6 +12063,13 @@ do
 					end
 				end
 			end)
+		end
+	)
+
+	HalloweenSection.CreateToggle(
+		{ Title = "Kill Aura Jack O' Lantern", Desc = "While farming Jack O' Lantern, kill Jack O' Lantern within 300 studs with the existing kill aura logic (needs Auto Farm Pumpkin Hunt)", Default = Settings["Kill Aura Jack O' Lantern"] or false },
+		function(state)
+			SaveSettings("Kill Aura Jack O' Lantern", state)
 		end
 	)
 
@@ -12712,13 +12735,49 @@ do
 		end
 	end
 
+	-- player đang ở trong workspace.Map.HellfireBossRealm (bounding box + margin)
+	-- (gán vào getgenv thay vì khai báo local vì scope này sát giới hạn 200 local)
+	getgenv().__TTInRealm = function()
+		local hrp = getHRP()
+		local map = workspace:FindFirstChild("Map")
+		local realm = map and map:FindFirstChild("HellfireBossRealm")
+		if not hrp or not realm then
+			return false
+		end
+		local ok, inside = pcall(function()
+			local cf, size
+			if realm:IsA("Model") then
+				cf, size = realm:GetBoundingBox()
+			else
+				local mn, mx
+				for _, d in ipairs(realm:GetDescendants()) do
+					if d:IsA("BasePart") then
+						local lo, hi = d.Position - d.Size / 2, d.Position + d.Size / 2
+						mn = mn and Vector3.new(math.min(mn.X, lo.X), math.min(mn.Y, lo.Y), math.min(mn.Z, lo.Z)) or lo
+						mx = mx and Vector3.new(math.max(mx.X, hi.X), math.max(mx.Y, hi.Y), math.max(mx.Z, hi.Z)) or hi
+					end
+				end
+				if not mn then
+					return false
+				end
+				cf, size = CFrame.new((mn + mx) / 2), mx - mn
+			end
+			local rel = cf:PointToObjectSpace(hrp.Position)
+			return math.abs(rel.X) <= size.X / 2 + 20
+				and math.abs(rel.Y) <= size.Y / 2 + 80
+				and math.abs(rel.Z) <= size.Z / 2 + 20
+		end)
+		return ok and inside == true
+	end
+
 	-- đã vào scene: có mob thì farm, không có thì đứng im; về lại gần tọa độ cũ thì kết thúc
+	-- đang ở trong HellfireBossRealm thì ở lại farm mob gần, không kết thúc dù gần tọa độ cũ
 	local function sceneFight(oldPos, tok)
 		while ttValid(tok) do
 			task.wait(0.1)
 			local hrp = getHRP()
 			if hrp then
-				if (hrp.Position - oldPos).Magnitude < TT_SCENE_FAR then
+				if not getgenv().__TTInRealm() and (hrp.Position - oldPos).Magnitude < TT_SCENE_FAR then
 					return
 				end
 				local mob = findAnyMob()
@@ -12755,7 +12814,7 @@ do
 				if not h then
 					break
 				end
-				if (h.Position - oldPos).Magnitude > TT_SCENE_FAR then
+				if getgenv().__TTInRealm() or (h.Position - oldPos).Magnitude > TT_SCENE_FAR then
 					teleported = true
 					break
 				end
@@ -12911,6 +12970,20 @@ do
 						if not ttInWindow(true) then
 							ttSetActive(false)
 							task.wait(1)
+							return
+						end
+						-- đã ở trong workspace.Map.HellfireBossRealm: không làm gì nữa (door/scene/dialogue), chỉ farm mob gần
+						if getgenv().__TTInRealm() then
+							ttSetActive(true)
+							local rmob = findAnyMob()
+							if rmob then
+								farmTTMob(rmob, tok)
+							else
+								local rh = getHRP()
+								if rh then
+									pcall(toTarget, rh.CFrame) -- đứng im, giữ float + noclip
+								end
+							end
 							return
 						end
 						-- GhostChase xuất hiện: fly tới các model trong đó trước, biến mất rồi mới gõ cửa tiếp
