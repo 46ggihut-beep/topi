@@ -11819,6 +11819,10 @@ do
 
 	-- ===== Phát hiện thông báo nhận Candy Corn / Pumpkin Bits => đổi pumpkin khác =====
 	local HWI = { got = 0, time = 60 }
+	local PUMPKIN_NEAR_RANGE = 100 -- tới trong phạm vi này của pumpkin thì bắt đầu đếm timeout
+	local PUMPKIN_TIMEOUT = 30 -- quá số giây này mà pumpkin vẫn còn => skip sang pumpkin khác
+	HWI.cur = nil -- pumpkin đang farm
+	HWI.nearT = nil -- tick() lúc bắt đầu vào phạm vi 100 stud của HWI.cur
 	HWI.skip = setmetatable({}, { __mode = "k" }) -- [pumpkin] = tick() hết hạn bỏ qua
 	function HWI.check(t)
 		if type(t) ~= "string" or t == "" then
@@ -12001,6 +12005,8 @@ do
 			end
 			if HWI.got >= startT then
 				HWI.skip[p] = tick() + HWI.time -- nhận item rồi => đổi pumpkin khác
+				HWI.cur = nil
+				HWI.nearT = nil
 				return
 			end
 			if findJackMob() then
@@ -12009,6 +12015,20 @@ do
 			local hrp = getHRP()
 			local cf = pivotOf(p)
 			if not hrp or not cf then
+				return
+			end
+			-- timeout: đổi sang pumpkin khác thì reset; vào trong 100 stud thì bắt đầu đếm, quá 30s mà pumpkin còn => skip
+			if HWI.cur ~= p then
+				HWI.cur = p
+				HWI.nearT = nil
+			end
+			if not HWI.nearT and (hrp.Position - cf.Position).Magnitude <= PUMPKIN_NEAR_RANGE then
+				HWI.nearT = tick()
+			end
+			if HWI.nearT and tick() - HWI.nearT > PUMPKIN_TIMEOUT then
+				HWI.skip[p] = tick() + HWI.time
+				HWI.cur = nil
+				HWI.nearT = nil
 				return
 			end
 			equipMelee()
@@ -12042,6 +12062,8 @@ do
 			if not state then
 				return
 			end
+			HWI.cur = nil
+			HWI.nearT = nil
 			spawn(function()
 				while Settings[HW_KEY] and task.wait() do
 					local ok, err = pcall(function()
