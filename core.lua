@@ -22,7 +22,7 @@ do
 		"QuestHunterDragon", "QuestDraco", "KilledTerroshark", "DesIdk", "DesIdk2", "DaBringMob", "KillMobRaid",
 		"GoCollectChest", "PathSeaBeast", "PathTerrorshark", "PathSpinBoat", "AimPos", "noclip",
 		"BuddhaRemoteHold", "Sky3Climbing", "FarmingTabActive", "DodgeSkillMobActive", "DodgeCakePrinceMob",
-		"RepairShipHoldUntil", "ReadyToDodge", "Doding", "__BF_TELEPORTING",
+		"RepairShipHoldUntil", "ReadyToDodge", "Doding", "__BF_TELEPORTING", "__TTNoclip",
 	}
 
 	local function destroyGuis()
@@ -5003,6 +5003,8 @@ function ToggleNoclip()
 		or Settings["Auto Celestial Soldier"]
 		or Settings["Auto Rip Commander"]
 		or Settings["Auto Event Halloween"]
+		or Settings["Auto Farm Pumpkin Hunt"]
+		or getgenv().__TTNoclip
 		or Settings["Auto Attack Dungeon"]
 		or Settings["Auto Fishing"]
 		or Settings["Teleport To Fruit"]
@@ -11953,6 +11955,62 @@ do
 		vim:SendMouseButtonEvent(v.X, v.Y, 0, false, game, 1)
 	end
 
+	-- giữ player lơ lửng bằng tween của script (không dùng FloatForce): tween dài về đúng điểm đang đứng.
+	-- gọi lại nhiều lần thì giữ nguyên tween cũ nếu vẫn đang giữ cùng điểm. killFloat = xóa FloatForce còn sót từ toTarget
+	function HWI.hold(cf, killFloat)
+		local hrp = getHRP()
+		local hum = hrp and hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
+		if not hrp or not hum or hum.Health <= 0 or hum.Sit then
+			return
+		end
+		if killFloat then
+			local ff = hrp:FindFirstChild("FloatForce")
+			if ff then
+				ff:Destroy()
+			end
+		end
+		if TweenManager.currentTween and TweenManager.currentPart == hrp and HWI.holdGoal and TweenManager.currentGoal == HWI.holdGoal then
+			-- đang giữ sẵn: chỉ khử vận tốc để gravity không kéo xuống giữa 2 frame
+			hrp.AssemblyLinearVelocity = Vector3.zero
+			hrp.AssemblyAngularVelocity = Vector3.zero
+			return
+		end
+		-- tween bị hủy/rơi nhẹ mà vẫn quanh điểm giữ cũ thì giữ lại đúng điểm cũ, không đổi điểm theo vị trí đã tụt
+		local at = cf and cf.Position or hrp.Position
+		if HWI.holdGoal and (hrp.Position - HWI.holdGoal.Position).Magnitude <= 6 then
+			at = HWI.holdGoal.Position
+		end
+		HWI.holdGoal = CFrame.new(at) * (hrp.CFrame - hrp.CFrame.Position)
+		HWI.holding = true
+		hrp.AssemblyLinearVelocity = Vector3.zero
+		hrp.AssemblyAngularVelocity = Vector3.zero
+		TweenManager.PlayTween(
+			hrp,
+			TweenInfo.new(3600, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut),
+			{ CFrame = HWI.holdGoal },
+			{ TargetEpsilon = 0 }
+		)
+	end
+	function HWI.pin()
+		local hrp = getHRP()
+		if hrp and HWI.holdGoal and TweenManager.currentGoal == HWI.holdGoal then
+			hrp.AssemblyLinearVelocity = Vector3.zero
+			hrp.AssemblyAngularVelocity = Vector3.zero
+		end
+	end
+	-- thả tween đang giữ (chỉ khi tween hiện tại đúng là tween hold, không đụng tween của farm khác)
+	function HWI.release()
+		if not HWI.holding then
+			return
+		end
+		HWI.holding = nil
+		local goal = HWI.holdGoal
+		HWI.holdGoal = nil
+		if goal and TweenManager.currentGoal == goal then
+			pcall(TweenManager.CancelCurrent)
+		end
+	end
+
 	local function stackOk()
 		return StackFarmOther ~= false and not getgenv().__TrickTreatActive
 	end
@@ -12040,10 +12098,8 @@ do
 			end
 			local stand = CFrame.new(cf.Position + standDir * PUMPKIN_SIDE_DIST)
 			if (hrp.Position - stand.Position).Magnitude <= PUMPKIN_HOLD_TOL then
-				-- tới điểm đứng: giữ float + noclip, đứng im tại chỗ (không bám theo nữa)
-				pcall(function()
-					toTarget(hrp.CFrame)
-				end)
+				-- tới điểm đứng: giữ lơ lửng bằng tween (noclip luôn bật qua ToggleNoclip), đứng im tại chỗ (không bám theo nữa)
+				pcall(HWI.hold, hrp.CFrame, true)
 				getgenv().__PumpkinAttackAt = tick()
 				pcall(AttackFunction, 30)
 			else
@@ -12060,6 +12116,7 @@ do
 		function(state)
 			SaveSettings(HW_KEY, state)
 			if not state then
+				HWI.release()
 				return
 			end
 			HWI.cur = nil
@@ -12980,10 +13037,32 @@ do
 			getgenv().__TrickTreatToken = getgenv().__TrickTreatToken + 1
 			ttSetActive(false)
 			if not state then
+				getgenv().__TTNoclip = nil
+				HWI.release()
 				return
 			end
 			local tok = getgenv().__TrickTreatToken
 			pcall(ttEnsureBusyHook)
+			-- trong khung giờ sự kiện: luôn noclip; khi TT đang làm việc mà không có tween nào chạy thì giữ tween tại chỗ.
+			-- ngoài khung giờ: không làm gì (tắt noclip, thả tween)
+			spawn(function()
+				while Settings[TT_KEY] and getgenv().__TrickTreatToken == tok do
+					task.wait()
+					if ttInWindow() then
+						getgenv().__TTNoclip = true
+						if getgenv().__TrickTreatActive then
+							if not TweenManager.currentTween then
+								pcall(HWI.hold)
+							else
+								pcall(HWI.pin)
+							end
+						end
+					else
+						getgenv().__TTNoclip = nil
+						HWI.release()
+					end
+				end
+			end)
 			spawn(function()
 				while Settings[TT_KEY] and getgenv().__TrickTreatToken == tok do
 					task.wait(0.1)
@@ -13003,7 +13082,7 @@ do
 							else
 								local rh = getHRP()
 								if rh then
-									pcall(toTarget, rh.CFrame) -- đứng im, giữ float + noclip
+									pcall(HWI.hold, rh.CFrame, true) -- đứng im, giữ bằng tween + noclip
 								end
 							end
 							return
@@ -22650,30 +22729,27 @@ DungeonSection.CreateDropdown(
 	end
 )
 local function ClickCardButton(btn)
-	for _, sig in ipairs({ "Activated", "MouseButton1Click", "MouseButton1Down", "MouseButton1Up" }) do
-		local ok, conns = pcall(getconnections, btn[sig])
-		if ok and conns and #conns > 0 then
-			for _, c in ipairs(conns) do
-				pcall(function()
-					if c.Function then
-						c.Function()
-					else
-						c:Fire()
-					end
-				end)
-			end
-			return true
-		end
+	if not btn or not btn.Parent then
+		return false
 	end
-	if firesignal then
-		local ok = pcall(firesignal, btn.Activated)
-		if ok then
-			return true
-		end
-		ok = pcall(firesignal, btn.MouseButton1Click)
-		return ok
+	local size = btn.AbsoluteSize
+	if size.X <= 0 or size.Y <= 0 then
+		return false
 	end
-	return false
+	local vim = game:GetService("VirtualInputManager")
+	local pos = btn.AbsolutePosition + size / 2
+	local sg = btn:FindFirstAncestorWhichIsA("ScreenGui")
+	if sg and not sg.IgnoreGuiInset then
+		pos = pos + game:GetService("GuiService"):GetGuiInset()
+	end
+	local ok = pcall(function()
+		vim:SendMouseMoveEvent(pos.X, pos.Y, game)
+		task.wait(0.05)
+		vim:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
+		task.wait(0.05)
+		vim:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
+	end)
+	return ok
 end
 function GetDungeonCards()
 	local cards, seen = {}, {}
