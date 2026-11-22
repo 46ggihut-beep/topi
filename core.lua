@@ -1,4 +1,3 @@
--- ===================== [BF SESSION] chay lai script = xoa UI cu + dung het logic cu =====================
 do
 	local g = getgenv()
 	if type(g.__BF_Shutdown) == "function" then
@@ -15,7 +14,6 @@ do
 		return c
 	end
 	g.__BF_Track = rt.track
-
 	local STALE = {
 		"BananaCatMainLoop", "__DSAuraRunning", "__SeaEventDSAuraRunning", "__KillAuraRaidRunning",
 		"LoadScript", "LoadScriptJob", "LoadScriptAt", "__BF_LOADED", "__BF_RESULT", "TopiHub", "QuestTrainer",
@@ -24,7 +22,6 @@ do
 		"BuddhaRemoteHold", "Sky3Climbing", "FarmingTabActive", "DodgeSkillMobActive", "DodgeCakePrinceMob",
 		"RepairShipHoldUntil", "ReadyToDodge", "Doding", "__BF_TELEPORTING", "__TTNoclip",
 	}
-
 	local function destroyGuis()
 		local names = { TopiHubStatusUI = true, BananaCatStatusUI = true, TopiDiscordCard = true, SB_UI = true, ScreenGuiFly = true, SCGUI = true }
 		local parents = {}
@@ -41,7 +38,6 @@ do
 			end)
 		end
 	end
-
 	local function shutdown()
 		if not rt.alive then
 			return
@@ -53,7 +49,6 @@ do
 		if g.__BF_RT == rt then
 			g.__BF_RT = nil
 		end
-		-- tween
 		for _, k in ipairs({ "TweenBoat", "TweenBoatBack", "TweenBoatToFrozen" }) do
 			pcall(function()
 				if g[k] then
@@ -65,7 +60,6 @@ do
 		end
 		pcall(function() g.BoatTween.Reset() end)
 		pcall(function() g.TweenManager.CancelTweenOnly() end)
-		-- connections
 		for _, c in ipairs(rt.conns) do
 			pcall(function() c:Disconnect() end)
 		end
@@ -78,12 +72,10 @@ do
 				g[k] = nil
 			end)
 		end
-		-- globals cu
 		for _, k in ipairs(STALE) do
 			g[k] = nil
 			pcall(function() realEnv[k] = nil end)
 		end
-		-- nhan vat
 		pcall(function()
 			local lp = game:GetService("Players").LocalPlayer
 			local char = lp.Character
@@ -112,7 +104,6 @@ do
 		end)
 		pcall(function() game:GetService("RunService"):Set3dRenderingEnabled(true) end)
 		pcall(function() if cleardrawcache then cleardrawcache() end end)
-		-- UI
 		pcall(function()
 			local L = rt.ui.Library
 			if L then
@@ -125,7 +116,6 @@ do
 		end)
 		pcall(function() if rt.ui.Gui then rt.ui.Gui:Destroy() end end)
 		destroyGuis()
-		-- thread (cuoi cung, bo qua thread dang chay shutdown)
 		local me = coroutine.running()
 		for th in pairs(rt.threads) do
 			if th ~= me then
@@ -138,8 +128,6 @@ do
 	end
 	rt.shutdown = shutdown
 	g.__BF_Shutdown = shutdown
-
-	-- shim: moi task.spawn/defer/delay/spawn/delay cua script deu duoc theo doi va dung khi shutdown
 	if setfenv then
 		local function wrap(f, ...)
 			if type(f) ~= "function" then
@@ -162,9 +150,6 @@ do
 			defer = function(f, ...) if not rt.alive then return end return track(realTask.defer(wrap(f, ...))) end,
 			delay = function(t, f, ...) if not rt.alive then return end return track(realTask.delay(t, wrap(f, ...))) end,
 		}, { __index = realTask })
-		-- spawn() kieu cu (legacy) chay tre 1 frame, KHONG chay ngay nhu task.spawn.
-		-- Rat nhieu toggle goi spawn(vong lap while Settings[x]) truoc SaveSettings(x, true);
-		-- neu chay ngay thi Settings[x] con false -> vong lap thoat luon -> bat toggle ma khong farm.
 		local function legacySpawn(f, ...)
 			if not rt.alive then return end
 			return track(realTask.delay(0, wrap(f, ...)))
@@ -179,7 +164,6 @@ do
 		warn("[BF] executor khong co setfenv: logic cu co the khong dung het khi xoa UI")
 	end
 end
-
 repeat
 	wait()
 until game:IsLoaded() and game.Players.LocalPlayer
@@ -189,7 +173,6 @@ end
 VM = VM or function(...)
 	return ...
 end
-
 function ElevateIdentity()
 	pcall(function()
 		local f = setthreadidentity or setidentity or set_thread_identity or (syn and syn.set_thread_identity) or setthreadcontext
@@ -199,12 +182,9 @@ function ElevateIdentity()
 	end)
 end
 ElevateIdentity()
-
--- [BananaFix] limit_type tu loader goc khong ton tai -> goi nil lam chet vong hop. Dat ham rong mac dinh.
 if type(getgenv().limit_type) ~= "function" then
 	getgenv().limit_type = function() end
 end
-
 getgenv().__BF_TELEPORTING = false
 local __streamOrig = {}
 pcall(function()
@@ -238,7 +218,6 @@ pcall(function()
 		end)
 	end)
 end)
-
 task.spawn(function()
 	local env = getgenv()
 	local need = {
@@ -297,7 +276,6 @@ local function guardUI(obj, label)
 		end,
 	})
 end
-
 local function readText(inst)
 	if not inst then
 		return nil
@@ -349,7 +327,6 @@ function HasQuest()
 	end
 	return tick() < _questSeenUntil
 end
-
 local function collectText(root)
 	local out = {}
 	if not root then
@@ -423,7 +400,6 @@ function EnsureEliteQuest(name)
 	task.wait(1)
 	return QuestHas(name)
 end
-
 Settings = {}
 HttpService = game:GetService("HttpService")
 FolderName = "Banana Cat Hub"
@@ -497,7 +473,6 @@ function BuddhaFarmY()
 	if TRexAuraOn() then
 		return 15
 	end
-	-- Buddha V2 has FakeHead; Buddha V1 uses the yellow Body Colors appearance.
 	local ch = t and (workspace:FindFirstChild("Characters") and workspace.Characters:FindFirstChild(t.Name) or t.Character)
 	if ch then
 		if ch:FindFirstChild("FakeHead") then
@@ -523,8 +498,6 @@ function BuddhaFarmY()
 	end
 	return BuddhaFarmOn() and 30 or 20
 end
--- Tắt Phật (nếu đang biến) trước khi chạy remote tele. Không phụ thuộc toggle farm.
--- keepAlive (tuỳ chọn): hàm gọi lặp trong lúc chờ (vd: alive / I)
 function BuddhaOffBeforeRemote(keepAlive)
 	local f = getgenv().BuddhaOffForRemote
 	if f then
@@ -643,7 +616,6 @@ getgenv().ExploitReq = (syn and syn.request)
 	or request
 	or requests
 getgenv().request = getgenv().request or getgenv().ExploitReq
-
 task.spawn(function()
 	pcall(function()
 		local DISCORD_LINK = "https://discord.gg/XTBcrRA5ae"
@@ -654,7 +626,6 @@ task.spawn(function()
 		if old then
 			old:Destroy()
 		end
-
 		local gui = Instance.new("ScreenGui")
 		gui.Name = "TopiDiscordCard"
 		gui.ResetOnSpawn = false
@@ -667,7 +638,6 @@ task.spawn(function()
 			end
 		end)
 		gui.Parent = parent
-
 		local card = Instance.new("Frame")
 		card.Name = "Card"
 		card.AnchorPoint = Vector2.new(0.5, 0)
@@ -691,7 +661,6 @@ task.spawn(function()
 		local list = Instance.new("UIListLayout", card)
 		list.Padding = UDim.new(0, 8)
 		list.SortOrder = Enum.SortOrder.LayoutOrder
-
 		local title = Instance.new("TextLabel")
 		title.LayoutOrder = 1
 		title.BackgroundTransparency = 1
@@ -702,7 +671,6 @@ task.spawn(function()
 		title.TextColor3 = Color3.fromRGB(255, 255, 255)
 		title.Text = "Hỗ trợ & Cập nhật"
 		title.Parent = card
-
 		local msg = Instance.new("TextLabel")
 		msg.LayoutOrder = 2
 		msg.BackgroundTransparency = 1
@@ -717,7 +685,6 @@ task.spawn(function()
 		msg.Text = "Script lỗi hoặc cần cập nhật? Vào server Discord.\n"
 			.. "Đây là Server của TopiHub."
 		msg.Parent = card
-
 		local btn = Instance.new("TextButton")
 		btn.LayoutOrder = 3
 		btn.Size = UDim2.new(1, 0, 0, 38)
@@ -729,7 +696,6 @@ task.spawn(function()
 		btn.Text = "Join server"
 		btn.Parent = card
 		Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-
 		local close = Instance.new("TextButton")
 		close.Name = "Close"
 		close.AnchorPoint = Vector2.new(1, 0)
@@ -742,13 +708,11 @@ task.spawn(function()
 		close.Text = "X"
 		close.ZIndex = 5
 		close.Parent = card
-
 		local function removeUI()
 			if gui and gui.Parent then
 				gui:Destroy()
 			end
 		end
-
 		btn.MouseButton1Click:Connect(function()
 			local copy = setclipboard or toclipboard or (Clipboard and Clipboard.set)
 			local ok = copy and pcall(copy, DISCORD_LINK)
@@ -758,11 +722,8 @@ task.spawn(function()
 				btn.Text = DISCORD_LINK
 			end
 		end)
-
 		close.MouseButton1Click:Connect(removeUI)
-
 		task.delay(AUTO_REMOVE_AFTER, removeUI)
-
 		TweenService:Create(
 			card,
 			TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
@@ -834,7 +795,6 @@ function BF_LoadUILibrary()
 		warn(("[TopiFix] tai UI that bai (lan %d/6): %s"):format(attempt, lastErr))
 		task.wait(math.min(attempt, 3))
 	end
-	-- fallback: dung ban cache lan truoc
 	local okc, cached = pcall(readfile, CACHE)
 	if okc then
 		local lib = build(cached)
@@ -843,7 +803,7 @@ function BF_LoadUILibrary()
 			return lib
 		end
 	end
-	getgenv().LoadScript = nil -- cho phep chay lai script, khong bi 'Double UI'
+	getgenv().LoadScript = nil
 	pcall(function()
 		game:GetService("StarterGui"):SetCore("SendNotification", {
 			Title = "Topi Hub",
@@ -859,28 +819,20 @@ local A = (function()
 	local UIS = game:GetService("UserInputService")
 	local API = { Options = {} }
 	local Options = API.Options
-
-	-- Core tu luu config qua SaveSettings (theo tieu de), nen tat config rieng cua lib
-	-- de khong ghi de / trung file voi cac script Topi khac.
 	Library.AutoSave = false
 	Library.Settings = {}
-
 	local LOGO = "rbxassetid://77671524243147"
-
-	-- lib bat buoc moi element co idx duy nhat (Library.Options[idx]); tieu de co the trung nen them so thu tu
 	local uid = 0
 	local function nextIdx(title)
 		uid = uid + 1
 		return title .. "#" .. uid
 	end
-
 	local function pick(a, b)
 		if b ~= nil then
 			return b
 		end
 		return a
 	end
-
 	local function fire(cb, ...)
 		if not cb then
 			return
@@ -893,7 +845,6 @@ local A = (function()
 			end
 		end)
 	end
-
 	local function normList(list)
 		local names, states = {}, {}
 		if type(list) ~= "table" then
@@ -917,8 +868,6 @@ local A = (function()
 		end
 		return names, states
 	end
-
-	-- Precise (slider cu) -> lay le thap phan: khoang ngan thi 2 chu so, khoang dai thi 1 chu so
 	local function roundingFor(precise, minV, maxV)
 		if not precise then
 			return 0
@@ -928,8 +877,6 @@ local A = (function()
 		end
 		return 1
 	end
-
-	-- thu tu hien thi cho slider dropdown (List la map nen mat thu tu): phim skill truoc, con lai theo ABC
 	local SKILL_RANK = { Z = 1, X = 2, C = 3, V = 4, F = 5 }
 	local function keyLess(a, b)
 		local ra, rb = SKILL_RANK[a], SKILL_RANK[b]
@@ -944,10 +891,8 @@ local A = (function()
 		end
 		return a < b
 	end
-
 	local function makeSection(box, pageName, secName)
 		local sec = {}
-
 		local function reg(title, kind, extra)
 			local o = extra or {}
 			o.type = kind
@@ -956,12 +901,10 @@ local A = (function()
 			Options[title] = o
 			return o
 		end
-
 		function sec.CreateToggle(s, cb)
 			local title = tostring(s.Title or s.Text or "")
 			local default = (s.Default == true)
 			local opt = reg(title, "toggle", { value = default })
-			-- lib ban callback ngay luc tao (ca khi false); chan lai, chi giu hanh vi cu: default true thi fire 1 lan
 			local ready = false
 			local ret = box:AddToggle(nextIdx(title), {
 				Title = title,
@@ -985,7 +928,6 @@ local A = (function()
 			end
 			return obj
 		end
-
 		function sec.CreateButton(s, cb)
 			local title = tostring(s.Title or s.Text or "")
 			reg(title, "button", {})
@@ -1000,7 +942,6 @@ local A = (function()
 			})
 			return {}
 		end
-
 		function sec.CreateLabel(s)
 			local title = tostring(s.Title or s.Text or "")
 			local opt = reg(title, "textlabel", { text = title })
@@ -1014,11 +955,10 @@ local A = (function()
 			function obj.GetText()
 				return opt.text
 			end
-			function obj.SetColor() end -- lib moi khong co mau chu rieng cho label
+			function obj.SetColor() end
 			opt.FunctionCreate = obj
 			return obj
 		end
-
 		function sec.CreateSlider(s, cb)
 			local title = tostring(s.Title or s.Text or "")
 			local minV = tonumber(s.Min) or 0
@@ -1050,7 +990,6 @@ local A = (function()
 			fire(cb, default)
 			return obj
 		end
-
 		function sec.CreateBox(s, cb)
 			local title = tostring(s.Title or s.Text or "")
 			local default = s.Default
@@ -1063,7 +1002,7 @@ local A = (function()
 				Placeholder = s.Placeholder or "",
 				Numeric = (s.Number == true),
 				Default = default,
-				Finished = true, -- chi bao khi roi o nhap, tranh ghi file moi phim go
+				Finished = true,
 				Callback = function(v)
 					opt.value = v
 					if cb then
@@ -1086,9 +1025,6 @@ local A = (function()
 			end
 			return obj
 		end
-
-		-- lib moi: Keybind chi la o chon phim (khong tu bao khi nhan phim).
-		-- "Toggle GUI" -> doi MinimizeKey cua cua so. Bind khac -> adapter tu nghe phim va goi cb.
 		function sec.CreateBind(s, cb)
 			local title = tostring(s.Title or s.Text or "")
 			local raw = s.Key or s.Default
@@ -1128,8 +1064,6 @@ local A = (function()
 			end
 			return ret or {}
 		end
-
-		-- dropdown chon nhieu: multi_toggle -> cb(name, on) moi lan doi; priority -> cb(danh sach theo thu tu chon)
 		local function multiDropdown(s, cb)
 			local title = tostring(s.Title or s.Text or "")
 			local prio = (s.Priority == true)
@@ -1174,9 +1108,8 @@ local A = (function()
 				list = names,
 				value = prio and table.clone(init) or table.clone(states),
 			})
-
 			local r
-			local silent = true -- true trong luc dung/ dat lai danh sach: khong bao callback
+			local silent = true
 			local prev = {}
 			local function setPrev(list)
 				prev = {}
@@ -1185,12 +1118,11 @@ local A = (function()
 				end
 			end
 			setPrev(init)
-
 			r = box:AddDropdown(nextIdx(title), {
 				Title = title,
 				Values = names,
 				Multi = true,
-				ClickOrder = prio, -- priority: mo ta dropdown hien chuoi a -> b -> c theo thu tu chon
+				ClickOrder = prio,
 				Default = init,
 				Callback = function(val)
 					if silent then
@@ -1230,7 +1162,6 @@ local A = (function()
 				end,
 			})
 			silent = false
-
 			local obj = {}
 			function obj.GetNewList(a, b)
 				local ns, st = normList(pick(a, b))
@@ -1248,7 +1179,6 @@ local A = (function()
 				opt.list = ns
 				opt.value = prio and table.clone(initial) or table.clone(st)
 			end
-			-- thay toan bo lua chon: list {"A","B"} (giu thu tu), map {A=true}, hoac 1 ten (them vao)
 			function obj.SetValue(a, b)
 				local v = pick(a, b)
 				local list = {}
@@ -1286,9 +1216,6 @@ local A = (function()
 			opt.FunctionCreate = obj
 			return obj
 		end
-
-		-- slider dropdown: List la map ten -> { Title, KeyName, Min, Max, Default, Precise }
-		-- cb(ten, item) voi item.Default da cap nhat bang gia tri moi
 		local function sliderDropdown(s, cb)
 			local title = tostring(s.Title or s.Text or "")
 			local list = s.List or {}
@@ -1356,7 +1283,6 @@ local A = (function()
 			opt.FunctionCreate = obj
 			return obj
 		end
-
 		function sec.CreateDropdown(s, cb)
 			if s.Slider then
 				return sliderDropdown(s, cb)
@@ -1417,10 +1343,8 @@ local A = (function()
 			end
 			return obj
 		end
-
 		return sec
 	end
-
 	function API.CreateMain(_)
 		local Window = Library:CreateWindow({
 			Title = "Topi Hub",
@@ -1444,7 +1368,6 @@ local A = (function()
 					rt.shutdown()
 				end))
 			end
-			-- watchdog: UI bi xoa/unload (nut dong, Library:Unload) -> dung toan bo logic
 			task.spawn(function()
 				while rt.alive do
 					task.wait(0.5)
@@ -1461,7 +1384,6 @@ local A = (function()
 				end
 			end)
 		end)
-
 		task.delay(1, function()
 			pcall(function()
 				Library:Notify({
@@ -1478,7 +1400,6 @@ local A = (function()
 				})
 			end)
 		end)
-
 		local main = {}
 		function main.CreatePage(s)
 			local name = tostring(s.Page_Name or s.Page_Title or "Page")
@@ -1492,7 +1413,6 @@ local A = (function()
 		end
 		return main
 	end
-
 	function API.CreateNoti(s)
 		s = s or {}
 		local title = s.Title
@@ -1507,16 +1427,13 @@ local A = (function()
 			})
 		end)
 	end
-
 	return API
 end)()
 getgenv().TopiTranslator = (function()
 	local HttpService = game:GetService("HttpService")
 	local CoreGui = game:GetService("CoreGui")
-
 	local BASE = "https://raw.githubusercontent.com/46ggihut-beep/topi-lang/main/lang/"
 	local CACHE_DIR = "Banana Cat Hub/lang"
-
 	local T = { Enabled = false }
 	local exact, patterns = {}, {}
 	local weak = { __mode = "k" }
@@ -1525,17 +1442,14 @@ getgenv().TopiTranslator = (function()
 		PlaceholderText = { orig = setmetatable({}, weak), out = setmetatable({}, weak) },
 	}
 	local hooked = setmetatable({}, weak)
-
 	local function notify(desc)
 		pcall(function()
 			A.CreateNoti({ Title = "Auto Translate", Description = desc })
 		end)
 	end
-
 	local function escape(s)
 		return (s:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"))
 	end
-
 	local function build(data)
 		exact, patterns = {}, {}
 		for k, v in pairs(data) do
@@ -1549,7 +1463,6 @@ getgenv().TopiTranslator = (function()
 			end
 		end
 	end
-
 	local function translate(text)
 		if exact[text] then
 			return exact[text]
@@ -1565,7 +1478,6 @@ getgenv().TopiTranslator = (function()
 			end
 		end
 	end
-
 	local function lookup(text)
 		local lead, core, trail = text:match("^(%s*)(.-)(%s*)$")
 		if not core or core == "" then
@@ -1576,7 +1488,6 @@ getgenv().TopiTranslator = (function()
 			return lead .. r .. trail
 		end
 	end
-
 	local function propOf(inst)
 		if inst:IsA("TextBox") then
 			return "PlaceholderText"
@@ -1585,7 +1496,6 @@ getgenv().TopiTranslator = (function()
 			return "Text"
 		end
 	end
-
 	local function apply(inst, prop)
 		local o = state[prop]
 		local cur = inst[prop]
@@ -1603,7 +1513,6 @@ getgenv().TopiTranslator = (function()
 			inst[prop] = r
 		end
 	end
-
 	local function hook(inst)
 		local prop = propOf(inst)
 		if not prop or hooked[inst] then
@@ -1615,7 +1524,6 @@ getgenv().TopiTranslator = (function()
 		end)
 		pcall(apply, inst, prop)
 	end
-
 	local attached = {}
 	local function attach(gui)
 		if attached[gui] then
@@ -1629,15 +1537,12 @@ getgenv().TopiTranslator = (function()
 			task.defer(hook, d)
 		end)
 	end
-
 	local function ensureAttached()
-		-- TopiUI chi co 1 ScreenGui (ten ngau nhien, co the nam trong gethui) chua ca cua so, popup va thong bao
 		local g = A.Gui
 		if g and g.Parent then
 			attach(g)
 		end
 	end
-
 	local function retranslate()
 		for prop, o in pairs(state) do
 			for inst, text in pairs(o.orig) do
@@ -1653,15 +1558,12 @@ getgenv().TopiTranslator = (function()
 			end
 		end
 	end
-
 	T.Langs = { Vietnamese = "vi", Japanese = "jp", Thai = "th", Chinese = "cn" }
 	T.LangList = { "Vietnamese", "Japanese", "Thai", "Chinese" }
 	T.LangName, T.Code = nil, nil
-
 	local function cachePath(code)
 		return CACHE_DIR .. "/" .. code .. ".json"
 	end
-
 	local function readCache(code)
 		local p = cachePath(code)
 		if isfile and isfile(p) then
@@ -1676,7 +1578,6 @@ getgenv().TopiTranslator = (function()
 			end
 		end
 	end
-
 	local function writeCache(code, raw)
 		pcall(function()
 			if not isfolder(FolderName) then
@@ -1688,7 +1589,6 @@ getgenv().TopiTranslator = (function()
 			writefile(cachePath(code), raw)
 		end)
 	end
-
 	local function fetch(code)
 		local ok, body = pcall(function()
 			return game:HttpGet(BASE .. code .. ".json")
@@ -1702,7 +1602,6 @@ getgenv().TopiTranslator = (function()
 			end
 		end
 	end
-
 	local function loadLang(code)
 		if not code then
 			return false
@@ -1737,7 +1636,6 @@ getgenv().TopiTranslator = (function()
 		retranslate()
 		return false
 	end
-
 	function T.SelectLang(name)
 		local code = T.Langs[name]
 		if not code or code == T.Code then
@@ -1752,7 +1650,6 @@ getgenv().TopiTranslator = (function()
 			end)
 		end
 	end
-
 	function T.SetEnabled(on)
 		T.Enabled = on and true or false
 		if T.Enabled then
@@ -1766,14 +1663,12 @@ getgenv().TopiTranslator = (function()
 			retranslate()
 		end
 	end
-
 	function T.Translate(text)
 		if not T.Enabled or type(text) ~= "string" then
 			return text
 		end
 		return lookup(text) or text
 	end
-
 	function T.Dump()
 		ensureAttached()
 		local tpl, n = {}, 0
@@ -1794,7 +1689,6 @@ getgenv().TopiTranslator = (function()
 		end)
 		return n
 	end
-
 	return T
 end)()
 Main = guardUI(A.CreateMain({ Title = "Blox Fruit", Desc = " - Blox Fruit By wzarii" }), "Main")
@@ -1913,41 +1807,32 @@ SectionShopMisc.CreateButton({ Title = "Redeem Code" }, function()
 		game.ReplicatedStorage.Remotes.Redeem:InvokeServer(v)
 	end
 end)
-
 SectionShopMisc.CreateButton({ Title = "Teleport Old World" }, function()
 	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer(unpack({ [1] = "TravelMain" }))
 end)
-
 SectionShopMisc.CreateButton({ Title = "Teleport New World" }, function()
 	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer(unpack({ [1] = "TravelDressrosa" }))
 end)
-
 SectionShopMisc.CreateButton({ Title = "Teleport Thid Sea" }, function()
 	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer(unpack({ [1] = "TravelZou" }))
 end)
-
 SectionShopMisc.CreateButton({ Title = "Buy Dual Flintlock" }, function()
 	game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyItem", "Dual Flintlock")
 end)
-
 SectionShopMisc.CreateButton({ Title = "Reroll Race" }, function()
 	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("BlackbeardReward", "Reroll", "2")
 end)
-
 SectionShopMisc.CreateButton({ Title = "Reset Stats" }, function()
 	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("BlackbeardReward", "Refund", "1")
 	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("BlackbeardReward", "Refund", "2")
 end)
-
 SectionShopMisc.CreateButton({ Title = "Buy Race Cyborg" }, function()
 	game.ReplicatedStorage.Remotes.CommF_:InvokeServer("CyborgTrainer", "Buy")
 end)
-
 SectionShopMisc.CreateButton({ Title = "Buy Race Ghoul" }, function()
 	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Ectoplasm", "BuyCheck", 4)
 	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Ectoplasm", "Change", 4)
 end)
-
 SectionShopFighting = PageShop.CreateSection("Fighting Shop")
 local g = {}
 getgenv().notsave = g
@@ -1992,7 +1877,6 @@ function DetectNpc(f)
 	end
 	return l, E
 end
-
 SectionShopFighting.CreateToggle({ Title = "Black Leg", Desc = nil, Default = false }, function(f)
 	if f then
 		spawn(function()
@@ -2012,7 +1896,6 @@ SectionShopFighting.CreateToggle({ Title = "Black Leg", Desc = nil, Default = fa
 	end
 	g["Black Leg"] = f
 end)
-
 SectionShopFighting.CreateToggle({ Title = "Fishman Karate", Desc = nil, Default = Settings["Buy Fishman Karate"] == true }, function(f)
 	g["Fishman Karate"] = f
 	SaveSettings("Buy Fishman Karate", f)
@@ -2046,7 +1929,6 @@ SectionShopFighting.CreateToggle({ Title = "Fishman Karate", Desc = nil, Default
 		end
 	end)
 end)
-
 SectionShopFighting.CreateToggle({ Title = "Electro", Desc = nil, Default = Settings["Buy Electro"] == true }, function(f)
 	g.Electro = f
 	SaveSettings("Buy Electro", f)
@@ -2077,7 +1959,6 @@ SectionShopFighting.CreateToggle({ Title = "Electro", Desc = nil, Default = Sett
 		end
 	end)
 end)
-
 SectionShopFighting.CreateToggle({ Title = "Dragon Breath", Desc = nil, Default = false }, function(f)
 	if f then
 		spawn(function()
@@ -2095,7 +1976,6 @@ SectionShopFighting.CreateToggle({ Title = "Dragon Breath", Desc = nil, Default 
 	end
 	g.DragonClaw = f
 end)
-
 SectionShopFighting.CreateToggle({ Title = "SuperHuman", Desc = nil, Default = false }, function(f)
 	if f then
 		spawn(function()
@@ -2112,7 +1992,6 @@ SectionShopFighting.CreateToggle({ Title = "SuperHuman", Desc = nil, Default = f
 	end
 	g.SuperHuman = f
 end)
-
 SectionShopFighting.CreateToggle({ Title = "Death Step", Desc = nil, Default = false }, function(f)
 	if f then
 		spawn(function()
@@ -2129,7 +2008,6 @@ SectionShopFighting.CreateToggle({ Title = "Death Step", Desc = nil, Default = f
 	end
 	g["Death Step"] = f
 end)
-
 SectionShopFighting.CreateToggle({ Title = "Sharkman Karate", Desc = nil, Default = false }, function(f)
 	if f then
 		spawn(function()
@@ -2146,7 +2024,6 @@ SectionShopFighting.CreateToggle({ Title = "Sharkman Karate", Desc = nil, Defaul
 	end
 	g["Sharkman Karate"] = f
 end)
-
 SectionShopFighting.CreateToggle({ Title = "Electric Claw", Desc = nil, Default = false }, function(f)
 	if f then
 		spawn(function()
@@ -2163,7 +2040,6 @@ SectionShopFighting.CreateToggle({ Title = "Electric Claw", Desc = nil, Default 
 	end
 	g["Electric Claw"] = f
 end)
-
 SectionShopFighting.CreateToggle({ Title = "Dragon Talon", Desc = nil, Default = false }, function(f)
 	if f then
 		spawn(function()
@@ -2230,11 +2106,9 @@ do
 	local Players = game:GetService("Players")
 	local lp = Players.LocalPlayer
 	local env = getgenv()
-
 	local UI_KEY = "Show TopiHub Status UI"
 	local PURPLE = Color3.fromRGB(150, 90, 255)
 	local BG = Color3.fromRGB(18, 12, 30)
-
 	local function tr(s)
 		local T = getgenv().TopiTranslator
 		if T and T.Translate then
@@ -2260,7 +2134,6 @@ do
 		end
 		return tr(act)
 	end
-
 	local CHAIN = {
 		"Auto Trick Or Treat",
 		"Auto New World",
@@ -2294,19 +2167,16 @@ do
 		"Auto Crafting Volcanic Magnet", "Auto Find Prehistoric Island", "Auto Event Prehistoric Island",
 		"Auto Collect Bone", "Auto Collect Egg",
 	}
-
 	local owner
 	function env.BananaOwner(name)
 		owner = name
 	end
 	BananaOwner = env.BananaOwner
-
 	local override, overrideUntil = nil, 0
 	function env.SetBananaStatus(text, ttl)
 		override = text and tostring(text) or nil
 		overrideUntil = tick() + (ttl or 4)
 	end
-
 	local hopDepth, teleportUntil = 0, 0
 	pcall(function()
 		lp.OnTeleport:Connect(function()
@@ -2333,12 +2203,10 @@ do
 			end
 		end
 	end
-
 	local lastMoveCF, lastMoveT = nil, 0
 	local lastBoatCF, lastBoatT = nil, 0
 	local lastMob, lastMobT = nil, 0
 	local lastFind, lastFindT = nil, 0
-
 	local function mobName(E)
 		if typeof(E) ~= "Instance" then
 			return nil
@@ -2387,14 +2255,12 @@ do
 			lastFind, lastFindT = txt, tick()
 		end
 	end
-
 	local function wrap(orig, pre)
 		return function(...)
 			pcall(pre, ...)
 			return orig(...)
 		end
 	end
-
 	local wTo, wBackup, wSize, wClick, wShoot, wDetect, wBoat
 	local function hookMovement()
 		if type(toTarget) == "function" and toTarget ~= wTo then
@@ -2426,7 +2292,6 @@ do
 			manageTween = wBoat
 		end
 	end
-
 	local locCache, locT = {}, 0
 	local function placeName(cf)
 		if typeof(cf) ~= "CFrame" then
@@ -2457,16 +2322,13 @@ do
 		end
 		return string.format("%d, %d, %d", math.floor(pos.X), math.floor(pos.Y), math.floor(pos.Z))
 	end
-
 	local function on(k)
 		return Settings[k] == true
 	end
-
 	local function computeActive()
 		local out = {}
 		local stackFarm = StackFarm ~= false
 		local stackOther = StackFarmOther ~= false
-
 		if not stackFarm or not stackOther then
 			local name = owner
 			if not (name and on(name)) then
@@ -2482,7 +2344,6 @@ do
 				out[#out + 1] = name
 			end
 		end
-
 		if stackFarm and on("Start Farm") then
 			if on("Farm Material") then
 				out[#out + 1] = "Farm Material : " .. tostring(Settings["Select Material"] or "?")
@@ -2493,7 +2354,6 @@ do
 				out[#out + 1] = "Farm Mastery"
 			end
 		end
-
 		if stackOther then
 			for _, k in ipairs(GATED_OTHER) do
 				if on(k) then
@@ -2501,7 +2361,6 @@ do
 				end
 			end
 		end
-
 		for _, k in ipairs(INDEPENDENT) do
 			if on(k) then
 				out[#out + 1] = k
@@ -2509,7 +2368,6 @@ do
 		end
 		return out
 	end
-
 	local function autoStatus(active)
 		if hopDepth > 0 then
 			return tr("Hopping server...")
@@ -2522,11 +2380,9 @@ do
 		if not hum or hum.Health <= 0 then
 			return tr("Waiting for respawn...")
 		end
-
 		local now = tick()
 		local act = active[1]
 		local suffix = act and (" | " .. actLabel(act)) or ""
-
 		if lastMob and now - lastMobT < 1.5 then
 			return fmt("Fighting {}", tr(lastMob)) .. suffix
 		end
@@ -2537,7 +2393,6 @@ do
 			local find = (lastFind and now - lastFindT < 2) and (" (" .. fmt("find {}", tr(lastFind)) .. ")") or ""
 			return fmt("Traveling to {}", tr(placeName(lastMoveCF))) .. find .. suffix
 		end
-
 		if not act then
 			return tr("Idle")
 		end
@@ -2550,7 +2405,6 @@ do
 		end
 		return fmt("Running : {}", actLabel(act))
 	end
-
 	local function getParent()
 		if gethui then
 			local ok, ui = pcall(gethui)
@@ -2566,7 +2420,6 @@ do
 		end
 		return lp:WaitForChild("PlayerGui")
 	end
-
 	local parent = getParent()
 	for _, n in ipairs({ "BananaCatStatusUI", "TopiHubStatusUI" }) do
 		local old = parent:FindFirstChild(n)
@@ -2574,7 +2427,6 @@ do
 			old:Destroy()
 		end
 	end
-
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "TopiHubStatusUI"
 	gui.ResetOnSpawn = false
@@ -2583,7 +2435,6 @@ do
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Enabled = Settings[UI_KEY] == true
 	gui.Parent = parent
-
 	local frame = Instance.new("Frame")
 	frame.Name = "Main"
 	frame.AnchorPoint = Vector2.new(0.5, 0)
@@ -2594,7 +2445,6 @@ do
 	frame.BackgroundTransparency = 0.05
 	frame.BorderSizePixel = 0
 	frame.Parent = gui
-
 	local sizeLimit = Instance.new("UISizeConstraint")
 	sizeLimit.MaxSize = Vector2.new(480, math.huge)
 	sizeLimit.Parent = frame
@@ -2616,7 +2466,6 @@ do
 	list.SortOrder = Enum.SortOrder.LayoutOrder
 	list.Padding = UDim.new(0, 6)
 	list.Parent = frame
-
 	local function makeLabel(text, color, size, order)
 		local l = Instance.new("TextLabel")
 		l.BackgroundTransparency = 1
@@ -2632,10 +2481,8 @@ do
 		l.Parent = frame
 		return l
 	end
-
 	local titleLabel = makeLabel(tr("TopiHub Status"), PURPLE, 20, 1)
 	local statusLabel = makeLabel("Status : ...", Color3.fromRGB(255, 255, 255), 18, 2)
-
 	local lastStatus
 	local function refresh()
 		local active = computeActive()
@@ -2650,7 +2497,6 @@ do
 			statusLabel.Text = st
 		end
 	end
-
 	task.spawn(function()
 		while gui.Parent do
 			pcall(hookHop)
@@ -2659,7 +2505,6 @@ do
 			task.wait(0.3)
 		end
 	end)
-
 	local SectionStatusUI = PageStatusAndServer.CreateSection("TopiHub Status UI")
 	SectionStatusUI.CreateToggle({
 		Title = "Show TopiHub Status UI",
@@ -3147,7 +2992,7 @@ SectionServer.CreateButton({ Title = "Open Gui Server Browser (Low Player and Pi
 	end
 	local function N(q, c)
 		local r = 0
-		for n = 0, l.RETRY_MAX, 1 do repeat 
+		for n = 0, l.RETRY_MAX, 1 do repeat
 			local u, W = pcall(function()
 				return m({
 					Url = q,
@@ -3644,7 +3489,6 @@ function CheckJobIdServer()
 end
 BF_HopTried = BF_HopTried or {}
 function BF_ServerNotFull(info)
-	-- chi vao server co DUOI 10 nguoi (<= 9). Server tu 10 nguoi tro len -> bo qua. Khong biet so nguoi -> bo qua
 	local c = type(info) == "table" and (tonumber(info.Count) or tonumber(info.count) or tonumber(info.Players) or tonumber(info.playing)) or nil
 	if not c then
 		return false
@@ -3690,7 +3534,7 @@ function HopServer(R, stop)
 					pcall(function()
 						getgenv().limit_type("clearAll")
 					end)
-					return -- 1 server moi lan, cho ket qua roi moi thu server khac
+					return
 				end
 			end
 		end
@@ -3709,19 +3553,15 @@ function HopServer(R, stop)
 		m()
 	end
 end
-
--- ================= TopiHub API =================
--- Dung global table de khong ton slot local cua main chunk
 TopiHub = TopiHub or {
 	API = "https://topihub.onrender.com",
-	Key = "topi_8f3k29xz", -- phai trung voi bien API_KEY tren Render
+	Key = "topi_8f3k29xz",
 	Reported = {},
 	Cache = {},
 	LastHop = 0,
 	Busy = false,
-	Delay = 5, -- giay cho truoc khi join server tu API (tat toggle hop trong luc cho de huy)
+	Delay = 5,
 }
-
 function TopiHub.Request(method, path, body)
 	local fn = getgenv().ExploitReq or request or http_request
 	if not fn then
@@ -3738,7 +3578,6 @@ function TopiHub.Request(method, path, body)
 	end
 	return nil
 end
-
 function TopiHub.Report(name)
 	TopiHub.Request("POST", "/report", {
 		placeId = game.PlaceId,
@@ -3748,12 +3587,9 @@ function TopiHub.Report(name)
 		maxPlayers = game.Players.MaxPlayers,
 	})
 end
-
 function TopiHub.Remove(name)
 	TopiHub.Request("POST", "/remove", { jobId = game.JobId, name = name })
 end
-
--- Doc danh sach server tu API (cache 3s de khong bi du lieu cu)
 function TopiHub.Fetch(name)
 	local c = TopiHub.Cache[name]
 	if c and tick() - c.t < 3 then
@@ -3772,8 +3608,6 @@ function TopiHub.Fetch(name)
 	TopiHub.Cache[name] = { t = tick(), list = list }
 	return list
 end
-
--- Chon jobId hop le dau tien trong danh sach (jobId la du lieu tu ben ngoai nen kiem tra ky)
 function TopiHub.Pick(list)
 	for _, s in ipairs(list) do
 		local id = tostring(s.jobId or "")
@@ -3790,10 +3624,6 @@ function TopiHub.Pick(list)
 		end
 	end
 end
-
--- Thu tu: thong bao -> cho TopiHub.Delay giay (stop() = true thi huy) -> HET DELAY moi doc API -> hop
--- Tra ve true  = da teleport / bi huy / dang cho
---        false = API rong, loi, hoac khong co server hop le
 function TopiHub.Hop(name, stop)
 	if TopiHub.Busy or tick() - TopiHub.LastHop < 10 or tick() < (TopiHub.EmptyUntil or 0) then
 		return true
@@ -3807,32 +3637,28 @@ function TopiHub.Hop(name, stop)
 	end
 	TopiHub.Busy = true
 	local ok, done = pcall(function()
-		-- 1) thong bao truoc, chua dung toi API
 		pcall(function()
 			require(game:GetService("ReplicatedStorage").Notification)
 				.new("<Color=Red>TopiHub : Hop sau " .. TopiHub.Delay .. "s, tat toggle de huy<Color=/>")
 				:Display()
 		end)
-		-- 2) delay: nguoi choi con thoi gian tat hop
 		local t0 = tick()
 		while tick() - t0 < TopiHub.Delay do
 			if stopped() then
-				return true -- da tat hop / da du dieu kien -> huy, khong doc API
+				return true
 			end
 			task.wait(0.25)
 		end
 		if stopped() then
 			return true
 		end
-		-- 3) het delay moi doc API va chon server
 		TopiHub.Cache[name] = nil
 		local list = TopiHub.Fetch(name)
 		local id = list and TopiHub.Pick(list)
 		if not id then
-			TopiHub.EmptyUntil = tick() + 15 -- API rong: nghi 15s roi moi thong bao/thu lai
+			TopiHub.EmptyUntil = tick() + 15
 			return false
 		end
-		-- 4) hop
 		BF_HopTried[id] = tick()
 		TopiHub.LastHop = tick()
 		game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", id)
@@ -3844,9 +3670,6 @@ function TopiHub.Hop(name, stop)
 	TopiHub.Busy = false
 	return ok and done or false
 end
-
--- Kiem tra moi 3s. Chi goi API khi trang thai doi (co/het) + bao lai moi 45s khi con
--- (tranh vuot gioi han 60 request/phut cua API khi mo nhieu cua so Roblox)
 task.spawn(function()
 	task.wait(3)
 	local checks = {
@@ -3868,15 +3691,13 @@ task.spawn(function()
 				elseif TopiHub.Reported[name] then
 					TopiHub.Reported[name] = nil
 					lastSent[name] = nil
-					task.spawn(TopiHub.Remove, name) -- vua giet xong -> go khoi API ngay
+					task.spawn(TopiHub.Remove, name)
 				end
 			end
 		end
 		task.wait(3)
 	end
 end)
-
--- Katakuri: da co Cake Prince thi KHONG doc API; khong co thi doc API roi hop
 function KataHopStep()
 	if not Settings["Hop Find Katakuri"] or CheckNameBoss("Cake Prince") then
 		return
@@ -3885,8 +3706,6 @@ function KataHopStep()
 		return not Settings["Hop Find Katakuri"] or (CheckNameBoss("Cake Prince") and true or false)
 	end)
 end
-
--- Elite Hunter: KHONG hop neu co Elite, dang giu God's Chalice, hoac co rip_indra
 function BF_EliteBlocked()
 	local function safe(f, ...)
 		local ok, r = pcall(f, ...)
@@ -3911,14 +3730,12 @@ function EliteHopStep()
 		end
 		return
 	end
-	-- Thieu dieu kien (khong Elite + khong chen + khong rip_indra) -> doc API roi hop
 	local function stop()
 		return not Settings["Hop Server Elite Hunter"] or (BF_EliteBlocked())
 	end
 	if TopiHub.Hop("Elite", stop) then
 		return
 	end
-	-- API khong co server nao -> hop ngau nhien nhu cu
 	HopServer(nil, stop)
 end
 SectionServer.CreateButton({ Title = "Hop Server" }, function()
@@ -4308,7 +4125,7 @@ SectionLocalPlayerMain.CreateButton({ Title = "Load config in Web" }, function()
 	game:GetService("RunService")
 	local R, m, E = "https://cfg.banana-hub.xyz", getgenv().Key, game.Players.LocalPlayer.Name
 	function ApplyConfigFromWeb(l)
-		for Q, S in pairs(l) do repeat 
+		for Q, S in pairs(l) do repeat
 			if not S.name then
 				break
 			end
@@ -5712,8 +5529,6 @@ local function H()
 	end
 	return B
 end
--- Tween người chơi: logic TweenService Linear giống TweenTo của Topi SeaEvent
--- (dùng lại TweenManager.PlayTween có sẵn: hủy tween cũ, dedupe theo đích)
 local function B(Z, C, J, F, skipBoat)
 	if not Z or typeof(C) ~= "CFrame" then
 		return
@@ -5723,11 +5538,8 @@ local function B(Z, C, J, F, skipBoat)
 	if not char or Z.Parent ~= char or not hum or hum.Health <= 0 or Z.Anchored then
 		return
 	end
-
-	J = math.max(tonumber(J) or 350, 1) -- speed (stud/s)
-	F = tonumber(F) or 2.5 -- epsilon
-
-	-- [BoatTween] toggle "Use Boat Tween": chang xa -> mua thuyen, ngoi, tween thuyen toi gan dich
+	J = math.max(tonumber(J) or 350, 1)
+	F = tonumber(F) or 2.5
 	if not skipBoat and Settings["Use Boat Tween"] and getgenv().BoatTween then
 		local okb, handled = pcall(getgenv().BoatTween.Hook, Z, C, J, F, B, G or ReadyToDodge)
 		if not okb and type(WarnOnce) == "function" then
@@ -5737,14 +5549,13 @@ local function B(Z, C, J, F, skipBoat)
 			return
 		end
 	end
-
-	-- chi tween vi tri, giu nguyen huong hien tai cua nguoi choi
 	C = CFrame.new(C.Position) * (Z.CFrame - Z.CFrame.Position)
 	k.LastTP, k.LastCF = tick(), C
-
 	local dist = (C.Position - Z.Position).Magnitude
+	if dist <= 350 then
+		J = 350
+	end
 	if dist <= F then
-		-- đã sát đích -> snap luôn
 		TweenManager.CancelTweenOnly()
 		I()
 		Z.CFrame = C
@@ -5752,18 +5563,14 @@ local function B(Z, C, J, F, skipBoat)
 		Z.AssemblyAngularVelocity = Vector3.zero
 		return
 	end
-
-	I() -- tag "Teleporting"
+	I()
 	getgenv().noclip = true
-
 	local tw = TweenManager.PlayTween(
 		Z,
 		TweenInfo.new(math.max(dist / J, 0.05), Enum.EasingStyle.Linear, Enum.EasingDirection.InOut),
 		{ CFrame = C },
 		{ TargetEpsilon = math.max(F, 6) }
 	)
-
-	-- giữ tag Teleporting trong lúc tween chạy + reset vận tốc khi xong
 	if tw and TweenManager.__keepFor ~= tw then
 		TweenManager.__keepFor = tw
 		task.spawn(function()
@@ -5779,33 +5586,23 @@ local function B(Z, C, J, F, skipBoat)
 	end
 	return tw
 end
-
--- ===================== [BoatTween] Use Boat Tween =====================
--- Hook nam trong B (tween nguoi choi) nen ap dung cho ca dich cuoi lan tele trung gian.
---  * Muc tieu cach > 500 stud (mat phang ngang) va dich khong nam trong 1000 stud cua Boat Dealer gan nhat -> mua thuyen
---  * Tween toi Boat Dealer gan nhat -> BuyBoat -> ngoi vao -> tween thuyen toi dich
---  * Con cach dich <= 500 stud -> nhay xuong, tween thuong de farm
---  * Chi tac dong khi chinh no dang cam thuyen (session). Thuyen cua cac tinh nang khac khong bi dung toi
 getgenv().BoatTween = (function()
-	local BOAT_NAME = "PirateGrandBrigade" -- ten remote cua GrandBrigade (khop voi code Sea Event)
+	local BOAT_NAME = "Dinghy"
 	local DEALER_KEY = "Boat Dealer"
-	local DISMOUNT_DIST = 500 -- con cach dich bay nhieu thi nhay xuong
-	local DEALER_SKIP_DIST = 1000 -- dich gan dealer <= 1000 thi khong mua
-	local REUSE_DIST = 300 -- thuyen cua minh o gan hon muc nay thi dung lai, khong mua moi
+	local DISMOUNT_DIST = 500
+	local DEALER_SKIP_DIST = 1000
+	local REUSE_DIST = 300
 	local lp = game:GetService("Players").LocalPlayer
 	local RS = game:GetService("ReplicatedStorage")
 	local VIM = game:GetService("VirtualInputManager")
 	local st = { busy = false, session = nil, riding = false, seaY = nil, cool = 0, drive = 0, sitUntil = 0, dealers = {}, scanAt = 0 }
 	local M = {}
-
 	local function flat(a, b)
 		return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
 	end
-	-- thuyen khong di duoc: tren troi, duoi nuoc sau, vung X > 40000
 	local function zoneOk(p)
 		return p.Y > -100 and p.Y < 1500 and p.X < 40000
 	end
-
 	local function scanDealers()
 		if tick() < st.scanAt then
 			return st.dealers
@@ -5832,7 +5629,6 @@ getgenv().BoatTween = (function()
 		end
 		return st.dealers
 	end
-
 	local function nearestDealer(pos)
 		local best, bd
 		for _, d in ipairs(scanDealers()) do
@@ -5843,8 +5639,6 @@ getgenv().BoatTween = (function()
 		end
 		return best, bd
 	end
-
-	-- thuyen cua minh (gan nearPos nhat, trong maxDist neu co)
 	local function myBoat(nearPos, maxDist)
 		local boats = workspace:FindFirstChild("Boats")
 		if not boats then
@@ -5864,8 +5658,6 @@ getgenv().BoatTween = (function()
 		end
 		return best
 	end
-
-	-- dich la thuyen / gan thuyen (ghe, engine, thuyen dich...) -> de cac tinh nang khac tu xu ly
 	local function nearAnyBoat(p)
 		local boats = workspace:FindFirstChild("Boats")
 		if boats then
@@ -5880,7 +5672,6 @@ getgenv().BoatTween = (function()
 		end
 		return false
 	end
-
 	local function cancelBoat()
 		local tb = getgenv().TweenBoat
 		if tb then
@@ -5889,11 +5680,9 @@ getgenv().BoatTween = (function()
 			end)
 		end
 	end
-
 	local function clearSession()
 		st.session, st.riding, st.seaY = nil, false, nil
 	end
-
 	local function dismount(hum, hrp)
 		cancelBoat()
 		clearSession()
@@ -5914,7 +5703,6 @@ getgenv().BoatTween = (function()
 		if hrp.Parent then
 			hrp.CFrame = hrp.CFrame * CFrame.new(0, 10, 0)
 		end
-		-- tra lai va cham / tat noclip (giong nhanh Sit goc cua toTarget)
 		getgenv().noclip = false
 		pcall(function()
 			for _, p in ipairs(lp.Character:GetDescendants()) do
@@ -5925,8 +5713,6 @@ getgenv().BoatTween = (function()
 		end)
 		TweenManager.CancelCurrent()
 	end
-
-	-- toTarget dung de biet co nen giu nguoi choi tren thuyen (khong nhay xuong) hay khong
 	function M.OwnsSeat(hum)
 		local b = st.session
 		if not b or not hum or not b.Parent then
@@ -5936,18 +5722,14 @@ getgenv().BoatTween = (function()
 		if not (seat and seat.Parent == b) then
 			return false
 		end
-		-- lau khong co lenh tween nao (vd. luong khac dang xu ly rieng) -> tra quyen cho toTarget
 		return tick() - st.drive < 4
 	end
-
 	function M.Reset()
 		cancelBoat()
 		clearSession()
 		st.busy = false
 		st.cool = 0
 	end
-
-	-- tra true = da xu ly (B khong tween nguoi choi nua)
 	function M.Hook(hrp, cf, speed, eps, B, dodge)
 		if dodge or not Settings["Use Boat Tween"] then
 			return false
@@ -5965,8 +5747,6 @@ getgenv().BoatTween = (function()
 		if st.session and not st.session.Parent then
 			clearSession()
 		end
-
-		-- A. dang ngoi tren thuyen cua session -> tween thuyen
 		if st.session and seat and seat.Parent == st.session then
 			st.riding, st.drive = true, tick()
 			st.seaY = st.seaY or seat.Position.Y
@@ -5991,13 +5771,11 @@ getgenv().BoatTween = (function()
 			)
 			return true
 		end
-
-		-- B. khong ngoi tren thuyen cua session
 		if st.riding then
-			clearSession() -- vua xuong thuyen
+			clearSession()
 		end
 		if seat then
-			return false -- dang ngoi cho khac (thuyen cua tinh nang khac...)
+			return false
 		end
 		if flat(hp, tpos) <= DISMOUNT_DIST then
 			clearSession()
@@ -6006,7 +5784,6 @@ getgenv().BoatTween = (function()
 		if tick() < st.cool or not zoneOk(hp) or not zoneOk(tpos) or nearAnyBoat(tpos) then
 			return false
 		end
-
 		local pspeed = math.max(tonumber(Settings["Speed Tween "]) or 190, 1)
 		local bspeed = math.max(tonumber(Settings["Value Speed Tween Boat"]) or 350, 1)
 		local boat = st.session or myBoat(hp, REUSE_DIST)
@@ -6019,8 +5796,6 @@ getgenv().BoatTween = (function()
 				return false
 			end
 		end
-
-		-- chi tinh loi/lo luc moi bat dau (da vao session thi di tiep)
 		if not st.session then
 			local pick = bseat and bseat.Position or dealer
 			local tDirect = flat(hp, tpos) / pspeed
@@ -6032,9 +5807,7 @@ getgenv().BoatTween = (function()
 				return false
 			end
 		end
-
 		if bseat then
-			-- ra ghe thuyen, cham vao la tu ngoi
 			if st.session ~= boat then
 				st.session, st.riding, st.seaY, st.sitUntil = boat, false, nil, tick() + 20
 			elseif tick() > st.sitUntil then
@@ -6042,17 +5815,14 @@ getgenv().BoatTween = (function()
 				st.cool = tick() + 30
 				return false
 			end
-			st.drive = tick() -- giu quyen OwnsSeat luc vua ngoi vao, neu khong toTarget se nhay xuong ngay
+			st.drive = tick()
 			B(hrp, bseat.CFrame, pspeed, 4, true)
 			return true
 		end
-
-		-- toi Boat Dealer gan nhat
 		if (hp - dealer).Magnitude > 15 then
 			B(hrp, CFrame.new(dealer), pspeed, 8, true)
 			return true
 		end
-		-- toi noi -> mua thuyen
 		st.busy = true
 		TweenManager.CancelTweenOnly()
 		pcall(function()
@@ -6075,11 +5845,8 @@ getgenv().BoatTween = (function()
 		st.drive = tick()
 		return true
 	end
-
 	return M
 end)()
--- =====================================================================
-
 do
 	local Sea1Gate = {}
 	getgenv().Sea1Gate = Sea1Gate
@@ -6097,11 +5864,10 @@ do
 		UNDER_X = 40000,
 		CLOUD_REACH = 10,
 		CLOUD_ENTRANCE_POS = Vector3.new(-6023.57666015625, 5469.7197265625, 2203.308349609375),
-		CLOUD_SKIP_TIME = 2, -- mây đã đánh mà vẫn còn: bỏ qua ngắn để sang mây khác (hết mây khác thì quay lại ngay, không đứng chờ)
+		CLOUD_SKIP_TIME = 2,
 		CLOUD_INTERVAL = 0.1,
 	}
 	local st = { lastClick = 0, arrivedAt = nil, lastEntrance = 0, cloudSkip = setmetatable({}, { __mode = "k" }) }
-
 	local function zoneOf(pos)
 		if pos.X > CFG.UNDER_X then
 			return "Under"
@@ -6111,11 +5877,9 @@ do
 		end
 		return "Main"
 	end
-
 	local function flyTo(H, pos)
 		B(H, CFrame.new(pos), tonumber(Settings["Speed Tween "]) or 190, 8)
 	end
-
 	local function cloudPart(obj)
 		if obj:IsA("BasePart") then
 			return obj
@@ -6123,7 +5887,6 @@ do
 			return obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
 		end
 	end
-
 	local function cloudPos(obj)
 		if obj:IsA("BasePart") then
 			return obj.Position
@@ -6131,8 +5894,6 @@ do
 			return obj:GetPivot().Position
 		end
 	end
-
-	-- đánh mây bằng 3 remote Net (thay cho click chuột)
 	local function attackCloud(obj)
 		local part = cloudPart(obj)
 		if not part then
@@ -6151,8 +5912,6 @@ do
 		rv:FireServer(part)
 		return true
 	end
-
-	-- mây còn tồn tại / chưa bị phá
 	local function cloudAlive(obj)
 		if not obj or not obj.Parent then
 			return false
@@ -6160,9 +5919,6 @@ do
 		local part = cloudPart(obj)
 		return part ~= nil and part.Transparency < 1
 	end
-
-	-- chọn mây gần nhất; không dùng vùng/map cố định, chỉ cần có mây trong Map.Sky.
-	-- Nếu mọi mây đều đang bị skip thì xóa skip và chọn lại ngay (không đứng chờ).
 	local function pickCloud(hrp)
 		local map = workspace:FindFirstChild("Map")
 		local sky = map and map:FindFirstChild("Sky")
@@ -6191,7 +5947,6 @@ do
 		end
 		return best
 	end
-
 	local function gate(H, waitPos, entrancePos, delay, after)
 		if tick() < (st.cool or 0) then
 			return false
@@ -6217,7 +5972,7 @@ do
 			st.cool, st.arrivedAt, st.attemptStart = now + 30, nil, nil
 			return false
 		end
-		BuddhaOffBeforeRemote(I) -- tới pos trung gian: tắt Phật (giữ fly) rồi mới chạy remote
+		BuddhaOffBeforeRemote(I)
 		st.lastEntrance = now
 		local before = H.Position
 		local t0 = tick()
@@ -6239,7 +5994,6 @@ do
 		end
 		return true
 	end
-
 	local function startClickLoop()
 		if st.clicking then
 			return
@@ -6274,10 +6028,10 @@ do
 					if (hrp.Position - pos).Magnitude > CFG.CLOUD_REACH then
 						flyTo(hrp, pos)
 					else
-						BuddhaOffBeforeRemote(I) -- tắt Phật trước khi đánh mây + requestEntrance
+						BuddhaOffBeforeRemote(I)
 						local hit = target
 						st.cloudSkip[hit] = tick() + CFG.CLOUD_SKIP_TIME
-						target = nil -- vòng sau chọn ngay mây kế tiếp
+						target = nil
 						pcall(attackCloud, hit)
 						task.wait(0.15)
 						I()
@@ -6298,7 +6052,6 @@ do
 			st.clicking = false
 		end)
 	end
-
 	local function climbSky3(H)
 		st.climbTick = tick()
 		if st.clicking then
@@ -6312,7 +6065,6 @@ do
 		end
 		return true
 	end
-
 	function Sea1Gate.Step(H, targetPos)
 		local pz, tz = zoneOf(H.Position), zoneOf(targetPos)
 		if pz == tz then
@@ -6336,7 +6088,6 @@ do
 		end
 		return false
 	end
-
 	local C2 = {
 		MANSION_WAIT = Vector3.new(-287, 328, 591),
 		MANSION_ENTRANCE = Vector3.new(-286.9859619140625, 306.13739013671875, 597.8905029296875),
@@ -6351,13 +6102,10 @@ do
 		DOOR_ENTRANCE = Vector3.new(-6508.55810546875, 89.035003662109375, -132.83999633789062),
 		SHIP_Z = 20000,
 	}
-
 	local SHIP_FLAG = nil
-
 	local function horiz(a, b)
 		return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
 	end
-
 	local function flamZone(pos)
 		if pos.Y > C2.MANSION_MIN_Y and horiz(pos, C2.MANSION_WAIT) < C2.MANSION_R then
 			return "Mansion"
@@ -6367,7 +6115,6 @@ do
 		end
 		return nil
 	end
-
 	local function lift(cond, dy)
 		return function()
 			local hrp = getHRP()
@@ -6376,11 +6123,9 @@ do
 			end
 		end
 	end
-
 	function Sea2Gate.Step(H, targetPos)
 		local pos = H.Position
 		local pShip, tShip = pos.Z > C2.SHIP_Z, targetPos.Z > C2.SHIP_Z
-
 		if pShip ~= tShip then
 			if SHIP_FLAG and not getgenv().IsUnlocked(SHIP_FLAG) then
 				return false
@@ -6399,7 +6144,6 @@ do
 			st.arrivedAt = nil
 			return false
 		end
-
 		if not getgenv().IsUnlocked("FlamingoAccess") then
 			return false
 		end
@@ -6423,18 +6167,15 @@ do
 		return false
 	end
 end
-
 do
 	local Sea3Gate = {}
 	getgenv().Sea3Gate = Sea3Gate
 	local V3 = Vector3.new
-
 	getgenv().ShortcutWorth = function(direct, viaFly, overheadSec)
 		local speed = tonumber(Settings["Speed Tween "]) or 190
 		local margin = tonumber(getgenv().Sea3RouteMargin) or 0
 		return viaFly + (overheadSec or 0) * speed + margin < direct
 	end
-
 	local HOP = {
 		["Castle>Hydra"] = { to = "Hydra", fly = V3(-5027.0302734375, 330, -3206.70361328125), ent = V3(5662, 1013, -338), need = "indra" },
 		["Hydra>Castle"] = { to = "Castle", fly = V3(5659, 1030, -334), ent = V3(-5021, 314, -3194), need = "indra" },
@@ -6445,7 +6186,6 @@ do
 		["Tiki>Submerged"] = { to = "Submerged", fly = V3(-16269.4082, 23.9799957, 1371.66235), sub = true, need = "tiki" },
 	}
 	local LIFT = 100
-
 	local REFS = {
 		Hydra = { V3(3399, 72, 1572), V3(5245, 602, 251), V3(5288, 1011, 392), V3(5661, 1013, -334), V3(5659, 1030, -334) },
 		Castle = { V3(-5500, 314, -2855), V3(-5055, 314, -3179), V3(-5027, 318, -3206), V3(-5060, 330, -3193), V3(-5098, 316, -3179) },
@@ -6468,7 +6208,6 @@ do
 		end
 		return m
 	end
-
 	local function nearestHub(pos)
 		local best, bd
 		for name, refs in pairs(REFS) do
@@ -6479,7 +6218,6 @@ do
 		end
 		return best, bd
 	end
-
 	local function hubOpen(name)
 		if name == "Castle" then
 			return true
@@ -6493,7 +6231,6 @@ do
 		end
 		return true
 	end
-
 	local function nearestOpenHub(pos)
 		local best, bd
 		for name, refs in pairs(REFS) do
@@ -6506,7 +6243,6 @@ do
 		end
 		return best
 	end
-
 	local SUB_ISLANDS = {
 		["Turtle Mountain"] = V3(-9537, 7, -8348),
 		["Hydra Town"] = V3(3251, 5, 2431),
@@ -6519,7 +6255,6 @@ do
 		["Ice Cream Land"] = V3(-1007, 7, -10745),
 		["Cake Land"] = V3(-1989, 9, -11411),
 	}
-
 	local CAKE_ARENA = Vector3.new(-1990.67, 4532.97, -14973.67)
 	local function nearestNode(pos, onlyOpen)
 		if (pos - CAKE_ARENA).Magnitude <= 1000 then
@@ -6542,7 +6277,6 @@ do
 		end
 		return best
 	end
-
 	getgenv().SubmarineDest = function(pos)
 		if not Settings["Use Submarine Teleport"] then
 			return nil
@@ -6556,7 +6290,6 @@ do
 		end
 		return nil
 	end
-
 	local function route(ph, dh)
 		local hops = {}
 		if ph ~= "Castle" then
@@ -6567,9 +6300,7 @@ do
 		end
 		return hops
 	end
-
 	local running, cancelled, cool, fails = false, false, 0, 0
-
 	local function dbg(...)
 		if getgenv().DebugSea3 then
 			print("[Sea3]", ...)
@@ -6582,13 +6313,11 @@ do
 			print("[Sea3] bỏ qua cổng:", msg)
 		end
 	end
-
 	local function alive()
 		k.LastCall = tick()
 		getgenv().noclip = true
 		I()
 	end
-
 	local function hold(t)
 		local t0 = tick()
 		while tick() - t0 < t do
@@ -6599,7 +6328,6 @@ do
 			task.wait(0.1)
 		end
 	end
-
 	local function flyTo(pos, radius, timeout)
 		radius = radius or 15
 		local t0 = tick()
@@ -6621,7 +6349,6 @@ do
 		dbg("flyTo timeout/huỷ", pos)
 		return false
 	end
-
 	local function doJump()
 		local ch = game:GetService("Players").LocalPlayer.Character
 		local hum = ch and ch:FindFirstChildOfClass("Humanoid")
@@ -6638,7 +6365,6 @@ do
 		task.wait(0.1)
 		vim:SendKeyEvent(false, "Space", false, game)
 	end
-
 	local function jumpUntilNear(name, timeout)
 		local t0 = tick()
 		while tick() - t0 < (timeout or 25) do
@@ -6660,7 +6386,6 @@ do
 		dbg("nhảy timeout, vẫn chưa tới", name)
 		return false
 	end
-
 	local function runHop(h)
 		dbg("hop ->", h.to, "bay tới", h.fly)
 		if not flyTo(h.fly) then
@@ -6668,7 +6393,7 @@ do
 		end
 		hold(h.jump and 0.6 or 0.3)
 		if h.sub or h.ent then
-			BuddhaOffBeforeRemote(alive) -- tới pos trung gian: tắt Phật trước khi chạy remote
+			BuddhaOffBeforeRemote(alive)
 		end
 		if h.sub then
 			local b0 = getHRP()
@@ -6734,11 +6459,9 @@ do
 		dbg("xong hop, đang ở", hub, "mong đợi", h.to, hrp.Position)
 		return hub == h.to
 	end
-
 	function Sea3Gate.Cancel()
 		cancelled = true
 	end
-
 	local function landingOf(h)
 		if h.ent then
 			return h.ent + V3(0, LIFT, 0)
@@ -6760,7 +6483,6 @@ do
 		end
 		return dist + (cur - targetPos).Magnitude
 	end
-
 	function Sea3Gate.Step(H, targetPos)
 		if running then
 			return true
@@ -6813,7 +6535,6 @@ do
 				return false
 			end
 		end
-
 		do
 			local direct = (pos - targetPos).Magnitude
 			local viaFly = routeFlyDist(pos, hops, targetPos, island)
@@ -6825,7 +6546,6 @@ do
 			end
 			dbg(string.format("di duong tat loi hon: bay %.0f + cho %.0fs < thang %.0f", viaFly, overheadSec, direct))
 		end
-
 		running, cancelled = true, false
 		getgenv().noclip = true
 		local allOk = true
@@ -6837,7 +6557,6 @@ do
 			end
 		end
 		running = false
-
 		dbg("kết quả chuỗi:", allOk)
 		if allOk then
 			fails = 0
@@ -6851,10 +6570,8 @@ do
 		return true
 	end
 end
-
 do
 	local st = { pos = nil, tick = 0, running = false }
-
 	local function screenOf(pos)
 		local cam = workspace.CurrentCamera
 		local v = cam:WorldToViewportPoint(pos)
@@ -6870,7 +6587,6 @@ do
 		end
 		return x, y
 	end
-
 	getgenv().ClickWorldPos = function(pos)
 		local now = tick()
 		if now - (st.last or 0) < (getgenv().TreeClickInterval or 0.7) then
@@ -6886,17 +6602,14 @@ do
 		vim:SendMouseButtonEvent(x, y, 0, false, game, 1)
 	end
 end
-
 do
 	local NPC = Vector3.new(3033, 2281, -7324)
 	local running = false
-
 	local function alive()
 		k.LastCall = tick()
 		getgenv().noclip = true
 		I()
 	end
-
 	local function hold(t)
 		local t0 = tick()
 		while tick() - t0 < t do
@@ -6904,13 +6617,11 @@ do
 			task.wait(0.1)
 		end
 	end
-
 	local function dbg(...)
 		if getgenv().DebugTemple then
 			print("[Temple]", ...)
 		end
 	end
-
 	getgenv().EnterTempleOfTime = function(entry)
 		if running then
 			return
@@ -6935,7 +6646,7 @@ do
 				dbg("không bay tới được npc")
 				return
 			end
-			BuddhaOffBeforeRemote(alive) -- tắt Phật trước khi RaceV4Progress Teleport
+			BuddhaOffBeforeRemote(alive)
 			BorrowTempleOfTime()
 			hold(0.3)
 			local inside = false
@@ -6968,7 +6679,6 @@ do
 		running = false
 	end
 end
-
 do
 	local cache, last = {}, {}
 	getgenv().IsUnlocked = function(flag)
@@ -6991,7 +6701,6 @@ do
 		return cache[flag] == true
 	end
 end
-
 do
 	local cache, lastAsk = false, 0
 	getgenv().IsTikiBossKilled = function()
@@ -7016,7 +6725,6 @@ do
 		return cache
 	end
 end
-
 function toTarget(P, e)
 	LPH_ATTRIBUTES(VM(NONE))
 	if typeof(P) ~= "CFrame" then
@@ -7326,13 +7034,12 @@ function toTarget(P, e)
 		H.CFrame = H.CFrame * CFrame.new(0, 20, 0)
 	end
 	if ReadyToDodge and getgenv().DodgeSkillMobActive and not G then
-		-- Dodge skill mob: giữ Y theo WORLD = Y mob + Y dodge (không phụ thuộc mob nghiêng/ngửa)
 		getgenv().DodgeDescend = true
 		local dodgeOffsetY = 200
 		local mobHRP = AttackingMob and AttackingMob.Parent and AttackingMob:FindFirstChild("HumanoidRootPart")
 		local basePos = mobHRP and mobHRP.Position or P.Position
 		local dodgePos = Vector3.new(basePos.X, basePos.Y + dodgeOffsetY, basePos.Z)
-		local dodgeCF = CFrame.new(dodgePos) * (H.CFrame - H.CFrame.Position) -- giữ nguyên hướng
+		local dodgeCF = CFrame.new(dodgePos) * (H.CFrame - H.CFrame.Position)
 		if (dodgePos - H.Position).Magnitude < 3 then
 			TweenManager.CancelTweenOnly()
 			H.CFrame = dodgeCF
@@ -7516,7 +7223,6 @@ function AttackAOE(Q, d)
 			end
 		end
 	end
-	-- Pumpkin Hunt / Pumpkin Snowman: thêm model trong workspace.PumpkinHunt vào danh sách hit (chỉ khi farm pumpkin đang bật cờ)
 	local pOn = getgenv().__PumpkinAttackAt
 	if pOn and tick() - pOn < 0.5 then
 		pcall(function()
@@ -7865,10 +7571,8 @@ do
 	local VIM = game:GetService("VirtualInputManager")
 	local GuiService = game:GetService("GuiService")
 	local lp = game:GetService("Players").LocalPlayer
-
 	getgenv().ShootGunRange = getgenv().ShootGunRange or 500
 	getgenv().ShootGunDelay = getgenv().ShootGunDelay or 0.02
-
 	local function findNetRemote(name)
 		local net = RS:FindFirstChild("Modules") and RS.Modules:FindFirstChild("Net")
 		if not net then
@@ -7884,7 +7588,6 @@ do
 			end
 		end
 	end
-
 	local function shootPart(m)
 		if not m:IsA("Model") then
 			return
@@ -7917,7 +7620,6 @@ do
 			return m:FindFirstChild("HumanoidRootPart")
 		end
 	end
-
 	getgenv().GetShootGunTarget = function(range)
 		local char = lp.Character
 		local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -7940,7 +7642,6 @@ do
 		end
 		return best
 	end
-
 	getgenv().ShootGunDS = function(part)
 		if not part then
 			return
@@ -7960,9 +7661,6 @@ do
 			VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1)
 		end)
 	end
-
-	-- Support: bắn bằng MỌI súng (ToolTip == "Gun"). Chỉ dùng cho Farm Mastery (Gun).
-	-- Không tự trang bị súng. Trả về false nếu không có súng đang cầm / không có part.
 	local CombatUtilSupport
 	pcall(function()
 		CombatUtilSupport = require(RS.Modules.CombatUtil)
@@ -8014,7 +7712,6 @@ do
 	end
 end
 getgenv().FireHumanoidTap = function(pos)
-	-- code moi: Humanoid:GetChildren()[19] cua character local (workspace.Characters[ten])
 	pcall(function()
 		local lpl = game:GetService("Players").LocalPlayer
 		local chars = workspace:FindFirstChild("Characters")
@@ -8274,9 +7971,6 @@ function isnetworkowner2(Q)
 	end
 	return true
 end
--- BringMob reliability patch:
--- Re-checks eligible same-name mobs each call instead of using the old DaBringMob
--- early-return lock, which caused alternating successful/failed bring attempts.
 local __BringFreezeState = setmetatable({}, { __mode = "k" })
 local function __FreezeMobLocally(mob)
 	if not mob or not mob.Parent then return end
@@ -8302,18 +7996,14 @@ local function __FreezeMobLocally(mob)
 		end)
 	end
 end
-
--- Pull system: BringMob chi dang ky mob can keo, Heartbeat keo tung buoc nho theo dt (khong teleport).
--- Mob da du gan diem keo thi dung keo, xa hon thi keo lai. Dang ky het han sau 0.3s neu BringMob khong goi lai.
 __BringPull = __BringPull or setmetatable({}, { __mode = "k" })
--- mob bi server giat lai (rubber-band) thi khong bring mob do nua (theo tung mob, het khi mob chet/respawn)
 __BringBlock = __BringBlock or setmetatable({}, { __mode = "k" })
 __BringSnap = __BringSnap or setmetatable({}, { __mode = "k" })
 function __BringPullStep(dt)
-	local STOP_DIST = 8 -- (stud, mat phang ngang) du gan thi khong keo nua
-	local PULL_SPEED = 300 -- stud/giay
-	local SNAP_DIST = 8 -- mob tu nhay xa hon the so voi cho minh vua dat = bi giat lai
-	local SNAP_LIMIT = 2 -- so lan bi giat (trong 2s) de ngung bring mob do
+	local STOP_DIST = 8
+	local PULL_SPEED = 300
+	local SNAP_DIST = 8
+	local SNAP_LIMIT = 2
 	dt = math.clamp(tonumber(dt) or 1 / 60, 1 / 240, 1 / 20)
 	local now = tick()
 	for mob, d in pairs(__BringPull) do
@@ -8324,7 +8014,6 @@ function __BringPullStep(dt)
 		elseif __BringBlock[mob] then
 			__BringPull[mob] = nil
 		elseif d.last and (mobRoot.Position - d.last).Magnitude > SNAP_DIST then
-			-- mob bi giat lai cho cu: dem, du SNAP_LIMIT lan thi bo qua mob nay
 			local sn = __BringSnap[mob]
 			if not sn or now - sn.t > 2 then
 				sn = { n = 0, t = now }
@@ -8355,7 +8044,6 @@ function __BringPullStep(dt)
 				local step = math.min(PULL_SPEED * dt, dist - STOP_DIST * 0.5)
 				mobRoot.CFrame = mobRoot.CFrame + flat.Unit * step
 			end
-			-- triet van toc de AI/humanoid cua mob khong keo nguoc lai
 			mobRoot.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
 			mobRoot.AssemblyAngularVelocity = Vector3.zero
 			d.last = mobRoot.Position
@@ -8370,7 +8058,6 @@ getgenv().__BF_BringConn = (getgenv().__BF_Track or function(c) return c end)(
 		pcall(__BringPullStep, dt)
 	end)
 )
-
 function BringMob(Q)
 	if not Settings["Bring Mob"] or not Q or not Q.Parent then
 		return
@@ -8380,14 +8067,12 @@ function BringMob(Q)
 	if not root or not hum or hum.Health <= 0 then
 		return
 	end
-
 	if E ~= Q or not l then
 		local spawnPart = DetectPartMobBring(Q.Name, Q, true)
 		E = Q
 		if spawnPart then
 			l = spawnPart.CFrame
 		else
-			-- Keep the target's current position as a fallback if spawn-part lookup fails.
 			l = root.CFrame
 		end
 		local cyborgTransformed = false
@@ -8401,22 +8086,17 @@ function BringMob(Q)
 		end
 		DeleteIgnoredMob()
 	end
-
 	local playerRoot = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
 	if not playerRoot or (playerRoot.Position - root.Position).Magnitude > 300 then
 		return
 	end
-
 	local buddhaFarm = BuddhaFarmOn() or TRexAuraOn()
 	local maxCount = buddhaFarm and math.huge or math.max(2, tonumber(Settings["Bring Mob Count"]) or 6)
 	local range = buddhaFarm and 500 or math.clamp(tonumber(Settings["Bring Mob Distance"]) or 300, 100, 500)
 	local targets = {}
-
 	if not Q:FindFirstChild("Ignored") and not __BringBlock[Q] then
 		table.insert(targets, Q)
 	end
-
-	-- bring tat ca mob trong pham vi (khong con loc cung ten), uu tien mob gan diem keo, toi da maxCount
 	local cands = {}
 	for _, mob in ipairs(workspace.Enemies:GetChildren()) do
 		if mob ~= Q and mob.Name ~= "PropHitboxPlaceholder" and mob.Name ~= "Blank Buddy"
@@ -8435,19 +8115,14 @@ function BringMob(Q)
 		if #targets >= maxCount then break end
 		table.insert(targets, c.mob)
 	end
-
-	-- khong co mob nao khac trong pham vi thi khong bring
 	if #cands == 0 or (playerRoot.Position - root.Position).Magnitude > 300 then
 		return
 	end
-
 	for _, mob in ipairs(targets) do
 		if mob.Parent and not __BringBlock[mob] and IsMobAlive(mob) then
 			local mobRoot = mob:FindFirstChild("HumanoidRootPart")
 			if mobRoot then
 				sizepart(mob)
-				-- Network ownership is controlled by Roblox; only move when the client can
-				-- plausibly control the assembly. Recheck on every call for transient changes.
 				local canControl = true
 				pcall(function() canControl = isnetworkowner2(mobRoot) end)
 				if canControl then
@@ -8548,13 +8223,10 @@ do
 		Conn = nil,
 	}
 	TR.Plr = game:GetService("Players").LocalPlayer
-
 	function TR.Root()
 		local c = TR.Plr.Character
 		return c and c:FindFirstChild("HumanoidRootPart")
 	end
-
-	-- lay fruit bat ky dang cam/co (ToolTip == "Blox Fruit"), uu tien cai dang cam tren tay
 	function TR.GetFruit()
 		local c = TR.Plr.Character
 		if c then
@@ -8574,8 +8246,6 @@ do
 		end
 		return nil
 	end
-
-	-- mob song gan nhat trong tam, tra ve huong ngang tu minh toi mob
 	function TR.AimDir()
 		local root, enemies = TR.Root(), workspace:FindFirstChild("Enemies")
 		if not (root and enemies) then
@@ -8601,7 +8271,6 @@ do
 		end
 		return flat.Unit
 	end
-
 	function TR.GetHum(mob)
 		local h = TR.HumCache[mob]
 		if not h or h.Parent ~= mob then
@@ -8610,7 +8279,6 @@ do
 		end
 		return h
 	end
-
 	function TR.HasTarget()
 		local root, enemies = TR.Root(), workspace:FindFirstChild("Enemies")
 		if not (root and enemies) then
@@ -8625,8 +8293,6 @@ do
 		end
 		return false
 	end
-
-	-- đếm "xung sát thương": mỗi lần có mob trong tầm bị trừ máu (gộp trong 0.04s) = 1 xung server đã nhận
 	function TR.Monitor()
 		local now = tick()
 		if now - TR.MonT < 0.03 then
@@ -8655,7 +8321,6 @@ do
 			TR.D = TR.D + 1
 		end
 	end
-
 	function TR.Fire()
 		local fruit = TR.GetFruit()
 		if not fruit then
@@ -8671,7 +8336,6 @@ do
 			remote:FireServer(false)
 			return true
 		end
-		-- fruit khong co LeftClickRemote (kieu TAP)
 		local rf, re = fruit:FindFirstChild("RemoteFunction"), fruit:FindFirstChild("RemoteEvent")
 		if rf then
 			if re then
@@ -8684,8 +8348,6 @@ do
 		end
 		return false
 	end
-
-	-- chỉnh delay theo tỉ lệ (xung server nhận / phát bắn) trong mỗi cửa sổ 1s
 	function TR.Tune()
 		local now = tick()
 		if now - TR.WinStart < 1 then
@@ -8703,7 +8365,6 @@ do
 			TR.Delay = math.min(TR.MaxDelay, TR.Delay * math.clamp(0.75 / ratio, 1.1, 1.5))
 		end
 	end
-
 	function TR.Stop()
 		TR.Id = TR.Id + 1
 		if TR.Conn then
@@ -8711,7 +8372,6 @@ do
 			TR.Conn = nil
 		end
 	end
-
 	function TR.Start()
 		TR.Stop()
 		local myId = TR.Id
@@ -8734,7 +8394,6 @@ do
 			end
 		end)
 	end
-
 	SettingFarmMainSection.CreateToggle(
 		{ Title = "Aura Fruit", Desc = "Auto M1 fruit dang co (moi loai fruit)", Default = Settings["Aura T-rex"] or false },
 		function(I)
@@ -8878,30 +8537,25 @@ SettingFarmMainSection.CreateToggle(
 )
 game:GetService("Workspace").Enemies.DescendantAdded:Connect(function(descendant)
 	local flag = Settings["Auto Dodge Skill Mobs"] and AttackingMob and AttackingMob.Parent and not Doding
-
 	if flag then
 		flag = descendant.Name == "BodyGyro" or descendant.Name == "BodyPosition" or descendant.Name == "KiBlastFireShort"
 	end
-
 	if flag and descendant.Parent.Parent == AttackingMob then
 		Doding = true
 		getgenv().DodgeCakePrinceMob = (AttackingMob.Name == "Cake Prince") and AttackingMob or nil
 		getgenv().DodgeSkillMobActive = true
 		ReadyToDodge = true
 		local now = tick()
-
-		while true do local __brk = false repeat 
+		while true do local __brk = false repeat
 			wait()
 			if not (not descendant or not descendant.Parent or tick() - now > 14) then
 				break
 			end
 			__brk = true break
 		until true if __brk then break end end
-
 		if tick() - now < 2 then
 			wait(0.5)
 		end
-
 		Doding = false
 		ReadyToDodge = false
 		getgenv().DodgeSkillMobActive = false
@@ -9007,7 +8661,7 @@ SettingFarmMainSection.CreateToggle(
 SettingFarmMainSection.CreateToggle(
 	{
 		Title = "Use Boat Tween",
-		Desc = "Tween xa: mua GrandBrigade o Boat Dealer gan nhat, lai thuyen toi cach dich 500 stud roi nhay xuong. Toc do thuyen = Value Speed Tween Boat",
+		Desc = "Tween xa: mua Dinghy o Boat Dealer gan nhat, lai thuyen toi cach dich 500 stud roi nhay xuong. Toc do thuyen = Value Speed Tween Boat",
 		Default = Settings["Use Boat Tween"] or false,
 	},
 	function(I)
@@ -9082,20 +8736,17 @@ do
 	local BUDDHA = "Buddha-Buddha"
 	local KEY = "Use Buddha with farming"
 	local running, retryAt = false, 0
-
 	local function charModel()
 		local p = Players.LocalPlayer
 		local chars = workspace:FindFirstChild("Characters")
 		return (chars and chars:FindFirstChild(p.Name)) or p.Character
 	end
-
 	local function isYellow(c)
 		return typeof(c) == "Color3"
 			and math.floor(c.R * 255 + 0.5) == 255
 			and math.floor(c.G * 255 + 0.5) == 255
 			and math.floor(c.B * 255 + 0.5) == 0
 	end
-
 	local function buddhaState()
 		local ch = charModel()
 		if not ch then
@@ -9115,7 +8766,6 @@ do
 		end
 		return ch:FindFirstChild("FakeHead") and "V2" or nil
 	end
-
 	getgenv().BuddhaCurrentFruit = function()
 		local p = Players.LocalPlayer
 		for _, holder in ipairs({ p.Character, p:FindFirstChild("Backpack") }) do
@@ -9129,7 +8779,6 @@ do
 		end
 		return nil
 	end
-
 	local function equipBuddha()
 		local p = Players.LocalPlayer
 		local ch = p.Character
@@ -9148,13 +8797,11 @@ do
 		end
 		return false
 	end
-
 	local function pressZ()
 		VIM:SendKeyEvent(true, "Z", false, game)
 		task.wait(0.1)
 		VIM:SendKeyEvent(false, "Z", false, game)
 	end
-
 	local function zState()
 		local main = Players.LocalPlayer.PlayerGui:FindFirstChild("Main")
 		local skills = main and main:FindFirstChild("Skills")
@@ -9163,8 +8810,6 @@ do
 		end
 		return IsMeleeSkillReady(BUDDHA, "Z")
 	end
-
-	-- Giữ nhân vật "fly" (lơ lửng) tại cf: tạo FloatForce + khử vận tốc, kéo lại vị trí nếu bị lệch
 	local function holdAir(hrp, cf)
 		if not hrp or not hrp.Parent then
 			return
@@ -9182,13 +8827,11 @@ do
 		end
 		hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 	end
-
 	local function hasBuddhaTool()
 		local p = Players.LocalPlayer
 		local ch, bp = p.Character, p:FindFirstChild("Backpack")
 		return (ch and ch:FindFirstChild(BUDDHA)) or (bp and bp:FindFirstChild(BUDDHA)) or false
 	end
-
 	getgenv().BuddhaFarmEnsure = function()
 		if running or getgenv().BuddhaRemoteHold or not BuddhaFarmOn() or getgenv().Sky3Climbing or tick() < retryAt then
 			return
@@ -9201,14 +8844,12 @@ do
 		if not hum or hum.Health <= 0 then
 			return
 		end
-		-- Z đang cooldown -> cứ farm bình thường
 		if zState() == false then
 			retryAt = tick() + 0.5
 			return
 		end
 		running = true
 		pcall(function()
-			-- chưa equip Phật thì equip để đọc cooldown
 			if zState() == nil then
 				equipBuddha()
 				task.wait(0.3)
@@ -9217,8 +8858,6 @@ do
 					return
 				end
 			end
-
-			-- Z đã sẵn sàng: teleport lên Y+50 và GIỮ fly (FloatForce) cho tới khi biến xong
 			pcall(function()
 				TweenManager.CancelCurrent()
 			end)
@@ -9227,7 +8866,6 @@ do
 			if hrp then
 				holdAir(hrp, liftCF)
 			end
-
 			local ok, onCooldown = false, false
 			for i = 1, 6 do
 				if not BuddhaFarmOn() then
@@ -9261,9 +8899,8 @@ do
 					break
 				end
 			end
-
 			if ok then
-				task.wait(0.6) -- biến xong: giữ nguyên FloatForce để toTarget farm tiếp
+				task.wait(0.6)
 			elseif onCooldown then
 				retryAt = tick() + 0.5
 			else
@@ -9272,19 +8909,13 @@ do
 		end)
 		running = false
 	end
-
-	-- Tắt Phật trước khi chạy remote tele (gọi khi đã bay tới pos trung gian).
-	-- * Không phụ thuộc toggle "Use Buddha with farming": thấy body vàng (V1) hoặc FakeHead (V2) là tắt.
-	-- * Giữ fly + giữ nguyên vị trí trong lúc tắt.
-	-- * Trang bị Phật -> bấm Z; nếu Z chưa hồi thì đợi hết cooldown rồi mới bấm.
 	getgenv().BuddhaOffForRemote = function(keepAlive)
 		if not buddhaState() then
 			return true
 		end
 		if not hasBuddhaTool() then
-			return false -- không có trái Phật để bấm Z tắt
+			return false
 		end
-		-- chờ lượt biến Phật đang chạy (nếu có) xong
 		local w0 = tick()
 		while running and tick() - w0 < 5 do
 			task.wait(0.1)
@@ -9319,7 +8950,6 @@ do
 				end
 				equipBuddha()
 				local z = zState()
-				-- Z sẵn sàng (hoặc không đọc được UI quá 3s) -> bấm Z để tắt; chưa hồi thì đợi
 				if (z == true or (z == nil and tick() - startT > 3)) and tick() - lastPress > 1.5 then
 					lastPress = tick()
 					task.wait(0.25)
@@ -9345,11 +8975,10 @@ do
 			running = false
 		end
 		if done then
-			task.wait(0.4) -- đợi hiệu ứng tắt Phật xong
+			task.wait(0.4)
 		end
 		return done
 	end
-
 	getgenv().BuddhaBossGuard = function()
 		if not Settings[KEY] or getgenv().FarmingTabActive ~= true then
 			return
@@ -9684,7 +9313,6 @@ local function B(C)
 	end
 	return c
 end
-
 TakeQuestLevel = function()
 	local V = B(t.Data.Level.Value)
 	if getgenv().DebugFarmLevel then
@@ -9713,14 +9341,12 @@ TakeQuestLevel = function()
 		toTarget(CFrame.new(H) * CFrame.new(0, 4, 2), true)
 	end
 end
-
 GetLevelQuestMob = function()
 	local ok, info = pcall(B, t.Data.Level.Value)
 	if ok and info and info.Mob then
 		return info.Mob
 	end
 end
-
 local _questMobCache = { text = nil, mob = nil }
 function GetCurrentQuestMob()
 	local exact = GetNameDoubleQuest()
@@ -9756,7 +9382,6 @@ function GetCurrentQuestMob()
 	_questMobCache.text, _questMobCache.mob = text, best
 	return best
 end
-
 function DetectPartSpawnMob(V, H)
 	local function B(C)
 		return C:gsub(" %p?Lv%.? %d+%p?", "")
@@ -10297,12 +9922,10 @@ function FarmMethod()
 			if CheckNameBoss("Cake Prince") then
 				local V = CheckNameBoss("Cake Prince")
 				getgenv().BuddhaBossGuard()
-
 				local mirror = workspace.Map:FindFirstChild("CakeLoaf")
 					and workspace.Map.CakeLoaf:FindFirstChild("BigMirror")
 					and workspace.Map.CakeLoaf.BigMirror:FindFirstChild("Main")
 				local root = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
-
 				if mirror and root and root.Position.Y <= 4000 then
 					repeat
 						repeat
@@ -10326,7 +9949,6 @@ function FarmMethod()
 						or not Settings["Start Farm"]
 						or not StackFarm
 				end
-
 				repeat
 					task.wait()
 					getgenv().BuddhaBossGuard()
@@ -11069,7 +10691,6 @@ getgenv().ValueCollectChestSpawnGod = 0
 task.spawn(function()
 	while task.wait() do
 		local V, V = pcall(function()
-			-- Trick Or Treat: có sự kiện (đang trong khung giờ + còn door) thì dừng toàn bộ farm stack để đi gõ cửa
 			if getgenv().__TrickTreatActive then
 				StackFarm = false
 				StackFarmOther = false
@@ -11658,10 +11279,8 @@ task.spawn(function()
 	end
 end)
 FarmotherMain = Main.CreatePage({ Page_Name = "Farming Other", Page_Title = "Farming Other" })
-
 do
 	localPlayer = t or game.Players.LocalPlayer
-
 	ToTarget = ToTarget or toTarget or getgenv().toTarget or function(cf)
 		if type(toTarget) == "function" then
 			return toTarget(cf)
@@ -11670,7 +11289,6 @@ do
 			return getgenv().BackupTween(cf)
 		end
 	end
-
 	SizePart = SizePart or sizepart
 	if type(getgenv().ClickM1) == "function" then
 		ClickM1 = getgenv().ClickM1
@@ -11679,7 +11297,6 @@ do
 	if type(UsedualFlock) ~= "function" and type(getgenv().UsedualFlock) == "function" then
 		UsedualFlock = getgenv().UsedualFlock
 	end
-
 	Place_Id = Place_Id or {}
 	Place_Id.sea1 = Place_Id.sea1 or function()
 		return game.PlaceId == (getgenv().CheckPlaceId3 or 2753915549)
@@ -11692,7 +11309,6 @@ do
 	Place_Id.sea3 = Place_Id.sea3 or function()
 		return game.PlaceId == (getgenv().CheckPlaceId or 7449423635)
 	end
-
 	VxezeNotify = VxezeNotify or function(title, desc, kind, extra)
 		local text = tostring(title or "")
 		if desc and tostring(desc) ~= "" then
@@ -11710,7 +11326,6 @@ do
 			end)
 		end
 	end
-
 	if type(GetInventoryItems) ~= "function" then
 		GetInventoryItems = function()
 			local ok, list = pcall(function()
@@ -11745,7 +11360,6 @@ do
 			return ok and list or {}
 		end
 	end
-
 	StopTweenNow = StopTweenNow or function()
 		pcall(function()
 			if TweenManager and TweenManager.CancelCurrent then
@@ -11755,7 +11369,6 @@ do
 			end
 		end)
 	end
-
 	ReleaseTweenPhysics = ReleaseTweenPhysics or function()
 		pcall(function()
 			local c = localPlayer.Character
@@ -11769,7 +11382,6 @@ do
 			end
 		end)
 	end
-
 	EnforceGate = EnforceGate or function(_, name, ok, msg)
 		if not ok then
 			SaveSettings(name, false)
@@ -11778,21 +11390,16 @@ do
 		end
 		return true
 	end
-
 	VxezeLog = VxezeLog or function(a, b)
 		print("[SecretQuest]", tostring(a), tostring(b))
 	end
-
 	ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
-
 	VirtualInputManager = VirtualInputManager or game:GetService("VirtualInputManager")
 	NoclipChanged = NoclipChanged or setmetatable({}, { __mode = "k" })
-
 	FormatMagnetTime = FormatMagnetTime or function(n)
 		n = math.floor(tonumber(n) or 0)
 		return string.format("%02d:%02d", math.floor(n / 60), n % 60)
 	end
-
 	SeaOnly = SeaOnly or function(label, title, seas)
 		local cur = Place_Id.sea1() and 1 or Place_Id.sea2() and 2 or Place_Id.sea3() and 3 or 0
 		for _, s in ipairs(seas) do
@@ -11810,26 +11417,21 @@ do
 		return false
 	end
 end
-
-
 HalloweenSection = FarmotherMain.CreateSection("Halloween")
 do
 	local HW_KEY = "Auto Farm Pumpkin Hunt"
-	local PUMPKIN_SIDE_DIST = 5 -- đứng cạnh pumpkin (song song, cùng độ cao) cách 5 stud
-	local PUMPKIN_HOLD_TOL = 3 -- tới trong khoảng này của điểm đứng thì giữ tween + float, đứng im tại chỗ
+	local PUMPKIN_SIDE_DIST = 5
+	local PUMPKIN_HOLD_TOL = 3
 	getgenv().__PumpkinHitRange = 40
-	local JACK_RANGE = 800 -- giới hạn khoảng cách tìm/đánh mob (Pumpkin Hunt + Pumpkin Snowman)
+	local JACK_RANGE = 800
 	local HW_MOBS = { jackolantern = true, pumpkinsnowman = true }
-
 	local function normName(s)
 		return (string.lower(tostring(s or "")):gsub("[^%w]", ""))
 	end
-
 	local function getHRP()
 		local ch = game.Players.LocalPlayer.Character
 		return ch and ch:FindFirstChild("HumanoidRootPart")
 	end
-
 	local function pivotOf(o)
 		if not o or not o.Parent then
 			return nil
@@ -11841,7 +11443,6 @@ do
 		end
 		return nil
 	end
-
 	local function collectPumpkins()
 		local list = {}
 		local root = workspace:FindFirstChild("PumpkinHunt")
@@ -11861,14 +11462,12 @@ do
 		end
 		return list
 	end
-
-	-- ===== Phát hiện thông báo nhận Candy Corn / Pumpkin Bits => đổi pumpkin khác =====
 	local HWI = { got = 0, time = 60 }
-	local PUMPKIN_NEAR_RANGE = 100 -- tới trong phạm vi này của pumpkin thì bắt đầu đếm timeout
-	local PUMPKIN_TIMEOUT = 30 -- quá số giây này mà pumpkin vẫn còn => skip sang pumpkin khác
-	HWI.cur = nil -- pumpkin đang farm
-	HWI.nearT = nil -- tick() lúc bắt đầu vào phạm vi 100 stud của HWI.cur
-	HWI.skip = setmetatable({}, { __mode = "k" }) -- [pumpkin] = tick() hết hạn bỏ qua
+	local PUMPKIN_NEAR_RANGE = 100
+	local PUMPKIN_TIMEOUT = 30
+	HWI.cur = nil
+	HWI.nearT = nil
+	HWI.skip = setmetatable({}, { __mode = "k" })
 	function HWI.check(t)
 		if type(t) ~= "string" or t == "" then
 			return
@@ -11901,7 +11500,6 @@ do
 		getgenv().__PumpkinItemConn = getgenv().__BF_Track(pg.DescendantAdded:Connect(function(o)
 			pcall(HWI.hook, o)
 		end))
-		-- label đã có sẵn: chỉ hook Text changed (không xét text cũ để tránh báo giả)
 		for _, o in ipairs(pg:GetDescendants()) do
 			if o:IsA("TextLabel") or o:IsA("TextButton") then
 				getgenv().__BF_Track(o:GetPropertyChangedSignal("Text"):Connect(function()
@@ -11910,7 +11508,6 @@ do
 			end
 		end
 	end)
-
 	local function nearestPumpkin()
 		local hrp = getHRP()
 		if not hrp then
@@ -11934,8 +11531,6 @@ do
 		end
 		return best
 	end
-
-	-- chỉ lấy Jack O' Lantern / Pumpkin Snowman trong JACK_RANGE stud quanh player
 	local function findJackMob()
 		local hrp = getHRP()
 		if not hrp then
@@ -11955,8 +11550,6 @@ do
 		end
 		return best
 	end
-
-	-- equip melee giống logic phá mây
 	local lastEquip = 0
 	local function equipMelee()
 		if tick() - lastEquip < 0.3 then
@@ -11973,9 +11566,7 @@ do
 			end
 		end)
 	end
-
-	local HW_CLICK_DELAY = 0.3 -- delay giữa mỗi lần click (giây)
-	-- click y hệt logic phá mây (VirtualInputManager)
+	local HW_CLICK_DELAY = 0.3
 	local CLICK_UDIM = UDim2.new(0.15, 0, 0.15, 0)
 	local function doClick()
 		local vim = game:GetService("VirtualInputManager")
@@ -11985,8 +11576,6 @@ do
 		vim:SendMouseButtonEvent(x, y, 0, true, game, 1)
 		vim:SendMouseButtonEvent(x, y, 0, false, game, 1)
 	end
-
-	-- click vào vị trí pumpkin trên màn hình (fallback: điểm cố định nếu pumpkin ngoài màn hình)
 	local function clickAtWorld(worldPos)
 		local cam = workspace.CurrentCamera
 		local vim = game:GetService("VirtualInputManager")
@@ -11997,9 +11586,6 @@ do
 		vim:SendMouseButtonEvent(v.X, v.Y, 0, true, game, 1)
 		vim:SendMouseButtonEvent(v.X, v.Y, 0, false, game, 1)
 	end
-
-	-- giữ player lơ lửng bằng tween của script (không dùng FloatForce): tween dài về đúng điểm đang đứng.
-	-- gọi lại nhiều lần thì giữ nguyên tween cũ nếu vẫn đang giữ cùng điểm. killFloat = xóa FloatForce còn sót từ toTarget
 	function HWI.hold(cf, killFloat)
 		local hrp = getHRP()
 		local hum = hrp and hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
@@ -12013,12 +11599,10 @@ do
 			end
 		end
 		if TweenManager.currentTween and TweenManager.currentPart == hrp and HWI.holdGoal and TweenManager.currentGoal == HWI.holdGoal then
-			-- đang giữ sẵn: chỉ khử vận tốc để gravity không kéo xuống giữa 2 frame
 			hrp.AssemblyLinearVelocity = Vector3.zero
 			hrp.AssemblyAngularVelocity = Vector3.zero
 			return
 		end
-		-- tween bị hủy/rơi nhẹ mà vẫn quanh điểm giữ cũ thì giữ lại đúng điểm cũ, không đổi điểm theo vị trí đã tụt
 		local at = cf and cf.Position or hrp.Position
 		if HWI.holdGoal and (hrp.Position - HWI.holdGoal.Position).Magnitude <= 6 then
 			at = HWI.holdGoal.Position
@@ -12041,7 +11625,6 @@ do
 			hrp.AssemblyAngularVelocity = Vector3.zero
 		end
 	end
-	-- thả tween đang giữ (chỉ khi tween hiện tại đúng là tween hold, không đụng tween của farm khác)
 	function HWI.release()
 		if not HWI.holding then
 			return
@@ -12053,11 +11636,9 @@ do
 			pcall(TweenManager.CancelCurrent)
 		end
 	end
-
 	local function stackOk()
 		return StackFarmOther ~= false and not getgenv().__TrickTreatActive
 	end
-
 	local function farmJackMob(mob)
 		repeat
 			task.wait()
@@ -12068,7 +11649,6 @@ do
 			if not hrp or (mob:FindFirstChild("HumanoidRootPart") and (mob.HumanoidRootPart.Position - hrp.Position).Magnitude > JACK_RANGE) then
 				return
 			end
-			-- Kill Aura Jack O' Lantern: dùng logic Kill Aura có sẵn (Humanoid:ChangeState(Dead), bán kính 300 stud như Kill Aura Raid)
 			if Settings["Kill Aura Jack O' Lantern"] and normName(mob.Name) == "jackolantern" then
 				pcall(function()
 					local enemies = workspace:FindFirstChild("Enemies")
@@ -12095,7 +11675,6 @@ do
 			end)
 		until not IsMobAlive(mob)
 	end
-
 	local function farmPumpkin(p)
 		local startT = tick()
 		local standDir
@@ -12105,7 +11684,7 @@ do
 				return
 			end
 			if HWI.got >= startT then
-				HWI.skip[p] = tick() + HWI.time -- nhận item rồi => đổi pumpkin khác
+				HWI.skip[p] = tick() + HWI.time
 				HWI.cur = nil
 				HWI.nearT = nil
 				return
@@ -12118,7 +11697,6 @@ do
 			if not hrp or not cf then
 				return
 			end
-			-- timeout: đổi sang pumpkin khác thì reset; vào trong 100 stud thì bắt đầu đếm, quá 30s mà pumpkin còn => skip
 			if HWI.cur ~= p then
 				HWI.cur = p
 				HWI.nearT = nil
@@ -12133,7 +11711,6 @@ do
 				return
 			end
 			equipMelee()
-			-- điểm đứng: cạnh pumpkin PUMPKIN_SIDE_DIST stud (mặt phẳng ngang, cùng Y với pumpkin), hướng chốt 1 lần theo phía player đang tới
 			if not standDir then
 				local d = hrp.Position - cf.Position
 				d = Vector3.new(d.X, 0, d.Z)
@@ -12141,19 +11718,16 @@ do
 			end
 			local stand = CFrame.new(cf.Position + standDir * PUMPKIN_SIDE_DIST)
 			if (hrp.Position - stand.Position).Magnitude <= PUMPKIN_HOLD_TOL then
-				-- tới điểm đứng: giữ lơ lửng bằng tween (noclip luôn bật qua ToggleNoclip), đứng im tại chỗ (không bám theo nữa)
 				pcall(HWI.hold, hrp.CFrame, true)
 				getgenv().__PumpkinAttackAt = tick()
 				pcall(AttackFunction, 30)
 			else
-				-- chưa tới: fly tới điểm đứng
 				pcall(function()
 					toTarget(stand)
 				end)
 			end
 		until not p.Parent or tick() - startT > 12
 	end
-
 	HalloweenSection.CreateToggle(
 		{ Title = "Auto Farm Pumpkin Hunt", Desc = "Fly to nearest pumpkin, then kill Jack O' Lantern / Pumpkin Snowman (800 studs)", Default = Settings[HW_KEY] or false },
 		function(state)
@@ -12187,21 +11761,17 @@ do
 			end)
 		end
 	)
-
 	HalloweenSection.CreateToggle(
 		{ Title = "Kill Aura Jack O' Lantern", Desc = "While farming Jack O' Lantern, kill Jack O' Lantern within 300 studs with the existing kill aura logic (needs Auto Farm Pumpkin Hunt)", Default = Settings["Kill Aura Jack O' Lantern"] or false },
 		function(state)
 			SaveSettings("Kill Aura Jack O' Lantern", state)
 		end
 	)
-
-	-- ===== Auto Farm Pumpkin Snowman (chỉ PumpkinPatch + mob Pumpkin Snowman) =====
 	local SN_KEY = "Auto Farm Pumpkin Snowman"
 	local SNHOP_KEY = "Auto Hop Find Pumpkin Patch"
-	local SN_GRACE = 6 -- không thấy patch/snowman liên tục bấy nhiêu giây mới hop (tránh hop nhầm khi map chưa stream xong)
+	local SN_GRACE = 6
 	getgenv().__PSnowToken = getgenv().__PSnowToken or 0
 	getgenv().__PSnowHopToken = getgenv().__PSnowHopToken or 0
-
 	local function findPatch()
 		local root = workspace:FindFirstChild("PumpkinHunt")
 		local p = root and root:FindFirstChild("PumpkinPatch")
@@ -12210,8 +11780,6 @@ do
 		end
 		return nil
 	end
-
-	-- chỉ Pumpkin Snowman, trong JACK_RANGE stud quanh player
 	local function findSnowMob()
 		local hrp = getHRP()
 		local enemies = workspace:FindFirstChild("Enemies")
@@ -12229,11 +11797,9 @@ do
 		end
 		return best
 	end
-
 	local function snValid(tok)
 		return Settings[SN_KEY] and getgenv().__PSnowToken == tok and stackOk()
 	end
-
 	local function farmSnowMob(mob, tok)
 		repeat
 			task.wait()
@@ -12255,7 +11821,6 @@ do
 			end)
 		until not IsMobAlive(mob)
 	end
-
 	local function farmPatch(p, tok)
 		local startT = tick()
 		local standDir
@@ -12265,7 +11830,7 @@ do
 				return
 			end
 			if findSnowMob() then
-				return -- có Pumpkin Snowman thì ưu tiên đánh mob trước
+				return
 			end
 			local hrp = getHRP()
 			local cf = pivotOf(p)
@@ -12273,7 +11838,6 @@ do
 				return
 			end
 			equipMelee()
-			-- điểm đứng: cạnh pumpkin PUMPKIN_SIDE_DIST stud (mặt phẳng ngang, cùng Y với pumpkin), hướng chốt 1 lần theo phía player đang tới
 			if not standDir then
 				local d = hrp.Position - cf.Position
 				d = Vector3.new(d.X, 0, d.Z)
@@ -12281,21 +11845,18 @@ do
 			end
 			local stand = CFrame.new(cf.Position + standDir * PUMPKIN_SIDE_DIST)
 			if (hrp.Position - stand.Position).Magnitude <= PUMPKIN_HOLD_TOL then
-				-- tới điểm đứng: giữ float + noclip, đứng im tại chỗ (không bám theo nữa)
 				pcall(function()
 					toTarget(hrp.CFrame)
 				end)
 				getgenv().__PumpkinAttackAt = tick()
 				pcall(AttackFunction, 30)
 			else
-				-- chưa tới: fly tới điểm đứng
 				pcall(function()
 					toTarget(stand)
 				end)
 			end
 		until not p.Parent or tick() - startT > 12
 	end
-
 	HalloweenSection.CreateToggle(
 		{ Title = "Auto Farm Pumpkin Snowman", Desc = "Only fly to PumpkinHunt.PumpkinPatch and kill Pumpkin Snowman", Default = Settings[SN_KEY] or false },
 		function(state)
@@ -12329,8 +11890,6 @@ do
 			end)
 		end
 	)
-
-	-- hop chỉ chạy khi đang bật Auto Farm Pumpkin Snowman; chỉ hop khi server không có cả PumpkinPatch lẫn Pumpkin Snowman
 	HalloweenSection.CreateToggle(
 		{ Title = "Auto Hop Find Pumpkin Patch", Desc = "Needs Auto Farm Pumpkin Snowman. Hop server when no PumpkinPatch and no Pumpkin Snowman", Default = Settings[SNHOP_KEY] or false },
 		function(state)
@@ -12373,15 +11932,11 @@ do
 			end)
 		end
 	)
-
-	-- ===== Auto Trick Or Treat =====
 	local TT_KEY = "Auto Trick Or Treat"
 	local TT_REVISIT = 120
 	local ttVisited = {}
 	getgenv().__TrickTreatToken = getgenv().__TrickTreatToken or 0
 	local ttBusyAt = 0
-
-	-- bắt thông báo skip door: "still busy with another door" / "nobody is home" (mỗi lần spam E tạo 1 label mới)
 	local TT_SKIP_TEXTS = { "still busy with another door", "nobody is home" }
 	local function ttIsBusyText(txt)
 		if type(txt) ~= "string" then
@@ -12419,7 +11974,6 @@ do
 			pcall(ttHookLabel, o)
 		end)
 	end
-
 	local function collectDoors()
 		local list = {}
 		local map = workspace:FindFirstChild("Map")
@@ -12436,7 +11990,6 @@ do
 				end
 			end
 		end
-		-- Sea 3 (Turtle/HalloweenHotel) + Sea 2 (Dressrosa): chỉ lấy đúng model tên "HalloweenDoor" (không lấy HalloweenDoor2 / Prop / ...)
 		local extraRoots = {
 			{ "Turtle", "IslandModel", "HalloweenHotel" },
 			{ "Dressrosa", "Dressrosa" },
@@ -12456,7 +12009,6 @@ do
 		end
 		return list
 	end
-
 	local function nearestDoor()
 		local hrp = getHRP()
 		if not hrp then
@@ -12476,10 +12028,8 @@ do
 		end
 		return best
 	end
-
-	-- chọn phía đứng: ưu tiên phía ngoài nhà (không có mái phía trên, không bị tường chắn giữa player và door)
 	local TT_STAND_DIST = 3
-	local TT_SIDE_SWITCH = 3 -- đứng 1 phía quá số giây này mà chưa mở được dialogue thì đổi phía khác
+	local TT_SIDE_SWITCH = 3
 	local function ttPickStandDirs(door, cf, hrp)
 		local params = RaycastParams.new()
 		params.FilterType = Enum.RaycastFilterType.Exclude
@@ -12502,18 +12052,15 @@ do
 					local pos = cf.Position + d * TT_STAND_DIST
 					local score = 0
 					pcall(function()
-						-- có mái/trần phía trên = đang ở trong nhà
 						local up = workspace:Raycast(pos + Vector3.new(0, 2, 0), Vector3.new(0, 60, 0), params)
 						if up and up.Instance.Transparency < 1 then
 							score = score + 2
 						end
-						-- có vật chắn (tường) giữa chỗ đứng và door
 						local toDoor = (cf.Position - pos) * 0.8
 						if workspace:Raycast(pos, toDoor, params) then
 							score = score + 3
 						end
 					end)
-					-- hoà điểm thì ưu tiên phía gần player
 					score = score + (hrp.Position - pos).Magnitude * 0.001
 					table.insert(cands, { dir = d, score = score })
 				end
@@ -12531,8 +12078,6 @@ do
 		end
 		return out
 	end
-
-	-- theo dõi prompt đang hiện (nút E "Interact"): chỉ nhấn E khi prompt của door đang hiện
 	local PPS = game:GetService("ProximityPromptService")
 	local ttShownPrompts = getgenv().__TTShownPrompts
 	if not ttShownPrompts then
@@ -12552,25 +12097,21 @@ do
 			ttShownPrompts[pr] = nil
 		end),
 	}
-
 	local function promptShown(door)
 		local prompt = door and door:FindFirstChildWhichIsA("ProximityPrompt", true)
 		if not prompt then
 			return false
 		end
-		-- tường chắn thì prompt bị ẩn: tắt check line-of-sight phía client để nó hiện
 		pcall(function()
 			prompt.RequiresLineOfSight = false
 		end)
 		return ttShownPrompts[prompt] == true and prompt.Enabled
 	end
-
 	local function pressE(door)
 		local vim = game:GetService("VirtualInputManager")
 		local prompt = door:FindFirstChildWhichIsA("ProximityPrompt", true)
 		local hold = prompt and prompt.HoldDuration or 0
 		if prompt then
-			-- tường chắn thì prompt bị ẩn (không hiện nút E): tắt check line-of-sight phía client
 			pcall(function()
 				prompt.RequiresLineOfSight = false
 			end)
@@ -12582,9 +12123,6 @@ do
 		task.wait(0.05 + hold)
 		vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 	end
-
-	-- trả về scroller, option1 (option1 có thể nil nếu chưa load)
-	-- DialogueGui có thể còn các frame "table: 0x..." cũ (đã ẩn): duyệt tất cả optionsList, ưu tiên cái có option1 đang hiện
 	local function getDialogue()
 		local pg = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
 		local dg = pg and pg:FindFirstChild("DialogueGui")
@@ -12614,8 +12152,6 @@ do
 		end
 		return fallbackSc, nil
 	end
-
-	-- DialogueGui["table: 0x..."]: thấy frame này thì mới click màn hình liên tục
 	local function getDialogueFrame()
 		local pg = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
 		local dg = pg and pg:FindFirstChild("DialogueGui")
@@ -12629,8 +12165,6 @@ do
 		end
 		return nil
 	end
-
-	-- click option: kích hoạt trực tiếp nút (firesignal) + click chuột ảo ở tâm option
 	local function clickGui(o)
 		local btn = o:IsA("GuiButton") and o or o:FindFirstChildWhichIsA("GuiButton", true)
 		if btn and firesignal then
@@ -12649,8 +12183,6 @@ do
 		vim:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
 		vim:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
 	end
-
-	-- sự kiện chỉ có từ phút 00 đến 09 của mỗi giờ tròn (giờ ngoài đời)
 	local TT_WINDOW_MIN = 10
 	local ttWinCache, ttWinAt = true, 0
 	local function ttInWindow(fresh)
@@ -12660,8 +12192,6 @@ do
 		end
 		return ttWinCache
 	end
-
-	-- cờ cho chain loop: true = đang có sự kiện và còn door để làm => dừng farm stack
 	local function ttSetActive(v)
 		if v then
 			StackFarm = false
@@ -12670,20 +12200,14 @@ do
 		end
 		getgenv().__TrickTreatActive = v and true or nil
 	end
-
 	local function ttValid(tok)
 		return Settings[TT_KEY] and getgenv().__TrickTreatToken == tok and ttInWindow()
 	end
-
-	-- mob bất kỳ trong TT_MOB_RANGE stud quanh player: phải farm xong mới làm tiếp trick or treat
 	local TT_MOB_RANGE = 200
-	local TT_WATER_Y = 0 -- mob có Y dưới mức này coi là đang ở dưới nước
-	local TT_WATER_MIN_Y = 3 -- Y thấp nhất của player khi farm mob dưới nước (để đứng trên mặt nước)
+	local TT_WATER_Y = 0
+	local TT_WATER_MIN_Y = 3
 	local TT_MOB_TIMEOUT = 60
 	local ttIgnoreMob = setmetatable({}, { __mode = "k" })
-
-	-- boss Hellfire Gas: không giới hạn khoảng cách, luôn ưu tiên đánh trước mob thường
-	-- (không khai báo thêm local vì scope này sát giới hạn 200 local)
 	local function findAnyMob()
 		local hrp = getHRP()
 		local enemies = workspace:FindFirstChild("Enemies")
@@ -12705,15 +12229,13 @@ do
 		end
 		return best
 	end
-
-	local TT_SPACE_DELAY = 0.1 -- spam space mỗi 0.1s khi đánh boss trong scene
+	local TT_SPACE_DELAY = 0.1
 	local function pressSpace()
 		local vim = game:GetService("VirtualInputManager")
 		vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
 		task.wait(0.03)
 		vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
 	end
-
 	local function farmTTMob(mob, tok, spamSpace, noRange)
 		local isBoss = mob.Name == "Hellfire Gas"
 		noRange = noRange or isBoss
@@ -12746,8 +12268,6 @@ do
 				local fy = Settings["Select Weapon"] == "Blox Fruit" and FruitFarmY() or BuddhaFarmY()
 				local tcf = r.CFrame * CFrame.new(0, fy, 0)
 				if r.Position.Y < TT_WATER_Y then
-					-- mob dưới nước (Y < 0): Y player = Y mob + offset nhưng luôn nằm trên mặt nước
-					-- mob lên mặt nước rồi thì quay về Y như cũ
 					local p = tcf.Position
 					tcf = CFrame.new(p.X, math.max(p.Y, TT_WATER_MIN_Y), p.Z) * (tcf - p)
 				end
@@ -12755,7 +12275,6 @@ do
 			end)
 		until not IsMobAlive(mob)
 	end
-
 	local function runDoor(door, tok)
 		local t0 = tick()
 		local stand, standList, standIdx, switches, arrived, goneAt
@@ -12764,7 +12283,6 @@ do
 		while ttValid(tok) do
 			task.wait()
 			local hrp = getHRP()
-			-- fly tới đúng HalloweenDoor (không dùng LeftDoor/RightDoor nữa)
 			local cf = pivotOf(door)
 			if not hrp or not cf then
 				return
@@ -12775,20 +12293,18 @@ do
 				t0, arrived = tick(), nil
 				continue
 			end
-			-- luôn bám theo HalloweenDoor: hướng đứng cố định, vị trí đứng cập nhật theo door mỗi frame
 			if not standList then
 				standList, standIdx, switches = ttPickStandDirs(door, cf, hrp), 1, 0
 			end
 			stand = CFrame.lookAt(cf.Position + standList[standIdx] * TT_STAND_DIST, cf.Position)
 			local sc, opt = getDialogue()
-			-- có option1 thì chỉ click option1 (bên dưới); không có option1 mới click frame dialogue liên tục
 			if not opt and getDialogueFrame() and tick() - lastScreen >= HW_CLICK_DELAY then
 				lastScreen = tick()
 				pcall(doClick)
 			end
 			if sc then
 				sawDialogue, goneAt = true, nil
-				pcall(toTarget, stand) -- đang hội thoại vẫn giữ bám door
+				pcall(toTarget, stand)
 				if opt and tick() - lastClick >= HW_CLICK_DELAY then
 					lastClick = tick()
 					pcall(clickGui, opt)
@@ -12807,34 +12323,30 @@ do
 				if (hrp.Position - stand.Position).Magnitude <= 8 then
 					arrived = arrived or tick()
 					if ttBusyAt >= arrived then
-						return -- door đang bận / không tương tác được, sang door tiếp
+						return
 					end
 					if tick() - lastE >= HW_CLICK_DELAY and promptShown(door) then
 						lastE = tick()
 						task.spawn(pcall, pressE, door)
 					end
-					-- đứng mãi không mở được dialogue (vd bị kẹt trong nhà): đổi sang phía khác của door
 					if tick() - arrived > TT_SIDE_SWITCH then
 						switches = switches + 1
 						if switches >= #standList then
-							return -- thử hết các phía rồi, sang door tiếp
+							return
 						end
 						standIdx = standIdx % #standList + 1
 						arrived = nil
 					end
 				else
-					arrived = nil -- bị đẩy ra xa door thì fly lại, không bỏ cuộc
+					arrived = nil
 				end
 			end
 		end
 	end
-
-	-- ===== SceneWindow: vào không gian đánh boss =====
-	local TT_SCENE_FAR = 500 -- cách tọa độ cũ > số này stud = đã bị teleport vào scene
-	local TT_SCENE_KNOCK = 6 -- gõ cửa SceneWindow bao lâu mà chưa teleport thì fly về chỗ cũ làm lại
+	local TT_SCENE_FAR = 500
+	local TT_SCENE_KNOCK = 6
 	local TT_SCENE_RETRY = 6
 	local ttSceneSkip = setmetatable({}, { __mode = "k" })
-
 	local function findSceneDoor()
 		for _, d in ipairs(collectDoors()) do
 			local sw = d:FindFirstChild("SceneWindow")
@@ -12844,7 +12356,6 @@ do
 		end
 		return nil
 	end
-
 	local function flyBack(pos, tok)
 		local t0 = tick()
 		while ttValid(tok) and tick() - t0 < 15 do
@@ -12856,9 +12367,6 @@ do
 			pcall(toTarget, CFrame.new(pos))
 		end
 	end
-
-	-- player đang ở trong workspace.Map.HellfireBossRealm (bounding box + margin)
-	-- (gán vào getgenv thay vì khai báo local vì scope này sát giới hạn 200 local)
 	getgenv().__TTInRealm = function()
 		local hrp = getHRP()
 		local map = workspace:FindFirstChild("Map")
@@ -12891,9 +12399,6 @@ do
 		end)
 		return ok and inside == true
 	end
-
-	-- đã vào scene: có mob thì farm, không có thì đứng im; về lại gần tọa độ cũ thì kết thúc
-	-- đang ở trong HellfireBossRealm thì ở lại farm mob gần, không kết thúc dù gần tọa độ cũ
 	local function sceneFight(oldPos, tok)
 		while ttValid(tok) do
 			task.wait(0.1)
@@ -12909,14 +12414,13 @@ do
 			end
 		end
 	end
-
 	local function runScene(door, sw, tok)
 		local hrp = getHRP()
 		local swCf = pivotOf(sw)
 		if not hrp or not swCf then
 			return
 		end
-		local oldPos = hrp.Position -- tọa độ trước khi fly tới SceneWindow
+		local oldPos = hrp.Position
 		if getgenv().DebugTrickTreat then
 			print("[TrickOrTreat] SceneWindow pos =", swCf.Position, "| oldPos =", oldPos)
 		end
@@ -12941,9 +12445,8 @@ do
 					break
 				end
 				if not cf then
-					break -- SceneWindow biến mất
+					break
 				end
-				-- boss ở cổng vào khu vực đánh boss: workspace.Enemies["Hellfire Gas"] (không giới hạn khoảng cách)
 				local enemiesF = workspace:FindFirstChild("Enemies")
 				local gateBoss = enemiesF and enemiesF:FindFirstChild("Hellfire Gas")
 				if gateBoss and IsMobAlive(gateBoss) then
@@ -12984,7 +12487,7 @@ do
 						task.spawn(pcall, pressE, pressTarget)
 					end
 					if tick() - arrived > TT_SCENE_KNOCK then
-						break -- vẫn ở gần tọa độ cũ: game chưa load, làm lại
+						break
 					end
 				elseif tick() - t0 > 40 then
 					break
@@ -12998,15 +12501,12 @@ do
 			if not pivotOf(sw) then
 				return
 			end
-			flyBack(oldPos, tok) -- fly về tọa độ cũ rồi vòng sau fly lại tới SceneWindow
+			flyBack(oldPos, tok)
 		end
 		ttSceneSkip[door] = tick() + TT_REVISIT
 	end
-
-	-- GhostChase: workspace.GhostChase xuất hiện -> fly tới tất cả model trong đó cho tới khi biến mất, rồi mới gõ cửa tiếp
-	-- trả về true nếu đã xử lý GhostChase trong vòng này
 	local function ttGhostChase(tok)
-		local SWITCH, TIMEOUT, SKIP = 0.2, 120, 30 -- đổi model mỗi 0.2s; kẹt quá 120s thì bỏ qua GhostChase 30s để không chặn gõ cửa
+		local SWITCH, TIMEOUT, SKIP = 0.2, 120, 30
 		local function items()
 			local list = {}
 			local root = workspace:FindFirstChild("GhostChase")
@@ -13033,9 +12533,8 @@ do
 			end
 			local list = items()
 			if #list == 0 then
-				return true -- GhostChase đã biến mất: quay lại gõ cửa
+				return true
 			end
-			-- chọn model gần nhất chưa ghé; ghé hết rồi thì bắt đầu lượt mới
 			local best, bestD
 			for pass = 1, 2 do
 				for _, c in ipairs(list) do
@@ -13053,7 +12552,7 @@ do
 				table.clear(visited)
 			end
 			if not best then
-				pcall(toTarget, hrp.CFrame) -- giữ float khi chưa có model nào lấy được vị trí
+				pcall(toTarget, hrp.CFrame)
 			else
 				visited[best] = true
 				local t1 = tick()
@@ -13072,7 +12571,6 @@ do
 		end
 		return true
 	end
-
 	HalloweenSection.CreateToggle(
 		{ Title = "Auto Trick Or Treat", Desc = "Fly to nearest HalloweenDoor, press E when prompt shows, click option1; chase GhostChase models", Default = Settings[TT_KEY] or false },
 		function(state)
@@ -13086,8 +12584,6 @@ do
 			end
 			local tok = getgenv().__TrickTreatToken
 			pcall(ttEnsureBusyHook)
-			-- trong khung giờ sự kiện: luôn noclip; khi TT đang làm việc mà không có tween nào chạy thì giữ tween tại chỗ.
-			-- ngoài khung giờ: không làm gì (tắt noclip, thả tween)
 			spawn(function()
 				while Settings[TT_KEY] and getgenv().__TrickTreatToken == tok do
 					task.wait()
@@ -13110,13 +12606,11 @@ do
 				while Settings[TT_KEY] and getgenv().__TrickTreatToken == tok do
 					task.wait(0.1)
 					local ok, err = pcall(function()
-						-- chưa có sự kiện: không làm gì, trả quyền cho các farm đang bật
 						if not ttInWindow(true) then
 							ttSetActive(false)
 							task.wait(1)
 							return
 						end
-						-- đã ở trong workspace.Map.HellfireBossRealm: không làm gì nữa (door/scene/dialogue), chỉ farm mob gần
 						if getgenv().__TTInRealm() then
 							ttSetActive(true)
 							local rmob = findAnyMob()
@@ -13125,19 +12619,17 @@ do
 							else
 								local rh = getHRP()
 								if rh then
-									pcall(HWI.hold, rh.CFrame, true) -- đứng im, giữ bằng tween + noclip
+									pcall(HWI.hold, rh.CFrame, true)
 								end
 							end
 							return
 						end
-						-- GhostChase xuất hiện: fly tới các model trong đó trước, biến mất rồi mới gõ cửa tiếp
 						if ttGhostChase(tok) then
 							return
 						end
 						local sceneDoor, sceneWin = findSceneDoor()
 						local door = (not sceneDoor) and nearestDoor() or nil
 						if not sceneDoor and not door then
-							-- không còn door nào để làm: trả quyền cho farm
 							ttSetActive(false)
 							task.wait(2)
 							return
@@ -13163,21 +12655,16 @@ do
 			end)
 		end
 	)
-
-	-- ===== Auto Summon + Farm Boss (Witch -> Summon -> GreatPumpkinCompass -> farm boss) =====
-	-- (gói trong function riêng vì scope Halloween đã chạm giới hạn 200 local của Lua)
 	xpcall(function()
 	local DJ_KEY = "Auto Summon + Farm Boss"
-	local DJ_SUMMON_WAIT = 15 -- delay sau Summon rồi mới fly tới compass
-	local DJ_HOLD_E = 1 -- nhấn giữ E ở compass (giây)
-	local DJ_E_DELAY = 0.5 -- tới compass rồi đợi bấy nhiêu giây mới giữ E
-	local DJ_BOSS_WAIT = 90 -- đợi boss spawn tối đa bấy nhiêu giây, quá thì làm lại từ đầu
-	local DJ_ARRIVE = 8 -- tới trong khoảng này của Witch coi là đã tới
-	local DJ_COMPASS_ARRIVE = 6 -- tới trong khoảng này của compass coi là đã tới
-	local DJ_ISLAND_ARRIVE = 40 -- tới trong khoảng này của đảo thì đứng chờ game load NPC
+	local DJ_SUMMON_WAIT = 15
+	local DJ_HOLD_E = 1
+	local DJ_E_DELAY = 0.5
+	local DJ_BOSS_WAIT = 90
+	local DJ_ARRIVE = 8
+	local DJ_COMPASS_ARRIVE = 6
+	local DJ_ISLAND_ARRIVE = 40
 	getgenv().__DJToken = getgenv().__DJToken or 0
-
-	-- đảo theo từng sea để game load NPC Witch: Sea 1 = đảo trung tâm, Sea 2 = Cafe, Sea 3 = Mansion
 	local function djIslandCF()
 		if game.PlaceId == getgenv().CheckPlaceId3 then
 			return CFrame.new(-703.16748, 9.55188751, 1575.1864)
@@ -13188,8 +12675,6 @@ do
 		end
 		return nil
 	end
-
-	-- boss: workspace.Enemies["Dapper Jack"] (đánh khi đã ở trong arena) và workspace.Enemies["Hellfire Gas"] (đánh ở bất kỳ đâu, không cần vào arena)
 	local DJ_BOSS_NAME = "Dapper Jack"
 	local DJ_GATE_BOSS = "Hellfire Gas"
 	local function djFindNamed(name)
@@ -13206,15 +12691,12 @@ do
 	local function djFindBoss()
 		return djFindNamed(DJ_BOSS_NAME) or djFindNamed(DJ_GATE_BOSS)
 	end
-
-	-- đứng im tại chỗ nhưng vẫn giữ float + noclip (gọi mỗi frame)
 	local function djHold()
 		local hrp = getHRP()
 		if hrp then
 			pcall(toTarget, hrp.CFrame)
 		end
 	end
-
 	local function djWait(sec, valid)
 		local t0 = tick()
 		while tick() - t0 < sec and valid() do
@@ -13223,8 +12705,6 @@ do
 		end
 		return valid()
 	end
-
-	-- fly tới Witch; chưa thấy NPC thì fly tới đảo của sea hiện tại, đứng chờ game load
 	local function djReachWitch(valid)
 		local deadline = tick() + 180
 		while valid() and tick() < deadline do
@@ -13256,14 +12736,11 @@ do
 		end
 		return false
 	end
-
 	local function djSummon()
 		return pcall(function()
 			return game:GetService("ReplicatedStorage").Remotes.DapperJackRitual:InvokeServer("Summon")
 		end)
 	end
-
-	-- fly tới workspace.GreatPumpkinCompass (đợi tối đa 10s cho compass xuất hiện)
 	local function djReachCompass(valid)
 		local t0 = tick()
 		while valid() and tick() - t0 < 60 do
@@ -13289,7 +12766,6 @@ do
 		end
 		return nil
 	end
-
 	local function djHoldE(obj, valid)
 		local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
 		local hold = prompt and prompt.HoldDuration or 0
@@ -13316,7 +12792,6 @@ do
 			end)
 		end
 	end
-
 	local function djWaitBoss(valid, maxSec)
 		local t0 = tick()
 		while valid() and tick() - t0 < (maxSec or DJ_BOSS_WAIT) do
@@ -13329,7 +12804,6 @@ do
 		end
 		return nil
 	end
-
 	local function djFarmBoss(boss, valid)
 		repeat
 			task.wait()
@@ -13352,14 +12826,11 @@ do
 			end)
 		until not IsMobAlive(boss)
 	end
-
-	-- nhặt kẹo sau khi boss chết: đợi model xuất hiện trong workspace.CandySpillFx, fly tới đúng model rồi mới đổi sang model khác
-	local DJ_CANDY_WAIT = 10 -- đợi candy xuất hiện tối đa bấy nhiêu giây
-	local DJ_CANDY_ARRIVE = 4 -- tới trong khoảng này của model kẹo coi là đã tới, mới đổi sang model khác
-	local DJ_CANDY_ITEM_TIMEOUT = 6 -- 1 model mà bay mãi không tới được thì bỏ qua sau bấy nhiêu giây (tránh kẹt)
-	local DJ_CANDY_TIMEOUT = 90 -- tổng thời gian nhặt tối đa
-	local DJ_CANDY_IDLE = 1.5 -- hết candy liên tục bấy nhiêu giây thì kết thúc
-
+	local DJ_CANDY_WAIT = 10
+	local DJ_CANDY_ARRIVE = 4
+	local DJ_CANDY_ITEM_TIMEOUT = 6
+	local DJ_CANDY_TIMEOUT = 90
+	local DJ_CANDY_IDLE = 1.5
 	local function djCandyItems(skip)
 		local list = {}
 		local root = workspace:FindFirstChild("CandySpillFx")
@@ -13372,9 +12843,8 @@ do
 		end
 		return list
 	end
-
 	local function djCollectCandy(valid)
-		local visited = setmetatable({}, { __mode = "k" }) -- model đã ghé trong lượt hiện tại
+		local visited = setmetatable({}, { __mode = "k" })
 		local t0 = tick()
 		while valid() and tick() - t0 < DJ_CANDY_WAIT and #djCandyItems({}) == 0 do
 			djHold()
@@ -13388,7 +12858,6 @@ do
 				return
 			end
 			local items = djCandyItems({})
-			-- chọn model gần nhất chưa ghé; ghé hết rồi thì bắt đầu lượt mới
 			local best, bestD
 			for pass = 1, 2 do
 				for _, c in ipairs(items) do
@@ -13414,7 +12883,6 @@ do
 				lastSeen = tick()
 				visited[best] = true
 				local t1 = tick()
-				-- phải fly tới đúng model này rồi mới đổi sang model khác (không đợi model biến mất)
 				while valid() and best.Parent and tick() - t1 < DJ_CANDY_ITEM_TIMEOUT do
 					local h = getHRP()
 					local cf = pivotOf(best)
@@ -13430,9 +12898,7 @@ do
 			end
 		end
 	end
-
-	-- hết kẹo: reset player (chết rồi đợi respawn) thay cho ExitPortal
-	local DJ_RESPAWN_TIMEOUT = 20 -- đợi respawn tối đa bấy nhiêu giây
+	local DJ_RESPAWN_TIMEOUT = 20
 	local function djResetPlayer(valid)
 		local lp = game:GetService("Players").LocalPlayer
 		local oldChar = lp.Character
@@ -13456,11 +12922,9 @@ do
 			end
 		end
 		if valid() then
-			task.wait(1) -- đợi character load xong
+			task.wait(1)
 		end
 	end
-
-	-- player đang ở trong khu đánh boss workspace.Map.DapperJackArena (kiểm tra theo bounding box + margin)
 	local DJ_ARENA_MARGIN = Vector3.new(20, 80, 20)
 	local function djInArena()
 		local hrp = getHRP()
@@ -13494,8 +12958,6 @@ do
 		end)
 		return ok and inside == true
 	end
-
-	-- đợi: Hellfire Gas xuất hiện (bất kỳ đâu) HOẶC (player ở trong workspace.Map.DapperJackArena VÀ Dapper Jack xuất hiện)
 	local function djWaitArenaBoss(valid, maxSec)
 		local t0 = tick()
 		while valid() and tick() - t0 < (maxSec or DJ_BOSS_WAIT) do
@@ -13514,8 +12976,6 @@ do
 		end
 		return nil
 	end
-
-	-- đánh boss; Dapper Jack chết thì nhặt kẹo + reset player. Hellfire Gas chết thì làm vòng tiếp luôn (không nhặt/reset)
 	local function djKill(boss, valid)
 		local isGate = boss.Name == DJ_GATE_BOSS
 		djFarmBoss(boss, valid)
@@ -13527,13 +12987,6 @@ do
 			djResetPlayer(valid)
 		end
 	end
-
-	-- 1 vòng đầy đủ:
-	-- Hellfire Gas đang sống: đánh luôn
-	-- chưa có compass: fly Witch -> Summon -> đợi 15s -> fly compass -> delay 0.5 -> giữ E 1s
-	-- đã có compass:   fly compass -> delay 0.5 -> giữ E 1s
-	-- rồi: đợi (ở trong DapperJackArena + boss xuất hiện) -> đánh boss -> boss chết nhặt CandySpillFx -> hết kẹo reset player
-	-- đang trong arena thì bỏ qua bước Witch / compass.
 	local function djRound(valid)
 		local gate = djFindGateBoss()
 		if gate then
@@ -13542,8 +12995,6 @@ do
 		end
 		local inArena = djInArena()
 		local boss = djFindBoss()
-
-		-- đang trong arena: có boss thì đánh luôn, hết boss mà còn kẹo thì nhặt luôn
 		if inArena then
 			if boss then
 				djKill(boss, valid)
@@ -13554,7 +13005,6 @@ do
 				djResetPlayer(valid)
 				return
 			end
-			-- trong arena mà không có boss lẫn kẹo: đợi boss ngắn rồi reset để làm lại
 			boss = djWaitArenaBoss(valid, 15)
 			if not boss then
 				if valid() and djInArena() then
@@ -13564,10 +13014,8 @@ do
 			end
 		else
 			local hasCompass = workspace:FindFirstChild("GreatPumpkinCompass") ~= nil
-			-- boss đang sống mà không có compass (ritual đã chạy): không summon lại, chỉ đợi vào arena + boss
 			if not (boss and not hasCompass) then
 				if not hasCompass then
-					-- chưa có compass: fly NPC -> chạy code summon -> đợi 15s
 					if not djReachWitch(valid) then
 						return
 					end
@@ -13576,7 +13024,6 @@ do
 						return
 					end
 				end
-				-- fly tới compass -> delay 0.5 -> giữ E 1s
 				local compass = djReachCompass(valid)
 				if not compass then
 					task.wait(3)
@@ -13587,7 +13034,6 @@ do
 				end
 				djHoldE(compass, valid)
 			end
-			-- đợi vào arena + boss xuất hiện
 			boss = djWaitArenaBoss(valid)
 			if not boss then
 				if valid() and djInArena() then
@@ -13596,10 +13042,8 @@ do
 				return
 			end
 		end
-
 		djKill(boss, valid)
 	end
-
 	HalloweenSection.CreateToggle(
 		{ Title = "Auto Summon + Farm Boss", Desc = "Witch > Summon > wait 15s > GreatPumpkinCompass (hold E) > kill Dapper Jack > collect CandySpillFx > reset player", Default = Settings[DJ_KEY] or false },
 		function(state)
@@ -13636,8 +13080,6 @@ StatusHiddenProgress = HiddenEventSection.CreateLabel({ Title = "Secret Quest : 
 StatusHiddenQuest = HiddenEventSection.CreateLabel({ Title = "Title Quest : ..." })
 StatusHiddenStep = HiddenEventSection.CreateLabel({ Title = "Doing Quest : None" })
 StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss : None" })
-
-
 	HiddenEvent = {
 		progress = {},
 		checked = 0,
@@ -13647,50 +13089,39 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		skipped = {},
 		lastNotify = {},
 	}
-
 	GetHiddenProgress = function(arg)
 		local flag
-
 		if arg then
 			flag = arg
 		else
 			local checked = HiddenEvent.checked
 			flag = os.clock() - checked > 15
 		end
-
 		if flag then
 			HiddenEvent.checked = os.clock()
-
 			local ok, result = pcall(function()
 				return ReplicatedStorage.Modules.Net["RF/RequestBonusMomentReplication"]:InvokeServer({ Type = "GetMomentProgress" })
 			end)
-
 			if ok and type(result) == "table" and type(result.Data) == "table" then
 				ReportHiddenDone(HiddenEvent.progress, result.Data)
 				HiddenEvent.progress = result.Data
 			end
 		end
-
 		return HiddenEvent.progress
 	end
-
 	ReportHiddenDone = function(arg, arg2)
 		local done = 0
-
 		for k, v6 in pairs(arg2) do
 			if type(v6) == "table" and v6.Completed then
 				done = done + (1)
 				local flag = type(arg) == "table" and arg[k]
-
 				if type(flag) == "table" and not flag.Completed then
 					HiddenNotify((tostring(k):match("([^/]+)$") or tostring(k)) .. " completed", "done" .. tostring(k), "reward", { SubContent = done .. "/39 secret quests", Duration = 8 })
 				end
 			end
 		end
-
 		HiddenEvent.done = done
 	end
-
 	HiddenNotify = function(arg, key, arg2, arg3)
 		key = key or arg
 		if os.clock() - (HiddenEvent.lastNotify[key] or 0) < 20 then
@@ -13701,20 +13132,16 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		tbl9.Key = key
 		VxezeNotify("Hidden Event", arg, arg2 or "info", tbl9)
 	end
-
 	SetHiddenStep = function(step)
 		if step ~= HiddenEvent.step then
 			local stepShape = tostring(step):gsub("%d+", "#")
-
 			if stepShape ~= HiddenEvent.stepShape then
 				HiddenEvent.stepShape = stepShape
 				VxezeLog("Hidden", step)
 			end
 		end
-
 		HiddenEvent.step = step
 	end
-
 	HiddenModules = setmetatable({}, { __index = function(arg, arg2)
 		local handlers = {
 			Controller = function()
@@ -13739,52 +13166,40 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return require(ReplicatedStorage.Modules.Net):RemoteEvent("RegisterHit", true)
 			end,
 		}
-
 		local v6 = handlers[arg2] and handlers[arg2]()
 		rawset(arg, arg2, v6)
 		return v6
 	end })
-
 	GetHiddenIsland = function(arg)
 		HiddenEvent.islands = HiddenEvent.islands or {}
-
 		if HiddenEvent.islands[arg] == nil then
 			local v6 = HiddenModules.Map.findCurrentMap()
 			local v7 = pairs
 			local islands = v6 and v6.Islands or {}
-
 			for _, island in v7(islands) do
 				if island.Index.Key == arg then
 					HiddenEvent.islands[arg] = island
 				end
 			end
 		end
-
 		return HiddenEvent.islands[arg]
 	end
-
 	GetHiddenMoment = function(arg)
 		return HiddenModules.Controller:GetLoadedMoments()[arg]
 	end
-
 	HiddenRelease = function()
 		local anchored = HiddenEvent.anchored
-
 		if anchored and anchored.Parent then
 			anchored.Anchored = false
 		end
-
 		HiddenEvent.anchored = nil
 	end
-
 	HiddenMove = function(arg)
 		HiddenRelease()
-
 		if IsSecretQuestOn() then
 			ToTarget(arg)
 		end
 	end
-
 	HiddenGoTo = function(arg, arg2)
 		if localPlayer:DistanceFromCharacter(arg) <= (arg2 or 8) then
 			return true
@@ -13792,7 +13207,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		HiddenMove(CFrame.new(arg))
 		return false
 	end
-
 	HiddenGoToIsland = function(arg)
 		local v6 = GetHiddenIsland(arg)
 		if not v6 then
@@ -13801,42 +13215,34 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		SetHiddenStep("Travel to " .. arg)
 		local position = v6.TeleportPoints[1].Position
 		local v7 = nil
-
 		for _, child in ipairs(workspace._WorldOrigin.Locations:GetChildren()) do
 			if child.Name == v6.Reference.Location then
 				local magnitude = (child.Position - v6.World.Position).Magnitude
-
 				if not v7 or magnitude < v7 then
 					position = child.Position
 					v7 = magnitude
 				end
 			end
 		end
-
 		return HiddenGoTo(position + Vector3.new(0, 30, 0), 150)
 	end
-
 	HiddenHold = function(arg)
 		local humanoidRootPart = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
 		if not humanoidRootPart then
 			return
 		end
-
 		if (humanoidRootPart.Position - arg.Position).Magnitude > 3 then
 			HiddenMove(arg)
 			return
 		end
-
 		if HiddenEvent.anchored ~= humanoidRootPart then
 			humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
 			humanoidRootPart.Anchored = true
 			HiddenEvent.anchored = humanoidRootPart
 		end
-
 		HiddenEvent.holdTime = tick()
 		TweenHoldUntil = tick() + 1
 	end
-
 	SweepHiddenTrigger = function(arg, arg2, arg3)
 		HiddenRelease()
 		local character = localPlayer.Character
@@ -13848,25 +13254,21 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		HiddenEvent.walking = true
 		local floatForce = humanoidRootPart:FindFirstChild("FloatForce")
 		local maxForce = floatForce and floatForce.MaxForce
-
 		if floatForce then
 			floatForce.MaxForce = Vector3.zero
 		end
-
 		for k in pairs(NoclipChanged) do
 			if k.Parent then
 				k.CanCollide = true
 			end
 		end
-
 		table.clear(NoclipChanged)
 		humanoidRootPart.CFrame = CFrame.new(arg2)
 		humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
 		task.wait(0.4)
 		character:MoveTo(arg3)
 		local now = tick()
-
-		while true do local __brk = false repeat 
+		while true do local __brk = false repeat
 			task.wait(0.1)
 			tbl3.LastCall = tick()
 			TweenHoldUntil = tick() + 1
@@ -13875,14 +13277,11 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 			__brk = true break
 		until true if __brk then break end end
-
 		if floatForce and floatForce.Parent then
 			floatForce.MaxForce = maxForce
 		end
-
 		HiddenEvent.walking = false
 	end
-
 	HiddenDialoguePriority = {
 		"not this time",
 		"help hasan",
@@ -13902,7 +13301,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		"continue",
 		"so go get it back",
 	}
-
 	HiddenDialogueAvoid = {
 		"walk away",
 		"leave",
@@ -13923,7 +13321,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		"exit",
 		"stop",
 	}
-
 	PickHiddenDialogue = function(arg)
 		local DialogueController = require(ReplicatedStorage.DialogueController)
 		if not DialogueController.Active then
@@ -13941,7 +13338,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		end
 		local v6 = ipairs
 		arg = arg or {}
-
 		for _, v7 in v6(arg) do
 			for _, v8 in ipairs(options2) do
 				if string.find(string.lower(type(v8._text) == "table" and table.concat(v8._text, " ") or tostring(v8._text)), string.lower(v7), 1, true) then
@@ -13950,16 +13346,13 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		return false
 	end
-
 	AutoHiddenDialogue = function()
 		if tick() < (HiddenEvent.talking or 0) then
 			HiddenEvent.strayDialogue = nil
 			return
 		end
-
 		if PickHiddenDialogue(HiddenDialoguePriority) then
 			HiddenEvent.strayDialogue = nil
 			return
@@ -13967,19 +13360,15 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		local DialogueController = require(ReplicatedStorage.DialogueController)
 		local ok, result = pcall(DialogueController.getActiveDialogue)
 		local pageStack = DialogueController.Active and ok and result and result._pageStack and result._pageStack[#result._pageStack]
-
 		if pageStack then
 			pageStack = #(pageStack._options or {}) > 0
 		end
-
 		if pageStack then
 			pageStack = tick() > (HiddenEvent.dialogueBusy or 0)
 		end
-
 		if pageStack then
 			HiddenEvent.strayDialogue = HiddenEvent.strayDialogue or tick()
 			local strayDialogue = HiddenEvent.strayDialogue
-
 			if tick() - strayDialogue > 1.5 then
 				HiddenEvent.strayDialogue = nil
 				pcall(DialogueController.close)
@@ -13988,14 +13377,12 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			HiddenEvent.strayDialogue = nil
 		end
 	end
-
 	HiddenDialogueLoop = function()
 		while IsSecretQuestOn() do
 			pcall(AutoHiddenDialogue)
 			task.wait(0.4)
 		end
 	end
-
 	HiddenMaterialMobs = {
 		["Yeti Fur"] = { mobs = { "Snow Bandit", "Snowman" }, center = Vector3.new(1350, 60, -1300) },
 		Leather = { mobs = { "Brute", "Pirate" }, center = Vector3.new(-1436, 28, 4357) },
@@ -14004,20 +13391,16 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		["Angel Wings"] = { mobs = { "Royal Soldier", "Royal Squad" }, center = Vector3.new(-7030, 5545, 1120) },
 		["Fish Tail"] = { mobs = { "Fishman Warrior", "Fishman Commando" }, center = Vector3.new(61000, 23, 1300) },
 	}
-
 	CountHiddenMaterial = function(arg)
 		local v6, v7, v8 = ipairs(GetInventoryItems() or {})
 		local n = 0
-
 		for _, v9 in v6, v7, v8 do
 			if tostring(v9.Name) == arg then
 				n = tonumber(v9.Count) or tonumber(v9.Amount) or 1
 			end
 		end
-
 		return n
 	end
-
 	FarmHiddenMaterial = function(arg, arg2)
 		local v6 = HiddenMaterialMobs[arg]
 		if not v6 then
@@ -14027,10 +13410,8 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		local now = tick()
 		local now2 = tick()
 		local str2
-
-		while true do local __brk = false repeat 
+		while true do local __brk = false repeat
 			local v7 = FindHiddenEnemy(v6.mobs, v6.center, 1500)
-
 			if not v7 then
 				HiddenGoTo(v6.center, 120)
 				str2 = "Look for " .. v6.mobs[1] .. " to farm " .. arg
@@ -14045,16 +13426,12 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				getgenv().ClickM1(v7, true)
 				task.wait()
 			end
-
 			local flag
-
 			if tick() - now2 > 4 then
 				local now3 = tick()
-
 				if not (arg2 <= CountHiddenMaterial(arg)) then
 					now2 = now3
 					flag = tick() - now > 45 or not IsSecretQuestOn()
-
 					if flag then
 						__brk = true break
 					else
@@ -14063,20 +13440,16 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			else
 				flag = tick() - now > 45 or not IsSecretQuestOn()
-
 				if flag then
 					__brk = true break
 				else
 					break
 				end
 			end
-
 			__brk = true break
 		until true if __brk then break end end
-
 		return str2
 	end
-
 	FindHiddenWaterSpot = function()
 		local humanoidRootPart = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
 		if not humanoidRootPart then
@@ -14086,17 +13459,14 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		local raycastParams = RaycastParams.new()
 		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 		raycastParams.FilterDescendantsInstances = { localPlayer.Character, workspace.Characters, workspace.Enemies }
-
 		local function fn(arg)
 			local ok, result = pcall(GetWaterHeightAtLocation, arg)
 			return ok and tonumber(result)
 		end
-
 		local function fn2(arg, arg2)
 			local hit = workspace:Raycast(Vector3.new(arg.X, arg2 + 200, arg.Z), Vector3.new(0, -500, 0), raycastParams)
 			return hit and hit.Position or nil
 		end
-
 		for i_ = 15, 400, 15 do
 			for i_2 = 0, 11 do
 				local v6 = math.rad(i_2 * 30)
@@ -14104,10 +13474,8 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				local vector = Vector3.new(math.cos(v6), 0, sin(v6))
 				local n = humanoidRootPart.Position + vector * i_
 				local v7 = fn(n)
-
 				if v7 then
 					local v8 = fn2(n, v7)
-
 					if v8 and v8.Y >= v7 - 1 then
 						local n3 = n + vector * 14
 						local v9 = fn(n3)
@@ -14120,7 +13488,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end
 	end
-
 	TalkFishermanDialogue = function(arg, arg2, arg3)
 		local DialogueController = require(ReplicatedStorage.DialogueController)
 		HiddenEvent.dialogueBusy = tick() + (arg3 or 20) + 4
@@ -14137,113 +13504,90 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		task.spawn(pcall, DialogueController.start, result)
 		local now = tick()
 		local n = 1
-
-		while true do local __brk = false repeat 
+		while true do local __brk = false repeat
 			task.wait(0.4)
 			local ok2, result2 = pcall(DialogueController.getActiveDialogue)
 			local pageStack = ok2 and result2 and result2._pageStack and result2._pageStack[#result2._pageStack]
-
 			if pageStack then
 				local options2 = pageStack._options or {}
-
 				if #options2 == 0 then
 					pcall(DialogueController.advance)
 				else
 					local v6 = nil
-
 					for _, v7 in ipairs(options2) do
 						local v8 = string.lower(type(v7._text) == "table" and table.concat(v7._text, " ") or tostring(v7._text))
 						local v9 = ipairs
 						local tbl9 = arg or {}
-
 						for _, v10 in v9(tbl9) do
 							if not v6 and string.find(v8, string.lower(v10), 1, true) then
 								v6 = v7
 							end
 						end
 					end
-
 					pcall(DialogueController.select, v6 or options2[1])
 					n = n + (1)
 				end
 			end
-
 			local flag = arg2 and arg2() or n > 6
-
 			if not flag then
 				flag = tick() - now > (arg3 or 15)
 			end
-
 			if not flag then
 				break
 			end
 			__brk = true break
 		until true if __brk then break end end
-
 		task.wait(0.5)
 		pcall(DialogueController.close)
 		return arg2 and arg2() or true
 	end
-
 	GoToFisherman = function()
 		local fisherman = workspace.NPCs:FindFirstChild("Fisherman")
 		fisherman = fisherman and fisherman:GetPivot().Position or Vector3.new(1065, 6, -1083)
 		if localPlayer:DistanceFromCharacter(fisherman) <= 12 then
 			return true
 		end
-
 		if IsSecretQuestOn() then
 			return HiddenSettle(fisherman + Vector3.new(0, 1.5, 4), 10)
 		end
 		ToTarget(CFrame.new(fisherman + Vector3.new(0, 1.5, 4)))
 		return false
 	end
-
 	CountFishingBait = function(arg)
 		local v6 = ipairs
 		local tbl9 = GetInventoryItems() or {}
-
 		for _, v7 in v6(tbl9) do
 			if tostring(v7.Name) == arg then
 				return tonumber(v7.Count) or tonumber(v7.Amount) or 1
 			end
 		end
-
 		return 0
 	end
-
 	BuyHiddenFishingGear = function(arg)
 		local selectBait = arg or Settings["Select Bait"] or "Basic Bait"
 		if DetectRod() and CountFishingBait(selectBait) > 0 then
 			return true
 		end
-
 		if not GoToFisherman() then
 			return false
 		end
-
 		if tick() - (HiddenEvent.rodAsked or 0) < 20 then
 			return DetectRod() ~= nil
 		end
 		HiddenEvent.rodAsked = tick()
-
 		if not DetectRod() then
 			TalkFishermanDialogue({ "Thanks" }, function()
 				return DetectRod() ~= nil
 			end, 15)
 		end
-
 		if DetectRod() and CountFishingBait(selectBait) <= 0 then
 			local v6 = CountFishingBait(selectBait)
-
 			TalkFishermanDialogue({ "Bait", selectBait, "Craft", "Buy", "Confirm", "Yes" }, function()
 				return CountFishingBait(selectBait) > v6
 			end, 20)
 		end
-
 		return DetectRod() ~= nil
 	end
-
 	RunHiddenFishing = function()
 		if not DetectRod() then
 			if not BuyHiddenFishingGear() then
@@ -14252,11 +13596,9 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 			DetectRod()
 		end
-
 		local selectBait = Settings["Select Bait"] or "Basic Bait"
 		local fishingData = localPlayer.Data:FindFirstChild("FishingData")
 		fishingData = fishingData and fishingData:GetAttribute("SelectedBait")
-
 		if not fishingData or fishingData == "None" then
 			if CountFishingBait(selectBait) > 0 then
 				CommF:InvokeServer("LoadItem", selectBait, { "Usables" })
@@ -14265,17 +13607,13 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return "Buy fishing bait from the Fisherman"
 			end
 		end
-
 		local fishSpot = HiddenEvent.fishSpot
-
 		if fishSpot then
 			fishSpot = tick() - (HiddenEvent.fishSpotAt or 0) > 120
 		end
-
 		if fishSpot then
 			HiddenEvent.fishSpot = nil
 		end
-
 		if not HiddenEvent.fishSpot then
 			local v6 = HiddenEvent
 			local v7 = HiddenEvent
@@ -14284,12 +13622,10 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			v7.fishWater = v9
 			HiddenEvent.fishSpotAt = tick()
 		end
-
 		local fishSpot2 = HiddenEvent.fishSpot
 		if not fishSpot2 then
 			return "Looking for a shore to fish from"
 		end
-
 		if localPlayer:DistanceFromCharacter(fishSpot2) > 10 then
 			HiddenMove(CFrame.new(fishSpot2, HiddenEvent.fishWater or fishSpot2 + Vector3.new(0, 0, 5)))
 			return "Go to the shore to fish"
@@ -14299,52 +13635,41 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		task.wait(0.4)
 		return "Fishing at the shore for Chef's Kiss"
 	end
-
 	GetHiddenFishCount = function()
 		local tbl9 = {}
-
 		for _, child in ipairs(ReplicatedStorage.FishReplicated.FishData:GetChildren()) do
 			tbl9[child.Name] = true
 		end
-
 		local v6, v7, v8 = ipairs(GetInventoryItems() or {})
 		local n = 0
-
 		for _, v9 in v6, v7, v8 do
 			if tbl9[tostring(v9.Name)] then
 				n = n + (tonumber(v9.Count) or 1)
 			end
 		end
-
 		return n
 	end
-
 	PrepareHiddenChef = function(arg)
 		if arg["Sea1/Pirate Village/Chef's Kiss"] == true then
 			return
 		end
-
 		if CountHiddenMaterial("Yeti Fur") < 1 then
 			HiddenEvent.current = "Chef's Kiss"
 			HiddenEvent.prepUntil = tick() + 60
 			SetHiddenStep(FarmHiddenMaterial("Yeti Fur", 1) or "Farm Yeti Fur for Chef's Kiss")
 			return true
 		end
-
 		if GetHiddenFishCount() < 1 then
 			HiddenEvent.current = "Chef's Kiss"
 			HiddenEvent.prepUntil = tick() + 60
 			SetHiddenStep(RunHiddenFishing() or "Fishing for Chef's Kiss")
 			return true
 		end
-
 		HiddenEvent.prepUntil = nil
 	end
-
 	GatherChefIngredients = function()
 		local text = HiddenEvent.chefMissing and HiddenEvent.chefMissing.text or ""
 		local v6 = string.lower(text)
-
 		for k in pairs(HiddenMaterialMobs) do
 			if string.find(text, k, 1, true) and CountHiddenMaterial(k) < 1 then
 				local v7 = FarmHiddenMaterial(k)
@@ -14353,9 +13678,7 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		local flag = string.find(v6, "fish", 1, true) ~= nil
-
 		if not flag then
 			for _, child in ipairs(ReplicatedStorage.FishReplicated.FishData:GetChildren()) do
 				if string.find(text, child.Name, 1, true) then
@@ -14364,93 +13687,74 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		if flag then
 			local v7 = RunHiddenFishing()
 			if v7 then
 				return v7
 			end
 		end
-
 		if string.find(v6, "material", 1, true) or string.find(v6, "ingredient", 1, true) then
 			for k in pairs(HiddenMaterialMobs) do
 				if CountHiddenMaterial(k) > 0 then
 					return
 				end
 			end
-
 			local v7 = FarmHiddenMaterial("Yeti Fur", 1)
 			if v7 then
 				return v7
 			end
 		end
 	end
-
 	ResetHiddenMomentFlag = function(arg, arg2, arg3)
 		for _, v6 in pairs(getgc()) do
 			if type(v6) == "function" and islclosure(v6) and debug.info(v6, "n") == arg2 and string.find(tostring(debug.info(v6, "s")), arg, 1, true) then
 				local ok, result = pcall(debug.getupvalues, v6)
-
 				if ok and type(result[arg3]) == "boolean" then
 					pcall(debug.setupvalue, v6, arg3, false)
 				end
 			end
 		end
 	end
-
 	TalkHiddenQuestNpc = function(arg, arg2)
 		pcall(function()
 			local v6 = HiddenModules.NpcList.List[arg].DialogueCallback()
-
 			if type(v6) == "table" and type(v6.Get) == "function" then
 				v6:Get()
 			end
 		end)
-
 		task.wait(0.6)
 		local v6 = GetHiddenDialogueKey(arg)
-
 		if v6 then
 			pcall(HiddenModules.Guide.interactQuestGiver, v6)
 		end
-
 		return RunHiddenDialogue(arg2, 10)
 	end
-
 	RunHiddenDialogue = function(arg, arg2)
 		local DialogueController = require(ReplicatedStorage.DialogueController)
 		local now = tick()
 		HiddenEvent.dialogueBusy = tick() + (arg2 or 12) + 2
 		local flag = false
-
-		while true do local __brk = false repeat 
+		while true do local __brk = false repeat
 			task.wait(0.3)
 			HiddenEvent.stallGrace = tick() + 20
-
 			if PickHiddenDialogue(arg) then
 				flag = true
 			end
-
 			local flag2 = flag and not DialogueController.Active
-
 			if not flag2 then
 				flag2 = tick() - now > (arg2 or 12)
 			end
-
 			if not flag2 then
 				break
 			end
 			__brk = true break
 		until true if __brk then break end end
-
 		if flag and DialogueController.Active then
 			task.wait(1)
 			pcall(DialogueController.close)
 		end
-
 		return flag
 	end
-
 	HiddenSettle = function(arg, arg2)
 		if not HiddenGoTo(arg, arg2) then
 			HiddenEvent.arrived = nil
@@ -14458,28 +13762,22 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		end
 		HiddenHold(CFrame.new(arg))
 		HiddenEvent.arrived = HiddenEvent.arrived or tick()
-
 		if not game:GetService("CollectionService"):HasTag(localPlayer, "Teleporting") then
 			HiddenEvent.teleportTag = nil
 		else
 			HiddenEvent.teleportTag = HiddenEvent.teleportTag or tick()
 		end
-
 		local arrived = HiddenEvent.arrived
 		local flag = tick() - arrived > 1.5
-
 		if flag then
 			flag = not HiddenEvent.teleportTag
-
 			if not flag then
 				local teleportTag = HiddenEvent.teleportTag
 				flag = tick() - teleportTag > 6
 			end
 		end
-
 		return flag
 	end
-
 	ListenHiddenMoment = function(arg, arg2)
 		return ReplicatedStorage.Remotes.BonusMomentsRemoteEvent.OnClientEvent:Connect(function(arg3, arg4, ...)
 			if arg3 == arg then
@@ -14487,7 +13785,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end)
 	end
-
 	HitHiddenPart = function(arg)
 		if localPlayer:DistanceFromCharacter(arg.Position) > 12 then
 			HiddenMove(arg.CFrame * CFrame.new(0, 0, 6))
@@ -14495,14 +13792,12 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		end
 		HiddenHold(localPlayer.Character.HumanoidRootPart.CFrame)
 		EquipHiddenWeapon("Melee")
-
 		if os.clock() - (HiddenEvent.lastHit or 0) >= 0.4 then
 			HiddenEvent.lastHit = os.clock()
 			HiddenModules.RegisterAttack:FireServer(0.3)
 			HiddenModules.RegisterHit:FireServer(arg)
 		end
 	end
-
 	IsHiddenEnemyMine = function(arg)
 		local attribute = arg:GetAttribute("LocalEnemy")
 		if attribute and attribute ~= localPlayer.Name then
@@ -14514,71 +13809,56 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		end
 		return true
 	end
-
 	IsHiddenTarget = function(arg)
 		local humanoid = arg and arg.Parent and arg:FindFirstChildWhichIsA("Humanoid")
 		return humanoid ~= nil and humanoid.Health > 0 and arg:FindFirstChild("HumanoidRootPart") ~= nil and IsHiddenEnemyMine(arg)
 	end
-
 	FindHiddenEnemyNear = function(arg, arg2)
 		local huge = math.huge
 		local v6 = nil
-
 		for _, child in ipairs(workspace.Enemies:GetChildren()) do
 			if IsHiddenTarget(child) and (child:GetPivot().Position - arg).Magnitude <= arg2 then
 				local v7 = localPlayer:DistanceFromCharacter(child:GetPivot().Position)
-
 				if v7 < huge then
 					huge = v7
 					v6 = child
 				end
 			end
 		end
-
 		return v6
 	end
-
 	FindHiddenEnemy = function(arg, arg2, arg3)
 		local huge = math.huge
 		local v6 = nil
-
 		for _, child in ipairs(workspace.Enemies:GetChildren()) do
 			if table.find(arg, child.Name) and IsHiddenTarget(child) and (child:GetPivot().Position - arg2).Magnitude <= arg3 then
 				local v7 = localPlayer:DistanceFromCharacter(child:GetPivot().Position)
-
 				if v7 < huge then
 					huge = v7
 					v6 = child
 				end
 			end
 		end
-
 		return v6
 	end
-
 	HiddenDodge = { untilTime = 0, target = nil, animations = {}, connection = nil, watching = false }
 	IsHiddenDodging = function()return HiddenDodge.target~=nil and tick()<HiddenDodge.untilTime;end
 	TriggerHiddenDodge = function(c)if HiddenDodge.target then HiddenDodge.untilTime=math.max(HiddenDodge.untilTime,tick()+math.clamp(c,0.3,8));end;end
-
 	IsHiddenBoss = function(arg)
 		if arg:GetAttribute("BossIndicatorAwakened") then
 			return true
 		end
 		local v6 = ipairs
 		local tbl9 = HiddenQuests or {}
-
 		for _, v7 in v6(tbl9) do
 			if v7.BossNames and table.find(v7.BossNames, arg.Name) then
 				return true
 			end
 		end
-
 		return false
 	end
-
 	OnHiddenEnemyAnimation = function(c)if c.Looped then return;end;local n,L=c.Animation and c.Animation.AnimationId or"",tick();local U=HiddenDodge.animations[n];if not U or L-U.since>20 then U={count=0,since=L};HiddenDodge.animations[n]=U;end;U.count=U.count+1;if U.count>4 then return;end;task.wait(0.05);if c.IsPlaying and c.Length>=0.9 then TriggerHiddenDodge(c.Length/math.max(c.Speed,0.1)+0.3);end;end
 	OnHiddenEnemySkill = function(n)if not HiddenDodge.target then return;end;if not n:IsA("BodyGyro")and not n:IsA("BodyPosition")and not string.find(n.Name,"KiBlast",1,true)then return;end;local L=n.Parent;while L and L.Parent~=workspace.Enemies do L=L.Parent;end;local U=L and(L:FindFirstChild("HumanoidRootPart"));if not U or L~=HiddenDodge.target and  localPlayer :DistanceFromCharacter(U.Position)>70 then return;end;L=tick();TriggerHiddenDodge(1);while n.Parent and HiddenDodge.target and tick()-L<8 do TriggerHiddenDodge(0.5);task.wait(0.2);end;end
-
 	WatchHiddenEnemy = function(target)
 		if HiddenDodge.target == target then
 			return
@@ -14586,61 +13866,48 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		StopHiddenDodge()
 		HiddenDodge.target = target
 		local humanoid = target:FindFirstChildOfClass("Humanoid")
-
 		if humanoid then
 			humanoid = humanoid:FindFirstChildOfClass("Animator") or humanoid
 		end
-
 		if humanoid then
 			HiddenDodge.connection = humanoid.AnimationPlayed:Connect(OnHiddenEnemyAnimation)
 		end
-
 		if not HiddenDodge.watching then
 			HiddenDodge.watching = true
 			workspace.Enemies.DescendantAdded:Connect(OnHiddenEnemySkill)
 		end
 	end
-
 	StopHiddenDodge = function()
 		if HiddenDodge.connection then
 			HiddenDodge.connection:Disconnect()
 			HiddenDodge.connection = nil
 		end
-
 		table.clear(HiddenDodge.animations)
 		HiddenDodge.target = nil
 		HiddenDodge.untilTime = 0
 	end
-
 	GetHiddenFarmCFrame = function(c)local n,L=c.HumanoidRootPart,Settings["Select Weapon"]=="Blox Fruit";local U=HiddenEvent.farmHeight or(TRexAuraOn()and 15)or L and 15 or 20;return n.CFrame*CFrame.new(L and-7 or 7,(function() if IsHiddenDodging() then return U+(IsHiddenBoss(c)and 40 or 25) else return U end end)(),0);end
-
 	KillHiddenEnemy = function(fighting)
 		local now = tick()
 		local v6 = IsHiddenBoss(fighting)
 		local n = v6 and 180 or 45
 		HiddenEvent.fighting = fighting
 		WatchHiddenEnemy(fighting)
-
-		while true do local __brk = false repeat 
+		while true do local __brk = false repeat
 			task.wait()
-
 			if not fighting:FindFirstChild("HumanoidRootPart") then
 				__brk = true break
 			else
 				SizePart(fighting)
-
 				if not v6 then
 					BringMob(fighting)
 				end
-
 				UsedualFlock()
 				local humanoidRootPart = fighting:FindFirstChild("HumanoidRootPart")
-
 				if humanoidRootPart then
 					local cFrame = humanoidRootPart.CFrame
 					getgenv().AimPos = cFrame
 				end
-
 				HiddenMove(GetHiddenFarmCFrame(fighting))
 				getgenv().ClickM1(fighting, true)
 				if not (not IsHiddenTarget(fighting) or not IsSecretQuestOn() or tick() - now > n) then
@@ -14649,16 +13916,13 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				__brk = true break
 			end
 		until true if __brk then break end end
-
 		HiddenEvent.fighting = nil
 		StopHiddenDodge()
 	end
-
 	GetHiddenDialogueKey = function(arg)
 		local v6 = HiddenModules.NpcList.List[arg]
 		local tbl9 = {}
 		local fn = nil
-
 		fn = function(arg2, arg3)
 			if type(arg2) ~= "function" or tbl9[arg2] or arg3 > 3 then
 				return nil
@@ -14667,17 +13931,14 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			local ok, result = pcall(debug.getconstants, arg2)
 			local v7 = ipairs
 			local tbl10 = ok and result or {}
-
 			for _, v8 in v7(tbl10) do
 				if type(v8) == "string" and rawget(HiddenModules.Dialogues, v8) ~= nil then
 					return v8
 				end
 			end
-
 			local ok2, result2 = pcall(debug.getupvalues, arg2)
 			local v8 = pairs
 			result2 = ok2 and result2 or {}
-
 			for _, v9 in v8(result2) do
 				local flag = fn(v9, arg3 + 1) or type(v9) == "table" and fn(rawget(v9, "original"), arg3 + 1)
 				if flag then
@@ -14685,10 +13946,8 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		return fn(v6 and v6.DialogueCallback, 0)
 	end
-
 	FindHiddenNpc = function(arg, arg2)
 		for _, v6 in ipairs({ workspace.NPCs, ReplicatedStorage.NPCs }) do
 			for _, child in ipairs(v6:GetChildren()) do
@@ -14698,54 +13957,43 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end
 	end
-
 	ClaimHiddenReward = function()
 		local v6 = HiddenModules.Guide.getRewardTracker()
 		local target = v6 and v6.Options and v6.Options.Target
 		HiddenEvent.rewardSeen = HiddenEvent.rewardSeen or {}
-
 		if typeof(target) == "Vector3" then
 			HiddenEvent.rewardSeen[tostring(target)] = { position = target, time = tick() }
 		end
-
 		local rewardLock = HiddenEvent.rewardLock
 		local v7 = rewardLock and HiddenEvent.rewardSeen[tostring(rewardLock)]
 		local flag = not v7
 		local flag2
-
 		if flag then
 			flag2 = flag
 		else
 			local time_ = v7.time
 			flag2 = tick() - time_ > 8
 		end
-
 		if not flag2 then
 			flag2 = tick() < (HiddenEvent.skipped["Reward:" .. tostring(rewardLock)] or 0)
 		end
-
 		if flag2 then
 			local v8 = nil
 			rewardLock = nil
-
 			for k, v9 in pairs(HiddenEvent.rewardSeen) do
 				local v10 = localPlayer:DistanceFromCharacter(v9.position)
 				local time_ = v9.time
 				local flag3 = tick() - time_ <= 8
-
 				if flag3 then
 					flag3 = tick() >= (HiddenEvent.skipped["Reward:" .. k] or 0)
 				end
-
 				if flag3 and (not v8 or v10 < v8) then
 					rewardLock = v9.position
 					v8 = v10
 				end
 			end
-
 			HiddenEvent.rewardLock = rewardLock
 		end
-
 		if typeof(rewardLock) ~= "Vector3" then
 			return false
 		end
@@ -14757,37 +14005,29 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			HiddenGoTo(rewardLock + Vector3.new(0, 5, 0), 20)
 			return true
 		end
-
 		if HiddenSettle(rewardLock + Vector3.new(0, 1.5, 4), 10) then
 			HiddenEvent.dialogueBusy = tick() + 12
-
 			pcall(function()
 				local v9 = HiddenModules.NpcList.List[v8.Name].DialogueCallback()
-
 				if type(v9) == "table" and type(v9.Get) == "function" then
 					v9:Get()
 				end
 			end)
-
 			task.wait(1)
 			local v9 = HiddenModules.Guide.getRewardTracker()
 			local v10 = GetHiddenDialogueKey(v8.Name)
-
 			if v10 and v9 and v9.Options and v9.Options.Target == rewardLock then
 				HiddenModules.Guide.interactQuestGiver(v10)
 			end
-
 			HiddenEvent.checked = 0
 			HiddenEvent.rewardSeen[tostring(rewardLock)] = nil
 			HiddenEvent.rewardLock = nil
 			local flag3 = false
-
 			for i_ = 1, 8 do
 				task.wait(0.5)
 				local v11 = HiddenModules.Guide.getRewardTracker()
 				flag3 = flag3 or v11 and v11.Options and v11.Options.Target == rewardLock
 			end
-
 			if flag3 then
 				HiddenEvent.skipped["Reward:" .. reward] = tick() + 300
 				HiddenNotify("Could not claim the reward from " .. v8.Name .. ", retry later", nil, "warning")
@@ -14795,22 +14035,17 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				HiddenNotify("Claimed reward from " .. v8.Name, nil, "reward")
 			end
 		end
-
 		return true
 	end
-
 	EquipHiddenWeapon = function(arg)
 		local character = localPlayer.Character
 		local v6 = NameWeapon(arg, true)
 		local flag = not v6
-
 		if flag then
 			flag = os.clock() - (HiddenEvent.loadedWeapon or 0) > 5
 		end
-
 		if flag then
 			HiddenEvent.loadedWeapon = os.clock()
-
 			for _, v7 in ipairs(GetInventoryItems()) do
 				if v7.Type == arg then
 					CommF:InvokeServer("LoadItem", v7.Name)
@@ -14820,23 +14055,17 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		local flag2 = not v6 and arg == "Gun"
-
 		if flag2 then
 			flag2 = os.clock() - (HiddenEvent.boughtGun or 0) > 30
 		end
-
 		if flag2 then
 			HiddenEvent.boughtGun = os.clock()
 			VxezeNotify("Hidden Event", "No gun in backpack or inventory, buying a Slingshot for the quest", "info", { Key = "hiddenbuygun" })
-
 			pcall(function()
 				CommF:InvokeServer("BuyItem", "Slingshot")
 			end)
-
 			task.wait(1)
-
 			for _, v7 in ipairs(GetInventoryItems()) do
 				if v7.Type == "Gun" then
 					CommF:InvokeServer("LoadItem", v7.Name)
@@ -14844,25 +14073,19 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					break
 				end
 			end
-
 			v6 = NameWeapon(arg, true)
 		end
-
 		if v6 and v6.Parent ~= character then
 			character.Humanoid:EquipTool(v6)
 		end
-
 		return v6
 	end
-
 	GetHiddenState = function(arg, arg2)
 		HiddenEvent.states = HiddenEvent.states or {}
 		local tbl9 = HiddenEvent.states[arg]
-
 		if not tbl9 then
 			tbl9 = {}
 			HiddenEvent.states[arg] = tbl9
-
 			ListenHiddenMoment(arg, function(arg3, ...)
 				local v6 = tbl9
 				local v7 = table.pack(...)
@@ -14874,10 +14097,8 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				v8(table.unpack(v7, 1, v7.n))
 			end)
 		end
-
 		return tbl9
 	end
-
 	FindTaggedPartNear = function(arg, arg2)
 		for _, v6 in ipairs(game:GetService("CollectionService"):GetTagged("M1HitRegistry")) do
 			if (v6.Position - arg).Magnitude <= arg2 then
@@ -14885,49 +14106,40 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end
 	end
-
 	GetPrisonLocation = function(arg)
 		local bonusMomentLocations = workspace.Map.Prison:FindFirstChild("BonusMoment_Locations", true)
 		bonusMomentLocations = bonusMomentLocations and bonusMomentLocations:FindFirstChild(arg, true)
 		return bonusMomentLocations and bonusMomentLocations:GetPivot().Position
 	end
-
 	FindHiddenEnemyMatch = function(arg, arg2, arg3)
 		local huge = math.huge
 		local v6 = nil
-
 		for _, child in ipairs(workspace.Enemies:GetChildren()) do
 			if IsHiddenTarget(child) and (child:GetPivot().Position - arg2).Magnitude <= arg3 then
 				for _, v7 in ipairs(arg) do
 					if string.find(child.Name, v7, 1, true) then
 						local v8 = localPlayer:DistanceFromCharacter(child:GetPivot().Position)
-
 						if v8 < huge then
 							huge = v8
 							v6 = child
 						end
-
 						break
 					end
 				end
 			end
 		end
-
 		return v6
 	end
-
 	FindHiddenPromptNear = function(arg, arg2, arg3)
 		local v6, v7, v8 = ipairs(arg)
 		local v9 = nil
 		local v10 = nil
-
 		for _, v11 in v6, v7, v8 do
 			for _, descendant in ipairs(v11:GetDescendants()) do
 				if descendant:IsA("ProximityPrompt") and descendant.Enabled then
 					local parent = descendant.Parent
 					local worldPosition = parent:IsA("Attachment") and parent.WorldPosition or parent:IsA("BasePart") and parent.Position or parent:IsA("Model") and parent:GetPivot().Position
 					local magnitude = worldPosition and (worldPosition - arg2).Magnitude
-
 					if magnitude and magnitude <= arg3 and (not v9 or magnitude < v9) then
 						v9 = magnitude
 						v10 = descendant
@@ -14935,10 +14147,8 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		return v10
 	end
-
 	HoldHiddenPrompt = function(arg)
 		if not pcall(function()
 			arg:InputHoldBegin()
@@ -14948,28 +14158,23 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			pcall(fireproximityprompt, arg, arg.HoldDuration + 0.35)
 		end
 	end
-
 	FindTaggedPartIn = function(arg)
 		if not arg then
 			return nil
 		end
 		local v6 = nil
 		local v7 = nil
-
 		for _, v8 in ipairs(game:GetService("CollectionService"):GetTagged("M1HitRegistry")) do
 			if v8:IsDescendantOf(arg) then
 				local v9 = localPlayer:DistanceFromCharacter(v8.Position)
-
 				if not v6 or v9 < v6 then
 					v6 = v9
 					v7 = v8
 				end
 			end
 		end
-
 		return v7
 	end
-
 	GetNpcPosition = function(arg)
 		local v6 = workspace.NPCs:FindFirstChild(arg) or ReplicatedStorage.NPCs:FindFirstChild(arg)
 		if v6 then
@@ -14979,12 +14184,10 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		local instance = v7 and v7._modelState and v7._modelState._instance
 		return instance and instance:GetPivot().Position
 	end
-
 	HoistHiddenFlag = function(arg, arg2)
 		local humanoidRootPart = localPlayer.Character.HumanoidRootPart
 		local tbl9 = {}
 		local flag = false
-
 		local v6 = ListenHiddenMoment("Fortress Flagpole", function(arg3, arg4, arg5, arg6)
 			if arg3 == "Shell" and typeof(arg4) == "Vector3" then
 				table.insert(tbl9, { position = arg4, time = tick() + (arg5 or 1.4), radius = arg6 or 9 })
@@ -14992,42 +14195,33 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				flag = true
 			end
 		end)
-
 		arg:FireServer("Hoist")
 		local now = tick()
 		local v7 = arg2
-
 		while IsSecretQuestOn() and not flag and tick() - now < 100 and humanoidRootPart.Parent do
 			task.wait(0.05)
 			local flag2 = false
-
 			for _, v8 in ipairs(tbl9) do
 				local vector = Vector3.new(v7.X - v8.position.X, 0, v7.Z - v8.position.Z)
-
 				if not flag2 then
 					local n = v8.time + 0.5
 					flag2 = tick() < n and vector.Magnitude < v8.radius + 4
 				end
 			end
-
 			if flag2 then
 				local v8 = nil
-
 				for i_ = 0, 330, 30 do
 					for _, v9 in ipairs({ 2, 7, 12, 15 }) do
 						local n = arg2 + Vector3.new(math.cos(math.rad(i_)) * v9, 0, math.sin(math.rad(i_)) * v9)
 						local v10, v11, v12 = ipairs(tbl9)
 						local huge = math.huge
-
 						for _, v13 in v10, v11, v12 do
 							local n3 = v13.time + 0.5
-
 							if tick() < n3 then
 								local radius = v13.radius
 								huge = math.min(huge, Vector3.new(n.X - v13.position.X, 0, n.Z - v13.position.Z).Magnitude - radius)
 							end
 						end
-
 						if not v8 or huge > v8 then
 							v8 = huge
 							v7 = n
@@ -15035,59 +14229,47 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					end
 				end
 			end
-
 			if (humanoidRootPart.Position - v7).Magnitude > 1.5 then
 				humanoidRootPart.CFrame = CFrame.new(v7)
 			end
-
 			humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
-
 			for i_ = #tbl9, 1, -1 do
 				if tbl9[i_].time + 1.5 < tick() then
 					table.remove(tbl9, i_)
 				end
 			end
 		end
-
 		v6:Disconnect()
 		HiddenEvent.checked = 0
 	end
-
 	TalkHiddenNpc = function(arg, arg2)
 		local DialogueController = require(ReplicatedStorage.DialogueController)
 		HiddenEvent.talking = tick() + 25
-
 		local function fn()
 			local v6 = DialogueController.getActiveDialogue()
 			return v6 and v6._pageStack[#v6._pageStack]
 		end
-
 		pcall(DialogueController.close)
 		task.wait(0.3)
 		task.spawn(pcall, DialogueController.start, HiddenModules.NpcList.List[arg].DialogueCallback())
 		local now = tick()
 		local n = 0
-
-		while true do local __brk = false repeat 
+		while true do local __brk = false repeat
 			if tick() - now < 20 and n < #arg2 then
 				task.wait(0.4)
 				local v6 = fn()
-
 				if v6 then
 					local options2 = v6._options or {}
-
 					if #options2 == 0 then
 						pcall(DialogueController.advance)
 						break
 					else
 						local v7 = nil
-
 						for _, v8 in ipairs(options2) do
 							if table.concat(v8._text or {}, " ") == arg2[n + 1] then
 								v7 = v8
 							end
 						end
-
 						if v7 then
 							n = n + (1)
 							DialogueController.select(v7)
@@ -15099,15 +14281,12 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					break
 				end
 			end
-
 			__brk = true break
 		until true if __brk then break end end
-
 		task.wait(1)
 		pcall(DialogueController.close)
 		return n == #arg2
 	end
-
 	RunHiddenTempleIntel = function(arg)
 		local v6 = GetHiddenState("Temple Intel", function(arg2, arg3, arg4, arg5)
 			if arg3 == "Reveal" then
@@ -15121,11 +14300,9 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				arg2.carrying = false
 			end
 		end)
-
 		if not rawget(arg, "HiddenGuard") then
 			local fireServer = arg.FireServer
 			arg.HiddenGuard = true
-
 			arg.FireServer = function(arg2, arg3, ...)
 				if arg3 == "Struck" then
 					return
@@ -15139,35 +14316,27 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return v8(table.unpack(v7, 1, v7.n))
 			end
 		end
-
 		if v6.carrying or v6.storm then
 			local v7 = GetNpcPosition("Sky Quest Giver 2")
-
 			if v7 and HiddenSettle(v7 + Vector3.new(0, 1.5, 4), 10) then
 				TalkHiddenNpc("Sky Quest Giver 2", { "The old temple", "Hand over the Intel" })
 				HiddenEvent.checked = 0
 				v6.carrying = false
 			end
-
 			return "Bring the Intel back to Sky Quest Giver 2"
 		end
-
 		local flag = not v6.revealed
-
 		if not flag then
 			local revealed = v6.revealed
 			flag = tick() - revealed > 6
 		end
-
 		if flag then
 			if HiddenSettle(Vector3.new(-7389.5, 5599, 339) + Vector3.new(0, 6, 0), 10) then
 				local arrived = HiddenEvent.arrived
-
 				if tick() - arrived > 9 then
 					HiddenEvent.arrived = nil
 					local v7 = GetNpcPosition("Sky Quest Giver 2")
 					local now = tick()
-
 					while IsSecretQuestOn() and tick() - now < 60 do
 						task.wait(0.3)
 						if v7 and HiddenSettle(v7 + Vector3.new(0, 1.5, 4), 10) then
@@ -15175,49 +14344,39 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 							return "Accept The old temple quest"
 						end
 					end
-
 					return "Accept The old temple quest"
 				end
 			end
-
 			return "Enter the old temple"
 		end
-
 		if not HiddenSettle(Vector3.new(-7389.5, 5599, 339) + Vector3.new(0, 6, 0), 10) then
 			HiddenEvent.stallGrace = tick() + 5
 			return "Go back into the old temple"
 		end
-
 		if not v6.solved then
 			arg:FireServer("Solved")
 			task.wait(2)
 			return "Turn the coils"
 		end
-
 		if arg:InvokeServer("TakeIntel") == true then
 			v6.carrying = true
 			HiddenNotify("Took the Intel, running back", nil, "found")
 		end
-
 		return "Take the Intel"
 	end
-
 	RunHiddenLookout = function(arg)
 		local response = arg:InvokeServer("StartAttempt")
 		if type(response) ~= "table" or type(response.Token) ~= "string" or type(response.Manifest) ~= "table" then
 			return "Captain is not ready for lookout duty", true
 		end
 		local response2
-
-		while IsSecretQuestOn() do repeat 
+		while IsSecretQuestOn() do repeat
 			local str2 = "/4: watching " .. #response.Manifest .. " ships"
 			SetHiddenStep("Lookout round " .. tostring(response.Round) .. str2)
 			local now = tick()
-
-			while true do local __brk = false repeat 
+			while true do local __brk = false repeat
 				response2 = arg:InvokeServer("ObservationFinished", response.Token)
 				local v6 = nil
-
 				if type(response2) ~= "table" then
 					response2 = v6
 					__brk = true break
@@ -15229,63 +14388,51 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 							break
 						end
 					end
-
 					__brk = true break
 				end
 			until true if __brk then break end end
-
 			if not response2 then
 				arg:InvokeServer("AbortAttempt", response.Token)
 				return "Lookout observation failed, retrying", true
 			end
 			local n = 0
-
 			for _, v6 in ipairs(response.Manifest) do
 				if v6.Boat == response2.TargetBoat and v6.FlagColor == response2.TargetFlagColor then
 					n = n + (1)
 				end
 			end
-
 			local response3 = arg:InvokeServer("SubmitAnswer", response.Token, n)
 			if type(response3) ~= "table" then
 				return "Lookout answer was rejected", true
 			end
-
 			if response3.Correct ~= true then
 				if type(response3.FinaleToken) == "string" then
 					arg:InvokeServer("FinishFinale", response3.FinaleToken)
 				end
-
 				HiddenNotify("Lookout miscounted (" .. n .. " " .. tostring(response2.TargetFlagColor) .. " " .. tostring(response2.TargetBoat) .. "), retrying", nil, "warning")
 				return "Lookout miscount, retrying"
 			end
-
 			if type(response3.NextRound) == "table" and type(response3.NextRound.Token) == "string" then
 				response = response3.NextRound
 				task.wait(1.25)
 				break
 			end
-
 			if type(response3.FinaleToken) == "string" then
 				arg:InvokeServer("FinishFinale", response3.FinaleToken)
 			end
-
 			HiddenModules.Guide.interactQuestGiver("TravelDressrosa")
 			HiddenEvent.checked = 0
 			HiddenNotify("Lookout duty complete", nil, "success")
 			return "Lookout duty complete"
 		until true end
-
 		return "Lookout stopped"
 	end
-
 	BuildHiddenSnowman = function(arg)
 		if not HiddenSettle(Vector3.new(1300, 60, -1450), 40) then
 			return "Go to the Frozen Village square"
 		end
 		local tbl9 = {}
 		local flag = false
-
 		local Snowman = ListenHiddenMoment("Snowman", function(arg2, arg3)
 			if arg2 == "Setup" and type(arg3) == "table" then
 				for k, v6 in pairs(arg3) do
@@ -15295,7 +14442,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				flag = true
 			end
 		end)
-
 		arg:FireServer("Init")
 		task.wait(3)
 		if not next(tbl9) then
@@ -15308,23 +14454,18 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		local tbl10 = {}
 		local tbl11 = {}
 		HiddenEvent.snowSequence = (HiddenEvent.snowSequence or 0) + 1000
-
 		local function fn()
 			local v6 = HiddenEvent
 			v6.snowSequence = v6.snowSequence + 1
 			local tbl12 = {}
-
 			for _, v7 in ipairs(tbl10) do
 				table.insert(tbl12, { i = v7.i, c = v7.c, d = v7.d })
 			end
-
 			snowmanBallRemote:FireServer(HiddenEvent.snowSequence, tbl12)
 		end
-
 		local function fn2(arg2)
 			local now = tick()
 			HiddenEvent.arrived = nil
-
 			while IsSecretQuestOn() and tick() - now < 60 do
 				task.wait(0.1)
 				fn()
@@ -15333,11 +14474,9 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		local n = 0
 		local cframe = nil
-
-		for k, v6 in pairs(tbl9) do local __brk = false repeat 
+		for k, v6 in pairs(tbl9) do local __brk = false repeat
 			if not (not IsSecretQuestOn() or not fn2(v6.Position + Vector3.new(0, 3, 0))) then
 				SetHiddenStep("Roll snowball " .. n + 1 .. "/3")
 				arg:FireServer("GrabSnowball", k)
@@ -15346,14 +14485,12 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				table.insert(tbl10, tbl12)
 				local n3 = humanoidRootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
 				local vector = n3.Magnitude < 0.1 and Vector3.new(0, 0, -1) or n3.Unit
-
 				for i_ = 3.5, 315, 3.5 do
 					task.wait(0.066666666666666666)
 					tbl12.d = math.clamp(i_ / 300, 0, 1) * 10 + 5
 					tbl12.c = CFrame.new(humanoidRootPart.Position + vector * (tbl12.d / 2 + 2.5))
 					fn()
 				end
-
 				if not cframe then
 					cframe = CFrame.new(tbl12.c.Position - Vector3.new(0, tbl12.d / 2, 0))
 				else
@@ -15363,35 +14500,27 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					fn()
 					task.wait(0.2)
 					table.insert(tbl11, 15)
-
 					if #tbl11 == 1 then
 						table.insert(tbl11, 15)
 					end
-
 					tbl10 = {}
 					fn()
 					snowmanStackRemote:FireServer(tbl11, cframe)
 				end
-
 				task.wait(1)
 				break
 			end
-
 			__brk = true break
 		until true if __brk then break end end
-
 		local now = tick()
-
-		while true do local __brk = false repeat 
+		while true do local __brk = false repeat
 			task.wait(0.5)
 			if not (flag or tick() - now > 8) then
 				break
 			end
 			__brk = true break
 		until true if __brk then break end end
-
 		Snowman:Disconnect()
-
 		if flag then
 			task.wait(2)
 			arg:FireServer("Finished")
@@ -15399,29 +14528,23 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			HiddenNotify("Snowman is alive again", nil, "found")
 			return "Snowman built"
 		end
-
 		tbl10 = {}
 		fn()
 		return "Snowman failed, retrying", true
 	end
-
 	FaceHiddenTarget = function(arg)
 		local humanoidRootPart = localPlayer.Character.HumanoidRootPart
 		humanoidRootPart.CFrame = CFrame.lookAt(humanoidRootPart.Position, Vector3.new(arg.X, humanoidRootPart.Position.Y, arg.Z))
 		workspace.CurrentCamera.CFrame = CFrame.lookAt(humanoidRootPart.Position + Vector3.new(0, 2, 0), arg)
 	end
-
 	GetHiddenFruitM1 = function()
 		local v6 = NameWeapon("Blox Fruit")
 		local character = localPlayer.Character
-
 		if v6 then
 			v6 = character and character:FindFirstChild(v6) or localPlayer.Backpack:FindFirstChild(v6)
 		end
-
 		return v6
 	end
-
 	NotifyHiddenFruitM1 = function(arg)
 		if os.clock() - (HiddenEvent.fruitNotified or -300) < 300 then
 			return
@@ -15430,7 +14553,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		local value = localPlayer.Data.DevilFruit.Value
 		VxezeNotify("Hidden Event", (value == "" and "You have no Blox Fruit" or value .. " has no M1 attack") .. ", please eat a Blox Fruit that has M1 (left click) for " .. arg, "warning", { Duration = 10 })
 	end
-
 	FindHiddenFruitTool = function()
 		for _, v6 in ipairs({ localPlayer.Backpack, localPlayer.Character }) do
 			for _, child in ipairs(v6:GetChildren()) do
@@ -15440,17 +14562,14 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end
 	end
-
 	EnsureHiddenFruit = function(arg)
 		if GetHiddenFruitM1() then
 			return true
 		end
-
 		if localPlayer.Data.DevilFruit.Value ~= "" then
 			return false, "your eaten fruit has no M1 attack"
 		end
 		local v6 = FindHiddenFruitTool()
-
 		if not v6 then
 			local v7 = TakeFruitInventory()
 			if not v7 then
@@ -15459,8 +14578,7 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			VxezeNotify("Hidden Event", "Loading " .. v7 .. " from inventory to eat for " .. tostring(arg), "info", { Key = "hiddenloadfruit" })
 			game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("LoadFruit", v7)
 			local now = tick()
-
-			while true do local __brk = false repeat 
+			while true do local __brk = false repeat
 				task.wait(0.3)
 				v6 = FindHiddenFruitTool()
 				if not (v6 or tick() - now > 4) then
@@ -15468,35 +14586,28 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 				__brk = true break
 			until true if __brk then break end end
-
 			if not v6 then
 				return false, "could not load a Blox Fruit from inventory, skipping this quest"
 			end
 		end
-
 		pcall(function()
 			localPlayer.Character.Humanoid:EquipTool(v6)
 		end)
-
 		task.wait(0.4)
 		local eatRemote = v6:FindFirstChild("EatRemote")
-
 		if eatRemote then
 			pcall(function()
 				eatRemote:InvokeServer("Eat")
 			end)
 		end
-
 		local now = tick()
-
-		while true do local __brk = false repeat 
+		while true do local __brk = false repeat
 			task.wait(0.3)
 			if not (localPlayer.Data.DevilFruit.Value ~= "" or tick() - now > 4) then
 				break
 			end
 			__brk = true break
 		until true if __brk then break end end
-
 		if localPlayer.Data.DevilFruit.Value == "" then
 			return false, "could not eat the Blox Fruit, skipping this quest"
 		end
@@ -15507,7 +14618,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		end
 		return true
 	end
-
 	UseHiddenSkillAt = function(arg)
 		if not EquipHiddenWeapon("Blox Fruit") then
 			return false
@@ -15515,7 +14625,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		local skills = localPlayer.PlayerGui.Main:FindFirstChild("Skills")
 		skills = skills and skills:FindFirstChild(localPlayer.Data.DevilFruit.Value)
 		local v6 = nil
-
 		for _, v7 in ipairs({ "Z", "X", "C", "V", "F" }) do
 			local v8 = skills and skills:FindFirstChild(v7)
 			local title = v8 and v8:FindFirstChild("Title")
@@ -15525,49 +14634,39 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				break
 			end
 		end
-
 		if not skills then
 			HiddenEvent.skillIndex = (HiddenEvent.skillIndex or 0) % 4 + 1
 			v6 = ({ "Z", "X", "C", "V" })[HiddenEvent.skillIndex]
 		end
-
 		if not v6 then
 			task.wait(0.5)
 			return true
 		end
 		FaceHiddenTarget(arg.Position)
-
 		pcall(function()
 			VirtualInputManager:SendKeyEvent(true, v6, false, game)
 		end)
-
 		task.wait(0.1)
-
 		pcall(function()
 			VirtualInputManager:SendKeyEvent(false, v6, false, game)
 		end)
-
 		task.wait(1.5)
 		return true
 	end
-
 	ShootHiddenGunAt = function(arg)
 		local Gun = EquipHiddenWeapon("Gun")
 		local flag = not Gun
 		local flag2
-
 		if flag then
 			flag2 = os.clock() - (HiddenEvent.boughtGun or 0) > 30
 		else
 			flag2 = flag
 		end
-
 		if flag2 then
 			HiddenEvent.boughtGun = os.clock()
 			CommF:InvokeServer("BuyItem", "Slingshot")
 			return false
 		end
-
 		if flag then
 			return false
 		end
@@ -15575,10 +14674,8 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		task.wait(0.1)
 		local v6 = workspace.CurrentCamera:WorldToViewportPoint(arg.Position)
 		local v7 = getupvalues(require(ReplicatedStorage.Controllers.CombatController).Attack)[9]
-
 		if type(v7) == "function" and debug.info(v7, "n") == "shootGun" and Gun.Parent == localPlayer.Character then
 			local guiInset = game:GetService("GuiService"):GetGuiInset()
-
 			pcall(v7, Gun, {
 				UserInputType = Enum.UserInputType.Touch,
 				Position = Vector3.new(v6.X - guiInset.X, v6.Y - guiInset.Y, 0),
@@ -15587,33 +14684,25 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			pcall(function()
 				VirtualInputManager:SendMouseButtonEvent(v6.X, v6.Y, 0, true, game, 0)
 			end)
-
 			task.wait(0.05)
-
 			pcall(function()
 				VirtualInputManager:SendMouseButtonEvent(v6.X, v6.Y, 0, false, game, 0)
 			end)
 		end
-
 		task.wait(1.2)
 		return true
 	end
-
 	GetHiddenRaidHint = function()
 		local flag = not HiddenEvent.hint
-
 		if not flag then
 			local time_ = HiddenEvent.hint.time
 			flag = tick() - time_ > 20
 		end
-
 		if flag then
 			local ok, result = pcall(function()
 				return ReplicatedStorage.Modules.Net["RF/RequestNextRaidHint"]:InvokeServer()
 			end)
-
 			HiddenEvent.hint = { time = tick(), data = ok and type(result) == "table" and result or {} }
-
 			if HiddenEvent.hint.data.Island and tonumber(HiddenEvent.hint.data.Seconds) then
 				HiddenEvent.expectedBoss = {
 					key = os.date("!%Y%m%d%H", os.time() + tonumber(HiddenEvent.hint.data.Seconds) + 5),
@@ -15621,18 +14710,15 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				}
 			end
 		end
-
 		local expectedBoss = HiddenEvent.expectedBoss
 		if not HiddenEvent.hint.data.Island and expectedBoss and expectedBoss.key == os.date("!%Y%m%d%H") and os.date("!*t").min < 8 then
 			return { Island = expectedBoss.hint.Island, Boss = expectedBoss.hint.Boss, State = "Triggered", Seconds = 0 }
 		end
 		return HiddenEvent.hint.data
 	end
-
 	FindHiddenBoss = function(arg, arg2)
 		for _, child in ipairs(workspace.Enemies:GetChildren()) do
 			local position = child:GetPivot().Position
-
 			if IsHiddenTarget(child) and ((position - arg2).Magnitude < 1500 or localPlayer:DistanceFromCharacter(position) < 1500) then
 				for _, v6 in ipairs(arg) do
 					if string.find(child.Name, v6, 1, true) then
@@ -15642,18 +14728,15 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end
 	end
-
 	GetChargedClouds = function()
 		return GetHiddenState("Electric Fighting Teacher", function(arg, arg2, arg3, arg4)
 			if arg2 == "Charge" and typeof(arg3) == "Instance" then
 				arg[arg3] = arg[arg3] or {}
-
 				if typeof(arg4) == "Instance" and not table.find(arg[arg3], arg4) then
 					table.insert(arg[arg3], arg4)
 				end
 			elseif arg2 == "Split" and typeof(arg3) == "Instance" and type(arg4) == "table" then
 				arg[arg3] = arg[arg3] or {}
-
 				for _, v6 in ipairs(arg4) do
 					table.insert(arg[arg3], v6)
 				end
@@ -15662,11 +14745,9 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end)
 	end
-
 	HitChargedCloud = function()
 		for k, v6 in pairs(GetChargedClouds()) do
 			local M1HitRegistry = nil
-
 			for _, v7 in ipairs(v6) do
 				if v7.Parent and v7:HasTag("M1HitRegistry") then
 					M1HitRegistry = v7
@@ -15675,7 +14756,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					M1HitRegistry = nil
 				end
 			end
-
 			M1HitRegistry = M1HitRegistry or k.Parent and k:HasTag("M1HitRegistry") and k
 			if M1HitRegistry then
 				HitHiddenPart(M1HitRegistry)
@@ -15684,43 +14764,33 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			GetChargedClouds()[k] = nil
 		end
 	end
-
 	PlayHiddenBellTune = function(arg, arg2)
 		for i_, note in ipairs(arg.notes) do
 			local str2 = tostring(note)
 			local n = arg.start + (i_ - 1) * arg.beat
 			local v6 = workspace
 			local n3 = n + arg.good
-
 			if v6:GetServerTimeNow() <= n3 then
 				if str2 == "Fruit" and not GetHiddenFruitM1() then
 					pcall(EnsureHiddenFruit, "Echoes Through the Clouds")
 				end
-
 				local v7 = EquipHiddenWeapon(str2 == "Fruit" and "Blox Fruit" or str2)
-
-				while true do local __brk = false repeat 
+				while true do local __brk = false repeat
 					task.wait()
-
 					if v7 and v7.Parent ~= localPlayer.Character then
 						pcall(localPlayer.Character.Humanoid.EquipTool, localPlayer.Character.Humanoid, v7)
 					end
-
 					if not (workspace:GetServerTimeNow() >= n - 0.08 or not IsSecretQuestOn()) then
 						break
 					end
 					__brk = true break
 				until true if __brk then break end end
-
 				FaceHiddenTarget(arg2.Position)
-
 				if str2 == "Gun" and v7 then
 					local v8 = workspace.CurrentCamera:WorldToViewportPoint(arg2.Position)
 					local v9 = getupvalues(require(ReplicatedStorage.Controllers.CombatController).Attack)[9]
-
 					if type(v9) == "function" and v7.Parent == localPlayer.Character then
 						local guiInset = game:GetService("GuiService"):GetGuiInset()
-
 						pcall(v9, v7, {
 							UserInputType = Enum.UserInputType.Touch,
 							Position = Vector3.new(v8.X - guiInset.X, v8.Y - guiInset.Y, 0),
@@ -15729,7 +14799,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						pcall(function()
 							VirtualInputManager:SendMouseButtonEvent(v8.X, v8.Y, 0, true, game, 0)
 						end)
-
 						pcall(function()
 							VirtualInputManager:SendMouseButtonEvent(v8.X, v8.Y, 0, false, game, 0)
 						end)
@@ -15738,42 +14807,34 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					pcall(function()
 						VirtualInputManager:SendKeyEvent(true, "Z", false, game)
 					end)
-
 					pcall(function()
 						VirtualInputManager:SendKeyEvent(false, "Z", false, game)
 					end)
 				elseif str2 == "Fruit" then
 					NotifyHiddenFruitM1("Echoes Through the Clouds")
 				end
-
 				if str2 ~= "Gun" then
 					HiddenModules.RegisterAttack:FireServer(0.3)
 					HiddenModules.RegisterHit:FireServer(arg2)
 				end
 			end
 		end
-
 		HiddenEvent.bellQuiet = tick() + 6
 		task.wait(1)
 	end
-
 	FindHiddenRaidShip = function(arg)
 		local v6 = nil
 		local v7
-
 		local function fn(arg2)
 			for _, child in ipairs(arg2:GetChildren()) do
 				if child:IsA("Model") and child ~= workspace.Map then
 					local v8 = string.lower(child.Name)
-
 					if string.find(v8, "ship", 1, true) or string.find(v8, "brigade", 1, true) or string.find(v8, "galleon", 1, true) or string.find(v8, "boat", 1, true) then
 						local ok, result = pcall(function()
 							return child:GetPivot().Position
 						end)
-
 						if ok then
 							local magnitude = (result - arg).Magnitude
-
 							if magnitude < 2500 and (not v7 or magnitude < v7) then
 								v6 = child
 								v7 = magnitude
@@ -15783,26 +14844,21 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		fn(workspace)
 		fn(workspace.Map)
 		fn(workspace.Enemies)
 		return v6
 	end
-
 	ListHiddenRaidShips = function(arg)
 		local tbl9 = {}
-
 		local function fn(arg2)
 			for _, child in ipairs(arg2:GetChildren()) do
 				if child:IsA("Model") and child ~= workspace.Map then
 					local v6 = string.lower(child.Name)
-
 					if string.find(v6, "brigade", 1, true) or string.find(v6, "ship", 1, true) or string.find(v6, "galleon", 1, true) then
 						local ok, result = pcall(function()
 							return child:GetPivot().Position
 						end)
-
 						if ok and (result - arg).Magnitude < 3000 then
 							table.insert(tbl9, { model = child, pos = result, dist = (result - arg).Magnitude })
 						end
@@ -15810,38 +14866,30 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		fn(workspace.Enemies)
 		fn(workspace)
 		fn(workspace.Map)
-
 		table.sort(tbl9, function(arg2, arg3)
 			return arg2.dist < arg3.dist
 		end)
-
 		return tbl9
 	end
-
 	ListenHiddenRaidChat = function()
 		if HiddenEvent.raidChat then
 			return
 		end
 		local tbl9 = {}
-
 		for _, descendant in ipairs(ReplicatedStorage:GetDescendants()) do
 			if (descendant:IsA("RemoteEvent") or descendant:IsA("UnreliableRemoteEvent")) and string.find(descendant.Name, "Chat", 1, true) then
 				table.insert(tbl9, descendant)
 			end
 		end
-
 		if #tbl9 == 0 then
 			return
 		end
 		HiddenEvent.raidChat = true
-
 		local function fn(...)
 			local str2 = ""
-
 			local function fn2(arg)
 				if type(arg) == "string" then
 					str2 = str2 .. (" " .. arg)
@@ -15853,34 +14901,27 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					end
 				end
 			end
-
 			for _, v6 in ipairs({ ... }) do
 				fn2(v6)
 			end
-
 			str2 = string.lower(str2)
-
 			if string.find(str2, "pirate sails", 1, true) or string.find(str2, "fleet will be", 1, true) or string.find(str2, "lookouts have spotted", 1, true) then
 				HiddenEvent.raidWarn = tick()
 				HiddenNotify("Pirate fleet spotted, manning the fortress cannons", "raidwarn" .. math.floor(tick() / 60), "found")
 			end
 		end
-
 		for _, v6 in ipairs(tbl9) do
 			v6.OnClientEvent:Connect(fn)
 		end
 	end
-
 	GetCannonAimState = function(arg)
 		if HiddenEvent.cannonState and HiddenEvent.cannonState.seat == arg then
 			return HiddenEvent.cannonState
 		end
-
 		if tick() - (HiddenEvent.cannonScanAt or 0) < 3 then
 			return nil
 		end
 		HiddenEvent.cannonScanAt = tick()
-
 		for _, v6 in pairs(getgc(true)) do
 			if type(v6) == "table" and rawget(v6, "targetYaw") ~= nil and rawget(v6, "seat") == arg then
 				HiddenEvent.cannonState = v6
@@ -15888,7 +14929,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end
 	end
-
 	SetCannonAim = function(arg, arg2)
 		local center = arg.center
 		local position = arg.seat.Position
@@ -15911,65 +14951,52 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		arg.yawVel = 0
 		local model = arg.model
 		local parent
-
 		if model then
 			parent = model
 		else
 			parent = arg.seat and arg.seat.Parent
 		end
-
 		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 		remotes = remotes and remotes:FindFirstChild("MarineBusterAim")
 		local flag = parent and remotes
-
 		if flag then
 			flag = tick() - (HiddenEvent.cannonRelay or 0) > 0.05
 		end
-
 		if flag then
 			HiddenEvent.cannonRelay = tick()
-
 			pcall(function()
 				remotes:FireServer(parent, targetYaw, targetPitch)
 			end)
 		end
 	end
-
 	AimHiddenCannon = function(cannonTarget)
 		local bonusMomentLocations = workspace.Map.MarineBase:FindFirstChild("BonusMoment_Locations")
 		local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
 		local seatPart = humanoid and humanoid.SeatPart
-
 		if not seatPart or seatPart.Parent.Name ~= "MarineBusterCannon" then
 			local v6 = ipairs
 			bonusMomentLocations = bonusMomentLocations and bonusMomentLocations:GetChildren() or {}
 			local v7 = nil
 			seatPart = nil
-
 			for _, bonusMomentLocation in v6(bonusMomentLocations) do
 				local seat = bonusMomentLocation.Name == "MarineBusterCannon" and bonusMomentLocation:FindFirstChild("Seat")
 				local flag
-
 				if seat then
 					flag = not seat.Occupant or seat.Occupant.Parent == localPlayer.Character
 				else
 					flag = seat
 				end
-
 				if flag then
 					local magnitude = (seat.Position - cannonTarget).Magnitude
-
 					if not v7 or magnitude < v7 then
 						v7 = magnitude
 						seatPart = seat
 					end
 				end
 			end
-
 			if not seatPart then
 				return false
 			end
-
 			if localPlayer:DistanceFromCharacter(seatPart.Position) > 10 then
 				HiddenMove(seatPart.CFrame * CFrame.new(0, 4, 0))
 				return true
@@ -15982,47 +15009,38 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			task.wait(0.6)
 			HiddenEvent.cannonState = nil
 		end
-
 		local v6 = GetCannonAimState(seatPart)
 		if not v6 then
 			return false
 		end
 		HiddenEvent.cannonTarget = cannonTarget
-
 		if not HiddenEvent.cannonLoop then
 			HiddenEvent.cannonLoop = game:GetService("RunService").RenderStepped:Connect(function(...) end)
 		end
-
 		pcall(SetCannonAim, v6, cannonTarget)
 		task.wait(0.2)
 		return true
 	end
-
 	FireHiddenCannon = function(arg)
 		local bonusMomentLocations = workspace.Map.MarineBase:FindFirstChild("BonusMoment_Locations")
 		local v6 = ipairs
 		bonusMomentLocations = bonusMomentLocations and bonusMomentLocations:GetChildren() or {}
 		local v7 = nil
 		local v8 = nil
-
 		for _, bonusMomentLocation in v6(bonusMomentLocations) do
 			local seat = bonusMomentLocation.Name == "MarineBusterCannon" and bonusMomentLocation:FindFirstChild("Seat")
-
 			if seat and (not seat.Occupant or seat.Occupant.Parent == localPlayer.Character) then
 				local magnitude = (seat.Position - arg).Magnitude
-
 				if not v7 or magnitude < v7 then
 					v7 = magnitude
 					v8 = seat
 				end
 			end
 		end
-
 		if not v8 then
 			return false
 		end
 		local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
-
 		if humanoid.SeatPart ~= v8 then
 			if localPlayer:DistanceFromCharacter(v8.Position) > 8 then
 				HiddenMove(v8.CFrame * CFrame.new(0, 3, 0))
@@ -16035,74 +15053,58 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			v8:Sit(humanoid)
 			task.wait(0.5)
 		end
-
 		local currentCamera = workspace.CurrentCamera
 		currentCamera.CFrame = CFrame.lookAt(v8.Position + Vector3.new(0, 12, 0) + (v8.Position - arg).Unit * 10, arg)
 		task.wait(0.1)
 		local v9, v10 = currentCamera:WorldToViewportPoint(arg)
-
 		if v10 then
 			pcall(function()
 				VirtualInputManager:SendMouseButtonEvent(v9.X, v9.Y, 0, true, game, 0)
 			end)
-
 			task.wait(0.05)
-
 			pcall(function()
 				VirtualInputManager:SendMouseButtonEvent(v9.X, v9.Y, 0, false, game, 0)
 			end)
 		end
-
 		task.wait(0.6)
 		return true
 	end
-
 	ShootHiddenCannon = function(arg)
 		local humanoid = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid")
 		humanoid = humanoid and humanoid.SeatPart
 		if not humanoid or humanoid.Parent.Name ~= "MarineBusterCannon" then
 			return false
 		end
-
 		if tick() - (HiddenEvent.cannonShot or 0) < 1.2 then
 			return true
 		end
 		local currentCamera = workspace.CurrentCamera
 		local v6, v7 = currentCamera:WorldToViewportPoint(arg)
-
 		if not v7 then
 			currentCamera.CFrame = CFrame.lookAt(humanoid.Position + Vector3.new(0, 10, 0) + (humanoid.Position - arg).Unit * 8, arg)
 			task.wait(0.12)
 			v6, v7 = currentCamera:WorldToViewportPoint(arg)
 		end
-
 		if not v7 then
 			return false
 		end
 		HiddenEvent.cannonShot = tick()
-
 		pcall(function()
 			VirtualInputManager:SendMouseButtonEvent(v6.X, v6.Y, 0, true, game, 0)
 		end)
-
 		task.wait(0.06)
-
 		pcall(function()
 			VirtualInputManager:SendMouseButtonEvent(v6.X, v6.Y, 0, false, game, 0)
 		end)
-
 		return true
 	end
-
 	LeaveHiddenCannon = function()
 		local humanoid = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid")
-
 		if humanoid and humanoid.SeatPart and humanoid.SeatPart.Parent.Name == "MarineBusterCannon" then
 			humanoid.Sit = false
 			humanoid.Jump = true
 		end
 	end
-
 	AttackHiddenSpot = function(arg)
 		if localPlayer:DistanceFromCharacter(arg.Position) > 10 then
 			HiddenMove(arg.CFrame * CFrame.new(0, 4, 4))
@@ -16110,14 +15112,12 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		end
 		HiddenHold(arg.CFrame * CFrame.new(0, 4, 4))
 		EquipHiddenWeapon("Melee")
-
 		if os.clock() - (HiddenEvent.lastHit or 0) >= 0.4 then
 			HiddenEvent.lastHit = os.clock()
 			HiddenModules.RegisterAttack:FireServer(0.3)
 			HiddenModules.RegisterHit:FireServer(arg)
 		end
 	end
-
 	RunMagmaOreCave = function()
 		local magmaCave = workspace.Map:FindFirstChild("MagmaCave")
 		local humanoidRootPart = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -16129,7 +15129,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		if not bonusMomentLocations or (humanoidRootPart.Position - bonusMomentLocations.Position).Magnitude > 1500 then
 			return
 		end
-
 		for _, child in ipairs(workspace.Enemies:GetChildren()) do
 			if child.Name == "Magma Drill" and IsHiddenTarget(child) then
 				KillHiddenEnemy(child)
@@ -16138,41 +15137,33 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end
 	end
-
 	FindAwakenedBoss = function(arg, arg2)
 		for _, child in ipairs(workspace.Enemies:GetChildren()) do
 			if child:GetAttribute("BossIndicatorAwakened") and IsHiddenTarget(child) then
 				local flag = true
-
 				if arg2 then
 					flag = false
-
 					for _, v6 in ipairs(arg2) do
 						if string.find(child.Name, v6, 1, true) then
 							flag = true
 						end
 					end
 				end
-
 				if flag and (not arg or (child:GetPivot().Position - arg).Magnitude < 3000) then
 					return child
 				end
 			end
 		end
 	end
-
 	HitHiddenTriggers = function(arg, arg2)
 		local v6 = nil
 		local v7 = nil
-
 		for _, v8 in ipairs(arg) do
 			local descendants = v8 and v8:GetDescendants() or {}
 			table.insert(descendants, v8)
-
 			for _, descendant in ipairs(descendants) do
 				if descendant:IsA("BasePart") and descendant:HasTag("M1HitRegistry") and (arg2 or descendant.Transparency < 1) then
 					local v9 = localPlayer:DistanceFromCharacter(descendant.Position)
-
 					if not v6 or v9 < v6 then
 						v6 = v9
 						v7 = descendant
@@ -16180,20 +15171,16 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		if v7 then
 			HitHiddenPart(v7)
 			return true
 		end
 	end
-
 	GetHiddenBossHour = function()
 		local v6 = os.date("!%Y%m%d%H")
-
 		if not HiddenEvent.bossHour or HiddenEvent.bossHour.key ~= v6 then
 			HiddenEvent.bossHour = { key = v6, checked = {}, active = nil }
 			local expectedBoss = HiddenEvent.expectedBoss
-
 			if expectedBoss and expectedBoss.key == v6 then
 				for _, v7 in ipairs(HiddenQuests) do
 					if v7.BossNames and not IsHiddenBossHinted(expectedBoss.hint, v7.HintIsland, v7.BossNames) then
@@ -16202,35 +15189,28 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		return HiddenEvent.bossHour
 	end
-
 	IsHiddenBossHinted = function(arg, arg2, arg3)
 		if not arg.Island then
 			return false
 		end
-
 		if table.find(arg3, arg.Boss) then
 			return true
 		end
-
 		for _, v6 in ipairs(HiddenQuests) do
 			if v6.BossNames and table.find(v6.BossNames, arg.Boss) then
 				return false
 			end
 		end
-
 		return arg.Island == arg2
 	end
-
 	IsHiddenHourUseful = function(arg)
 		local v6 = GetHiddenRaidHint()
 		if not v6 or not v6.Island or not v6.Boss then
 			return true
 		end
-
-		for _, v7 in ipairs(HiddenQuests) do repeat 
+		for _, v7 in ipairs(HiddenQuests) do repeat
 			if arg["Sea1/" .. v7.Island .. "/" .. v7.Name] ~= true then
 				if v7.BossNames then
 					if IsHiddenBossHinted(v6, v7.HintIsland or v7.Island, v7.BossNames) then
@@ -16238,23 +15218,18 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					end
 					break
 				end
-
 				if v6.Island == (v7.HintIsland or v7.Island) then
 					return true
 				end
 			end
 		until true end
-
 		return false
 	end
-
 	ListHiddenServers = function()
 		local tbl9 = {}
-
 		local ok, result = pcall(function()
 			return ReplicatedStorage.__ServerBrowser:InvokeServer(1)
 		end)
-
 		if ok and type(result) == "table" then
 			for k in pairs(result) do
 				if type(k) == "string" then
@@ -16262,51 +15237,40 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end
-
 		return tbl9
 	end
-
 	QueueHiddenReload = function()
 		return true
 	end
-
 	HopHiddenServer = function()
 		HiddenEvent.hopped = HiddenEvent.hopped or {}
 		QueueHiddenReload()
 		local v6 = ListHiddenServers()
-
 		for i_ = 1, 2 do
 			for k in pairs(v6) do
 				if k ~= game.JobId and not HiddenEvent.hopped[k] then
 					HiddenEvent.hopped[k] = true
 					HiddenNotify("Dead boss hour, switching server", "hop" .. k, "travel")
-
 					local function fn()
 						ReplicatedStorage.__ServerBrowser:InvokeServer("teleport", k)
 					end
-
 					pcall(fn)
 					return true
 				end
 			end
-
 			HiddenEvent.hopped = {}
 		end
-
 		return false
 	end
-
 	RunChefsKiss = function(arg)
 		local chefMissing = HiddenEvent.chefMissing
 		local flag
-
 		if chefMissing then
 			local time_ = HiddenEvent.chefMissing.time
 			flag = tick() - time_ < 300
 		else
 			flag = chefMissing
 		end
-
 		if flag then
 			local v6 = GatherChefIngredients(arg)
 			if v6 then
@@ -16315,23 +15279,17 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			HiddenEvent.chefMissing = nil
 			HiddenEvent.cooked = 0
 		end
-
 		local cauldronMoment = workspace.Map.Pirate:FindFirstChild("Cauldron_Moment")
-
 		if cauldronMoment then
 			cauldronMoment = cauldronMoment:FindFirstChild("Cauldron") or cauldronMoment:FindFirstChildWhichIsA("BasePart", true)
 		end
-
 		local flag2 = not cauldronMoment
-
 		if not flag2 then
 			flag2 = tick() - (HiddenEvent.cooked or 0) <= 15
 		end
-
 		if flag2 then
 			return
 		end
-
 		if not HiddenSettle(cauldronMoment:GetPivot().Position + Vector3.new(0, 3, 6), 10) then
 			return "Go to the tavern cauldron"
 		end
@@ -16343,19 +15301,16 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		local tbl9 = {}
 		local v6 = ipairs
 		local slots = response.Slots or {}
-
 		for _, slot in v6(slots) do
 			if not response.Placed[slot] then
 				local v7 = pairs
 				local owned = response.Owned and response.Owned[slot] or {}
 				local flag3 = nil
-
 				for k, v8 in v7(owned) do
 					if not (v8 > 0) then
 						flag3 = nil
 					else
 						local response2 = arg:InvokeServer("Insert", k)
-
 						if type(response2) == "table" then
 							flag3 = true
 							response = response2
@@ -16365,32 +15320,26 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						end
 					end
 				end
-
 				if not flag3 then
 					table.insert(tbl9, tostring(response.Examples and response.Examples[slot] and response.Examples[slot][1] or slot))
 				end
 			end
 		end
-
 		if #tbl9 > 0 then
 			arg:FireServer("CloseCauldron")
 			HiddenNotify("Chef's Kiss needs: " .. table.concat(tbl9, ", "), "chefmissing", "warning")
 			HiddenEvent.chefMissing = { time = tick(), text = "Chef's Kiss needs " .. table.concat(tbl9, ", "), needs = response.Slots }
 			return HiddenEvent.chefMissing.text, true
 		end
-
 		local response2 = arg:InvokeServer("Cook")
 		arg:FireServer("CloseCauldron")
 		HiddenEvent.awakened = HiddenEvent.awakened or {}
-
 		if response2 == "Cooked" then
 			HiddenEvent.awakened["Chef's Kiss"] = tick()
 			HiddenNotify("Chef's Kiss: recipe cooked, the Chef is awakening", "chefcooked", "success")
 		end
-
 		return "Cook the Chef's recipe"
 	end
-
 	CreateBossQuest = function(arg, active, arg2, arg3, arg4, arg5)
 		return {
 			Island = arg,
@@ -16402,17 +15351,14 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				local v6 = GetHiddenBossHour()
 				local flag = IsHiddenBossHinted(arg6, arg2, arg3) or v6.active == active
 				local flag2
-
 				if flag then
 					flag2 = flag
 				else
 					flag2 = tick() - ((HiddenEvent.announced or {})[active] or 0) < 400
 				end
-
 				if flag2 then
 					return true
 				end
-
 				if v6.active then
 					return false, "awakened boss is on " .. tostring(v6.active) .. " this hour"
 				end
@@ -16424,7 +15370,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				FindHiddenBoss(arg3, position)
 				HiddenEvent.awakened = HiddenEvent.awakened or {}
 				local v7 = FindAwakenedBoss(position, arg3)
-
 				if v7 then
 					GetHiddenBossHour().active = active
 					HiddenEvent.bossFight = { quest = active, time = tick() }
@@ -16432,65 +15377,51 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					HiddenEvent.checked = 0
 					return "Defeat the awakened " .. v7.Name
 				end
-
 				local v8 = GetHiddenBossHour()
 				local v9 = GetHiddenRaidHint()
 				local v10 = IsHiddenBossHinted(v9, arg2, arg3)
-
 				if arg6.Active and not v10 and os.date("!*t").min >= 12 then
 					v8.checked[active] = true
 					v8.active = nil
 					return arg3[1] .. " window passed this hour, wait for XX:50 hint", true
 				end
-
 				if arg6.Active then
 					v8.active = active
-
 					if arg4 then
 						local v11, v12 = arg4(arg6)
 						if v11 then
 							return v11, v12
 						end
 					end
-
 					return "Waiting for " .. arg3[1] .. " to awaken"
 				end
-
 				if v8.active == active then
 					v8.active = nil
 				end
-
 				if v10 then
 					local num = tonumber(v9.Seconds)
 					local flag = arg5
-
 					if arg5 then
 						flag = v9.State == "Triggered"
-
 						if not flag then
 							flag = (num or math.huge) <= 0
 						end
 					end
-
 					if flag then
 						local v11, v12 = arg5(arg6)
 						if v11 then
 							return v11, v12
 						end
 					end
-
 					return arg3[1] .. " stirs on " .. arg .. (num and " in ~" .. FormatMagnetTime(num) or " soon"), (num or 0) > 180
 				end
-
 				v8.checked[active] = true
 				return "No awakened " .. arg3[1] .. " this hour", true
 			end,
 		}
 	end
-
 	do
 		local tbl9 = {}
-
 		local Jungle = CreateBossQuest("Jungle", "Banana Tree", "Jungle", { "Gorilla King" }, function()
 			local v6 = GetHiddenState("Banana Tree", function(arg, arg2, arg3)
 				if arg2 == "Availability" then
@@ -16499,53 +15430,43 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					arg.tree = nil
 				end
 			end)
-
 			if HitHiddenTriggers({ v6.tree and v6.tree.Parent and v6.tree or workspace.Map.Jungle:FindFirstChild("BananaTrees") }) then
 				return "Shake the banana tree"
 			end
 		end)
-
 		local v6 = CreateBossQuest("Frozen Village", "Frozen Defense", "Frozen Village", { "Yeti" }, function()
 			local bonusMomentLocations = workspace.Map.Ice:FindFirstChild("BonusMoment_Locations")
 			local v6 = ipairs
 			local descendants = bonusMomentLocations and bonusMomentLocations:GetDescendants() or {}
 			local v7 = nil
 			local v8 = nil
-
 			for _, descendant in v6(descendants) do
 				local attribute = descendant:GetAttribute("FrozenDefenseRockPresent")
 				local isBasePart = descendant:IsA("BasePart") and descendant or descendant:IsA("Model") and (descendant.PrimaryPart or descendant:FindFirstChildWhichIsA("BasePart", true))
-
 				if attribute ~= nil and attribute ~= false and isBasePart then
 					local v9 = localPlayer:DistanceFromCharacter(isBasePart.Position)
-
 					if not v7 or v9 < v7 then
 						v7 = v9
 						v8 = isBasePart
 					end
 				end
 			end
-
 			if v8 then
 				AttackHiddenSpot(v8)
 				return "Break the cursed ice rocks"
 			end
-
 			if HitHiddenTriggers({ bonusMomentLocations }) then
 				return "Break the cursed ice rocks"
 			end
 			local bossFight = HiddenEvent.bossFight
 			local flag = bossFight and bossFight.quest == "Frozen Defense"
-
 			if flag then
 				local time_ = bossFight.time
 				flag = tick() - time_ < 240
 			end
-
 			if flag then
 				local position = GetHiddenIsland("Frozen Village")
 				position = position and position.World.Position
-
 				for _, child in ipairs(workspace.NPCs:GetChildren()) do
 					if string.find(string.lower(child.Name), "villager", 1, true) and position and (child:GetPivot().Position - position).Magnitude < 900 then
 						if not HiddenSettle(child:GetPivot().Position + Vector3.new(0, 2, 4), 8) then
@@ -16558,7 +15479,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end
 		end)
-
 		local v7 = CreateBossQuest("Magma Village", "One Last Eruption", "Magma Village", { "Magma Admiral", "Magma General" }, function(arg)
 			local v7 = GetHiddenState("One Last Eruption", function(arg2, arg3, spots)
 				if arg3 == "Setup" and type(spots) == "table" then
@@ -16568,35 +15488,28 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					arg2.destroyed[spots] = true
 				end
 			end)
-
 			if not v7.spots then
 				if tick() - (v7.asked or 0) > 5 then
 					v7.asked = tick()
 					arg:FireServer("Init")
 				end
-
 				return "Waiting for the lava fissures"
 			end
-
 			local bonusMomentLocations = workspace.Map.Magma:FindFirstChild("BonusMoment_Locations")
 			local v8 = nil
 			local v9 = nil
-
 			for k, spot in pairs(v7.spots) do
 				if not v7.destroyed[k] then
 					local v10 = localPlayer:DistanceFromCharacter(spot.Position)
-
 					if not v8 or v10 < v8 then
 						v8 = v10
 						v9 = spot
 					end
 				end
 			end
-
 			if not v9 then
 				return
 			end
-
 			if v8 > 10 then
 				HiddenMove(v9 * CFrame.new(0, 4, 3))
 				return "Go to the next lava fissure"
@@ -16605,64 +15518,53 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			bonusMomentLocations = bonusMomentLocations and bonusMomentLocations:GetChildren() or {}
 			local v11 = nil
 			local v12 = nil
-
 			for _, bonusMomentLocation in v10(bonusMomentLocations) do
 				if bonusMomentLocation.Name == "Volcano Fissure" and bonusMomentLocation:IsA("BasePart") then
 					local magnitude = (bonusMomentLocation.Position - v9.Position).Magnitude
-
 					if not v11 or magnitude < v11 then
 						v11 = magnitude
 						v12 = bonusMomentLocation
 					end
 				end
 			end
-
 			HiddenHold(v9 * CFrame.new(0, 4, 3))
 			EquipHiddenWeapon("Melee")
 			HiddenModules.RegisterAttack:FireServer(0.3)
 			local v13 = nil
 			local v14 = nil
-
 			for _, child in ipairs(workspace:GetChildren()) do
 				if child.Name == "MagmaFissure" and child:IsA("Model") then
 					local ok, result = pcall(child.GetPivot, child)
 					ok = ok and (result.Position - v9.Position).Magnitude
-
 					if ok and (not v13 or ok < v13) then
 						v13 = ok
 						v14 = child
 					end
 				end
 			end
-
 			if v14 and v13 < 25 then
 				local flag = false
-
 				for _, descendant in ipairs(v14:GetDescendants()) do
 					if descendant:IsA("BasePart") then
 						HiddenModules.RegisterHit:FireServer(descendant)
 						flag = true
 					end
 				end
-
 				if not flag then
 					HiddenModules.RegisterHit:FireServer(v14)
 				end
 			elseif v12 then
 				HiddenModules.RegisterHit:FireServer(v12)
 			end
-
 			pcall(getgenv().ClickM1)
 			task.wait(0.35)
 			return "Break the lava fissures"
 		end)
-
 		local Fountain = CreateBossQuest("Fountain", "Fountain Wire Repair", "Fountain City", { "Cyborg" }, function()
 			if HitHiddenTriggers({ workspace._WorldOrigin:FindFirstChild("FountainWireNodes") }, true) then
 				return "Repair the sparking wires"
 			end
 		end)
-
 		local v8 = CreateBossQuest("Marine Fortress", "Fortress Under Fire", "Marine Fortress", { "Vice Admiral" }, function()
 			local bonusMomentLocations = workspace.Map.MarineBase:FindFirstChild("BonusMoment_Locations")
 			bonusMomentLocations = bonusMomentLocations and bonusMomentLocations:FindFirstChild("MainBase")
@@ -16671,7 +15573,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 			local y = nil
 			local v8 = nil
-
 			for _, descendant in ipairs(bonusMomentLocations:GetDescendants()) do
 				if descendant:IsA("BasePart") and descendant.Transparency < 1 and (descendant:HasTag("M1HitRegistry") or descendant.Name:find("Target")) then
 					if not y or descendant.Position.Y > y then
@@ -16680,13 +15581,11 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					end
 				end
 			end
-
 			local boundingBox, v9 = bonusMomentLocations:GetBoundingBox()
 			if FireHiddenCannon(v8 and v8.Position or boundingBox.Position + Vector3.new(0, v9.Y / 4, 0)) then
 				return "Shell the fortress building with the cannon"
 			end
 		end)
-
 		local SkyArea2 = CreateBossQuest("SkyArea2", "The Tyrant Awakens", "Upper Skylands", { "Wysper", "Sky Warlord", "Tyrant" }, function()
 			local skyArea2 = workspace.Map:FindFirstChild("SkyArea2")
 			local v9 = HitHiddenTriggers
@@ -16699,7 +15598,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return "Break the dark clouds"
 			end
 		end)
-
 		local SkyArea22 = CreateBossQuest("SkyArea2", "Echoes Through the Clouds", "Upper Skylands", { "Thunder God", "Lightning God" }, function()
 			local v9 = GetHiddenState("Echoes Through the Clouds", function(arg, arg2, arg3, arg4, arg5, arg6, arg7)
 				if arg2 == "Listen" and type(arg3) == "table" and type(arg4) == "number" and type(arg5) == "number" then
@@ -16709,42 +15607,33 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					arg.round = nil
 				end
 			end)
-
 			local goldenBell = workspace.Map:FindFirstChild("SkyArea2") and workspace.Map.SkyArea2:FindFirstChild("Golden Bell")
-
 			if goldenBell then
 				goldenBell = goldenBell:FindFirstChild("Bell", true) or goldenBell:FindFirstChildWhichIsA("BasePart", true)
 			end
-
 			if not goldenBell then
 				return
 			end
-
 			if not HiddenSettle(goldenBell.Position + Vector3.new(0, 2, 7), 10) then
 				return "Go to the Golden Bell"
 			end
 			local round = v9.round
 			local flag
-
 			if round then
 				local n = round.start + #round.notes * round.beat
 				flag = workspace:GetServerTimeNow() < n
 			else
 				flag = round
 			end
-
 			if flag then
 				v9.round = nil
 				PlayHiddenBellTune(round, goldenBell)
 				return "Play the bell tune (" .. #round.notes .. " notes)"
 			end
-
 			local flag2 = tick() < (HiddenEvent.bellQuiet or 0)
-
 			if not flag2 then
 				flag2 = tick() - (v9.listen or 0) < 12
 			end
-
 			if flag2 then
 				return "Listen to the bell"
 			end
@@ -16754,7 +15643,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			task.wait(1)
 			return "Ring the Golden Bell"
 		end)
-
 		local v9 = CreateBossQuest("Underwater City", "Pearl of the Deep", "Underwater City", { "Fishman Lord" }, function(arg)
 			if not HiddenEvent.clamListener then
 				HiddenEvent.clamListener = ListenHiddenMoment("Pearl of the Deep", function(arg2, arg3)
@@ -16765,36 +15653,29 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					end
 				end)
 			end
-
 			HiddenEvent.openedClams = HiddenEvent.openedClams or {}
 			if os.date("!*t").min >= 45 then
 				return "Saving the clams for the XX:00 Fishman Lord window", true
 			end
 			local position = localPlayer.Character:GetPivot().Position
-
 			for _, child in ipairs(workspace.Enemies:GetChildren()) do
 				if IsHiddenTarget(child) and string.find(child.Name, "Mimic") and (child:GetPivot().Position - position).Magnitude < 300 then
 					KillHiddenEnemy(child)
 					return "Defeat the mimic clam"
 				end
 			end
-
 			local v9 = nil
 			local v10 = nil
-
 			for _, v11 in ipairs(game:GetService("CollectionService"):GetTagged("PearlClam")) do
 				local isBasePart = v11:IsA("BasePart") and v11 or v11:FindFirstChildWhichIsA("BasePart", true)
-
 				if isBasePart and v11:IsDescendantOf(workspace) and not HiddenEvent.openedClams[v11] then
 					local v12 = localPlayer:DistanceFromCharacter(isBasePart.Position)
-
 					if not v9 or v12 < v9 then
 						v9 = v12
 						v10 = v11
 					end
 				end
 			end
-
 			if not v10 then
 				local v11 = FindHiddenBoss({ "Fishman Lord" }, position)
 				if v11 then
@@ -16803,15 +15684,12 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 				return "Waiting for the clams to reappear", true
 			end
-
 			if HiddenSettle((v10:IsA("BasePart") and v10 or v10:FindFirstChildWhichIsA("BasePart", true)).CFrame * Vector3.new(0, 0, -3.5) + Vector3.new(0, 2, 0), 9) then
 				local response = arg:InvokeServer("OpenClam", v10)
 				HiddenEvent.openedClams[v10] = tick()
 				HiddenEvent.arrived = nil
-
 				if response == "Black" then
 					task.wait(1.5)
-
 					for i_ = 1, 5 do
 						if arg:InvokeServer("ClaimPearl") == true then
 							HiddenEvent.awakened["Pearl of the Deep"] = tick()
@@ -16823,12 +15701,9 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					end
 				end
 			end
-
 			return "Search the clams for the black pearl"
 		end)
-
 		local v10 = CreateBossQuest("Pirate Village", "Chef's Kiss", "Pirate Village", { "Chef" }, RunChefsKiss, RunChefsKiss)
-
 		local Prison = CreateBossQuest("Prison", "Lever Jailbreak", "Prison", { "Warden" }, function(arg)
 			local bonusMomentLocations = workspace.Map.Prison:FindFirstChild("BonusMoment_Locations", true)
 			bonusMomentLocations = bonusMomentLocations and bonusMomentLocations:FindFirstChild("Levers")
@@ -16836,79 +15711,62 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return
 			end
 			local tbl10 = {}
-
 			for _, child in ipairs(bonusMomentLocations:GetChildren()) do
 				local lever = child:FindFirstChild("Lever")
-
 				if lever then
 					table.insert(tbl10, lever)
 				end
 			end
-
 			table.sort(tbl10, function(arg2, arg3)
 				if math.abs(arg2.Position.X - arg3.Position.X) <= 0.001 then
 					return arg2.Position.Z < arg3.Position.Z
 				end
 				return arg2.Position.X < arg3.Position.X
 			end)
-
 			local leverPuzzle = HiddenEvent.leverPuzzle or { known = {}, pulled = 0, wrong = {} }
 			HiddenEvent.leverPuzzle = leverPuzzle
 			local v11
-
 			if leverPuzzle.pulled < #leverPuzzle.known then
 				v11 = leverPuzzle.known[leverPuzzle.pulled + 1]
 			else
 				local tbl11 = { 2, 3, 4, 1 }
-
 				for i_ = 1, #tbl10 do
 					if not table.find(tbl11, i_) then
 						table.insert(tbl11, i_)
 					end
 				end
-
 				v11 = tbl11[#leverPuzzle.known + 1]
 				local flag = v11 and v11 <= #tbl10 and not table.find(leverPuzzle.known, v11) and not leverPuzzle.wrong[#leverPuzzle.known + 1 .. ":" .. v11]
 				local v12 = nil
-
 				if not flag then
 					v11 = v12
 				end
-
-				for _, v13 in ipairs(tbl11) do local __brk = false repeat 
+				for _, v13 in ipairs(tbl11) do local __brk = false repeat
 					if not v11 then
 						if v13 <= #tbl10 and not table.find(leverPuzzle.known, v13) and not leverPuzzle.wrong[#leverPuzzle.known + 1 .. ":" .. v13] then
 							v11 = v13
 						end
-
 						break
 					end
-
 					__brk = true break
 				until true if __brk then break end end
 			end
-
 			if not v11 then
 				HiddenEvent.leverPuzzle = nil
 				return
 			end
 			local vector = Vector3.zero
-
 			for _, v12 in ipairs(tbl10) do
 				vector = vector + (v12.Position / #tbl10)
 			end
-
 			HiddenEvent.stallGrace = tick() + 5
-
 			if HiddenSettle(vector + Vector3.new(0, 3, 8), 12) then
 				local response = arg:InvokeServer("Pull", v11)
 				local result = type(response) == "table" and response.Result or response
-
 				if result == "Accepted" then
 					if leverPuzzle.pulled == #leverPuzzle.known then
 						table.insert(leverPuzzle.known, v11)
 					end
-
 					leverPuzzle.pulled = leverPuzzle.pulled + 1
 				elseif result == "Solved" then
 					HiddenEvent.leverPuzzle = nil
@@ -16916,16 +15774,12 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					if leverPuzzle.pulled == #leverPuzzle.known then
 						leverPuzzle.wrong[#leverPuzzle.known + 1 .. ":" .. v11] = true
 					end
-
 					leverPuzzle.pulled = 0
 				end
-
 				task.wait(0.4)
 			end
-
 			return "Solve the lever puzzle (" .. #leverPuzzle.known .. "/" .. #tbl10 .. ")"
 		end)
-
 		tbl9[1] = Jungle
 		tbl9[2] = v6
 		tbl9[3] = v7
@@ -16936,7 +15790,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		tbl9[8] = v9
 		tbl9[9] = v10
 		tbl9[10] = Prison
-
 		tbl9[11] = {
 			Island = "Prison",
 			Name = "Escape from Alcatraz",
@@ -16945,18 +15798,14 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				prisoners = type(prisoners) == "table" and prisoners or {}
 				local prisonerKey = HiddenEvent.prisonerKey
 				local v11 = prisonerKey and prisoners[prisonerKey]
-
 				if not v11 or typeof(v11.Model) ~= "Instance" or not v11.Model.Parent then
 					local v12 = nil
 					prisonerKey = nil
 					v11 = nil
-
 					for k, prisoner in pairs(prisoners) do
 						local model = prisoner.Model
-
 						if typeof(model) == "Instance" and model.Parent then
 							local v13 = localPlayer:DistanceFromCharacter(model:GetPivot().Position)
-
 							if not v12 or v13 < v12 then
 								v12 = v13
 								prisonerKey = k
@@ -16964,33 +15813,26 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 							end
 						end
 					end
-
 					HiddenEvent.prisonerKey = prisonerKey
 				end
-
 				if not v11 then
 					return "Waiting for prisoners to escape", true
 				end
 				local model = v11.Model
 				local flag = HiddenEvent.provoked == model
-
 				if flag then
 					flag = tick() - (HiddenEvent.provokedAt or 0) > 25
 				end
-
 				if flag then
 					HiddenEvent.provoked = nil
 				end
-
 				if HiddenEvent.provoked ~= model then
 					local n = model:GetPivot() * CFrame.new(0, 1.5, 6)
-
 					if localPlayer:DistanceFromCharacter(model:GetPivot().Position) > 12 then
 						HiddenMove(n)
 					else
 						HiddenHold(n)
 						HiddenEvent.provokeTry = HiddenEvent.provokeTry or {}
-
 						if tick() - (HiddenEvent.provokeTry[prisonerKey] or 0) > 1.5 then
 							HiddenEvent.provokeTry[prisonerKey] = tick()
 							arg:InvokeServer("Provoke", prisonerKey)
@@ -17001,16 +15843,12 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 							v13.provokedAt = now
 						end
 					end
-
 					return "Confront the escaping prisoner (" .. tostring(prisonerKey) .. ")"
 				end
-
 				HiddenEvent.stallGrace = tick() + 5
 				local humanoidRootPart = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-
 				if humanoidRootPart then
 					HitHiddenPart(humanoidRootPart)
-
 					if model:FindFirstChildOfClass("Humanoid") then
 						SizePart(model)
 						pcall(BringMob, model)
@@ -17021,11 +15859,9 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						getgenv().ClickM1(model, true)
 					end
 				end
-
 				return "Catch the prisoner (" .. tostring(prisonerKey) .. ")"
 			end,
 		}
-
 		tbl9[12] = {
 			Island = "Prison",
 			Name = "Don Megalo",
@@ -17037,66 +15873,51 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						arg2.gateOpen = true
 					end
 				end)
-
 				if tick() - (v11.initialized or 0) > 30 then
 					v11.initialized = tick()
 					arg:FireServer("Init")
 					task.wait(1)
 				end
-
 				local v12 = FindHiddenEnemyMatch({ "Megalo Guard", "Bouncer" }, Vector3.new(5277, 5, 743), 900)
 				if v12 then
 					KillHiddenEnemy(v12)
 					return "Defeat " .. v12.Name
 				end
 				local SharkCape = GetPrisonLocation("SharkCape")
-
 				if SharkCape and v11.gateOpen then
 					if HiddenSettle(SharkCape + Vector3.new(0, 1.5, 3), 8) then
 						arg:FireServer("BouncerReady")
 						local v13 = FindHiddenPromptNear({ workspace.Map.Prison, workspace._WorldOrigin }, SharkCape, 25)
-
 						if v13 then
 							HoldHiddenPrompt(v13)
 						end
-
 						if arg:InvokeServer("TakeCape") == true then
 							arg:InvokeServer("ClaimCape")
 							HiddenEvent.checked = 0
 						end
-
 						task.wait(1)
 					end
-
 					return "Hold to steal Don Megalo's coat"
 				end
-
 				local MegaloGate = GetPrisonLocation("MegaloGate")
-
 				if MegaloGate and not v11.gateOpen then
 					local Key = GetPrisonLocation("Key")
-
 					if Key and not v11.hasKey then
 						if HiddenSettle(Key + Vector3.new(0, 3, 3), 8) then
 							v11.hasKey = arg:InvokeServer("TakeKey") == true
 							task.wait(1)
 						end
-
 						return "Find the cell key"
 					end
-
 					if HiddenSettle(MegaloGate + Vector3.new(0, 3, 4), 8) then
 						v11.gateOpen = arg:InvokeServer("Unlock") == true
 						task.wait(1)
 					end
-
 					return "Unlock the tower gate"
 				end
-
 				return "Waiting for Don Megalo's tower", true
 			end,
 		}
-
 		tbl9[13] = {
 			Island = "Magma Village",
 			Name = "Magma Ore Extraction",
@@ -17111,11 +15932,9 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 				local magmaOreExtraction = HiddenEvent.announced and HiddenEvent.announced["Magma Ore Extraction"]
 				local flag = not arg.Active
-
 				if flag then
 					flag = not (magmaOreExtraction and tick() - magmaOreExtraction < 900)
 				end
-
 				if flag then
 					return "Waiting for the drilling at Magma Village", true
 				end
@@ -17126,7 +15945,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					return "Waiting for the drilling at Magma Village", true
 				end
 				local humanoidRootPart = localPlayer.Character.HumanoidRootPart
-
 				if HiddenGoTo(backArea.Position + Vector3.new(0, 4, 0), 6) then
 					HiddenHold(CFrame.new(backArea.Position + Vector3.new(0, 4, 0)))
 					pcall(firetouchinterest, humanoidRootPart, backArea, 0)
@@ -17134,11 +15952,9 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					pcall(firetouchinterest, humanoidRootPart, backArea, 1)
 					task.wait(3)
 				end
-
 				return "Take the mine elevator"
 			end,
 		}
-
 		tbl9[14] = {
 			Island = "Frozen Village",
 			Name = "Snowman",
@@ -17146,14 +15962,12 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return BuildHiddenSnowman(arg)
 			end,
 		}
-
 		tbl9[15] = {
 			Island = "Marine Fortress",
 			Name = "Battle Plans",
 			RetryDelay = 300,
 			Run = function(arg)
 				ListenHiddenRaidChat()
-
 				local v11 = GetHiddenState("Battle Plans", function(arg2, arg3)
 					if arg3 == "RaidStart" then
 						arg2.raid = tick()
@@ -17163,7 +15977,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						arg2.failed = tick()
 					end
 				end)
-
 				local position = workspace.Map.MarineBase:GetPivot().Position
 				local bonusMomentLocations = workspace.Map.MarineBase:FindFirstChild("BonusMoment_Locations")
 				bonusMomentLocations = bonusMomentLocations and bonusMomentLocations:FindFirstChild("PirateShip_Spawn")
@@ -17171,46 +15984,38 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				local v12 = ListHiddenRaidShips(bonusMomentLocations)
 				local battlePlans = (HiddenEvent.announced or {})["Battle Plans"]
 				local raidWarn = HiddenEvent.raidWarn
-
 				if raidWarn then
 					local raidWarn2 = HiddenEvent.raidWarn
 					raidWarn = tick() - raidWarn2 < 900
 				end
-
 				raidWarn = raidWarn or battlePlans and tick() - battlePlans < 900
 				local raid = v11.raid
-
 				if raid then
 					local raid2 = v11.raid
 					raid = tick() - raid2 < 900
 				end
-
 				if not arg.Active and not raid and not raidWarn and #v12 == 0 then
 					LeaveHiddenCannon()
 					return "Waiting for pirates to raid the Marine Fortress", true
 				end
 				HiddenEvent.stallGrace = tick() + 60
 				local v13 = v12[1]
-
 				if v13 and v13.model.Parent then
 					local model = v13.model
 					if not AimHiddenCannon(v13.pos) then
 						return "Boarding the fortress cannon"
 					end
-
 					if ShootHiddenCannon(v13.pos) then
 						return "Shelling " .. model.Name .. " (" .. #v12 .. " ships left)"
 					end
 					return "Aiming the cannon at " .. model.Name
 				end
-
 				if AimHiddenCannon(bonusMomentLocations + Vector3.new(0, 20, 0)) then
 					return "Manning the cannon, waiting for the pirate fleet"
 				end
 				return "Go to the fortress cannon"
 			end,
 		}
-
 		tbl9[16] = {
 			Island = "Colosseum",
 			Name = "Crowd Favorite",
@@ -17225,12 +16030,10 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						arg.active = target == true
 					end
 				end)
-
 				local target = v11.target or workspace:FindFirstChild("Ring")
 				local v12 = ipairs
 				local descendants = target and target.Parent and target:GetDescendants() or {}
 				local v13 = nil
-
 				for _, descendant in v12(descendants) do
 					if descendant:IsA("BasePart") and descendant:HasTag("M1HitRegistry") then
 						v13 = descendant
@@ -17239,7 +16042,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						v13 = nil
 					end
 				end
-
 				if not v13 then
 					return "Waiting for a Colosseum target", true
 				end
@@ -17250,7 +16052,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return "Hit the ring to start the show"
 			end,
 		}
-
 		tbl9[17] = {
 			Island = "SkyArea2",
 			Name = "Temple Intel",
@@ -17258,7 +16059,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return RunHiddenTempleIntel(arg)
 			end,
 		}
-
 		tbl9[18] = {
 			Island = "Pirate Village",
 			Name = "Tavern Brawl",
@@ -17282,29 +16082,22 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						arg2.sent = {}
 					end
 				end)
-
 				local tavernNEW = workspace.Map.Pirate:FindFirstChild("TavernNEW", true)
 				tavernNEW = tavernNEW and tavernNEW:FindFirstChild("TavernDoor", true)
 				local position = tavernNEW and tavernNEW:GetPivot().Position or Vector3.new(-1121, 14, 4121)
-
 				if v11.stage == "defeated" then
 					local tavernOwner = workspace.Terrain:FindFirstChild("Tavern Owner")
-
 					if HiddenSettle(tavernOwner and (tavernOwner:GetPivot() * CFrame.new(0, 0, -4)).Position or position, 6) then
 						arg:FireServer("ClaimReward")
 						arg:FireServer("ExitTavern")
 						HiddenEvent.checked = 0
 						task.wait(1.5)
 					end
-
 					return "Take the brew from the Bartender"
 				end
-
 				v11.sent = v11.sent or {}
-
 				if v11.stage and not v11.sent[v11.stage] then
 					v11.sent[v11.stage] = true
-
 					if v11.stage == "gang" then
 						arg:FireServer("BeginGangUp")
 					elseif v11.stage == "fight" or v11.stage == "inside" then
@@ -17314,40 +16107,32 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						task.wait(0.6)
 						arg:FireServer("DoorsKicked")
 					end
-
 					task.wait(1)
 					return "Start the tavern brawl (" .. v11.stage .. ")"
 				end
-
 				for _, child in ipairs(workspace.Enemies:GetChildren()) do
 					if IsHiddenTarget(child) and (child:GetPivot().Position - position).Magnitude < 120 and string.find(child.Name, "Tavern") then
 						KillHiddenEnemy(child)
 						return "Beat up the tavern punks"
 					end
 				end
-
 				if v11.stage == "gang" or v11.stage == "fight" or v11.stage == "inside" or v11.stage == "breach" then
 					if tick() - (v11.resent or 0) > 15 then
 						v11.resent = tick()
 						v11.sent[v11.stage] = nil
 					end
-
 					return "Waiting for the brawlers"
 				end
-
 				if not v11.available and not arg.Active then
 					return "Waiting for the tavern brawl (strange winds)", true
 				end
-
 				if HiddenSettle(position + Vector3.new(0, 3, 6), 10) then
 					arg:FireServer("Breach")
 					task.wait(2)
 				end
-
 				return "Breach the shaking tavern door"
 			end,
 		}
-
 		tbl9[19] = {
 			Island = "Fountain",
 			Name = "Sewer Gangs",
@@ -17365,95 +16150,75 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						arg2.chest = arg4.Position
 					end
 				end)
-
 				if v11.chest then
 					if HiddenSettle(v11.chest + Vector3.new(0, 3, 0), 5) then
 						if arg:InvokeServer("ClaimTreasure") == true then
 							v11.chest = nil
 							HiddenEvent.checked = 0
 						end
-
 						task.wait(1)
 					end
-
 					return "Claim the gang's treasure"
 				end
-
 				local sewerSystem = workspace.Map:FindFirstChild("SewerSystem")
-
 				if sewerSystem and (localPlayer:GetAttribute("CurrentLocation") == "Sewers" or localPlayer.Character:GetPivot().Position.Y < -300) then
 					local position = localPlayer.Character:GetPivot().Position
-
 					for _, child in ipairs(workspace.Enemies:GetChildren()) do
 						if IsHiddenTarget(child) and (child:GetPivot().Position - position).Magnitude < 700 then
 							KillHiddenEnemy(child)
 							return "Fight Megalo's sewer gang"
 						end
 					end
-
 					if HitHiddenTriggers({ sewerSystem:FindFirstChild("BreakableWalls", true) }) then
 						return "Break through the sewer walls"
 					end
 					local sewerEnemyRooms = sewerSystem:FindFirstChild("SewerEnemyRooms", true)
 					HiddenEvent.sewerRoom = (HiddenEvent.sewerRoom or 0) % math.max(#(sewerEnemyRooms and sewerEnemyRooms:GetChildren() or {}), 1) + 1
 					local v12
-
 					if sewerEnemyRooms then
 						local sewerRoom = HiddenEvent.sewerRoom
 						v12 = sewerEnemyRooms:GetChildren()[sewerRoom]
 					else
 						v12 = sewerEnemyRooms
 					end
-
 					if v12 then
 						HiddenGoTo(v12:GetPivot().Position + Vector3.new(0, 5, 0), 20)
 						task.wait(2)
 					end
-
 					return "Search the sewers"
 				end
-
 				local cranes = workspace.Map.Fountain:FindFirstChild("Cranes")
 				local sewerEntrancePrompt = cranes and cranes:FindFirstChild("SewerEntrancePrompt", true)
 				cranes = cranes and cranes:FindFirstChild("CraneBonus")
 				local sewerEntrance = workspace.Map.Fountain:FindFirstChild("SewerEntrance")
-
 				if cranes and sewerEntrance and cranes:GetAttribute("SewerEntranceLifted") then
 					HiddenMove(CFrame.new(sewerEntrance.Position + Vector3.new(0, 1, 0)))
 					local humanoidRootPart = localPlayer.Character.HumanoidRootPart
-
 					pcall(function()
 						firetouchinterest(humanoidRootPart, sewerEntrance, 0)
 						firetouchinterest(humanoidRootPart, sewerEntrance, 1)
 					end)
-
 					task.wait(8)
 					return "Drop into the sewer entrance"
 				end
-
 				if sewerEntrancePrompt and sewerEntrancePrompt.Enabled then
 					if HiddenSettle(sewerEntrancePrompt.Parent.WorldPosition + Vector3.new(0, 3, 0), 6) then
 						HoldHiddenPrompt(sewerEntrancePrompt)
 						local now = tick()
-
-						while true do local __brk = false repeat 
+						while true do local __brk = false repeat
 							task.wait(0.3)
 							if not (cranes and cranes:GetAttribute("SewerEntranceLifted") or tick() - now > 5) then
 								break
 							end
 							__brk = true break
 						until true if __brk then break end end
-
 						task.wait(2.6)
 					end
-
 					return "Lift the crane over the sewer"
 				end
-
 				return "The sewers only open at night", true
 			end,
 		}
-
 		tbl9[20] = {
 			Island = "Jungle",
 			Name = "The Thieving Monkey",
@@ -17465,20 +16230,17 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						arg2.footprints = footprints
 					elseif arg3 == "HatState" then
 						arg2.ownsHat = footprints == true
-
 						if arg2.ownsHat then
 							arg2.pickup = nil
 						end
 					elseif arg3 == "HatDropped" then
 						local position = typeof(footprints) == "CFrame" and footprints.Position
 						local flag
-
 						if position then
 							flag = position
 						else
 							flag = typeof(footprints) == "Vector3" and footprints
 						end
-
 						arg2.pickup = flag or typeof(arg4) == "CFrame" and arg4.Position or typeof(arg4) == "Vector3" and arg4 or nil
 						arg2.dropped = tick()
 					elseif arg3 == "ClearHatPickup" then
@@ -17492,83 +16254,61 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						arg2.landed = nil
 					end
 				end)
-
 				local flag = not v11.landed and not v11.pickup
-
 				if flag then
 					flag = tick() - (v11.initialized or 0) > 30
 				end
-
 				if flag then
 					v11.initialized = tick()
 					arg:FireServer("Initialize")
 					task.wait(1)
 				end
-
 				if v11.ownsHat or localPlayer.Backpack:FindFirstChild("Adventurer's Hat") or localPlayer.Character:FindFirstChild("Adventurer's Hat") then
 					v11.pickup = nil
-
 					if HiddenSettle((GetNpcPosition("Adventurer") or Vector3.new(-1680, 48, 175)) + Vector3.new(0, 1.5, 4), 8) then
 						arg:FireServer("ReturnHat")
 						task.wait(1)
-
 						if not arg.Completed then
 							pcall(TalkHiddenNpc, "Adventurer", { "Return the hat", "You're welcome." })
 						end
-
 						HiddenEvent.checked = 0
 						task.wait(1.5)
 					end
-
 					return "Return the hat to the Adventurer"
 				end
-
 				local adventurerSHat = workspace._WorldOrigin:FindFirstChild("Adventurer's Hat")
 				local handle = adventurerSHat and adventurerSHat:FindFirstChild("Handle")
-
 				if handle then
 					v11.pickup = v11.pickup or handle.Position
 				end
-
 				if v11.pickup then
 					local position = handle and handle.Position or v11.pickup
-
 					if HiddenGoTo(position + Vector3.new(0, 2, 0), 8) then
 						HiddenHold(CFrame.new(position + Vector3.new(0, 2, 0)))
 						handle = handle and handle:FindFirstChildOfClass("ProximityPrompt")
-
 						if handle and handle.Enabled then
 							pcall(fireproximityprompt, handle)
 						else
 							arg:FireServer("ClaimHat")
 						end
-
 						task.wait(1)
 					end
-
 					local flag2 = not adventurerSHat
-
 					if flag2 then
 						flag2 = tick() - (v11.dropped or 0) > 20
 					end
-
 					if flag2 then
 						v11.pickup = nil
 					end
-
 					return "Pick up the Adventurer's Hat"
 				end
-
 				local v12 = nil
-
 				for _, child in ipairs(workspace.Enemies:GetChildren()) do
 					local flag2 = child.Name == "Monkey"
-
 					if flag2 then
 						local name_ = localPlayer.Name
 						flag2 = child:GetAttribute("LocalEnemy") == name_
 					end
-
 					if flag2 then
 						v12 = child
 						break
@@ -17576,56 +16316,44 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						v12 = nil
 					end
 				end
-
 				local humanoidRootPart = v12 and v12:FindFirstChild("HumanoidRootPart")
-
 				if humanoidRootPart and v11.landed then
 					HiddenEvent.stallGrace = tick() + 5
-
 					if HiddenGoTo(humanoidRootPart.Position + Vector3.new(0, 2, 4), 12) then
 						HiddenHold(humanoidRootPart.CFrame * CFrame.new(0, 2, 4))
 						EquipHiddenWeapon("Melee")
-
 						if os.clock() - (HiddenEvent.lastHit or 0) >= 0.4 then
 							HiddenEvent.lastHit = os.clock()
 							HiddenModules.RegisterAttack:FireServer(0.3)
 							HiddenModules.RegisterHit:FireServer(humanoidRootPart, { { v12, humanoidRootPart } })
 						end
 					end
-
 					return "Catch the thieving monkey"
 				end
-
 				if not v11.footprints then
 					return "Waiting for the monkey to steal the hat", true
 				end
 				local vector = Vector3.zero
 				local n = 0
-
 				for _, footprint in pairs(v11.footprints) do
 					if typeof(footprint) == "CFrame" then
 						vector = vector + (footprint.Position)
 						n = n + (1)
 					end
 				end
-
 				local position = n > 0 and vector / n or localPlayer.Character:GetPivot().Position
 				local v13 = nil
 				local v14 = nil
-
 				for _, v15 in ipairs(game:GetService("CollectionService"):GetTagged("ValidMonkeyTree")) do
 					local magnitude = (v15:GetPivot().Position - position).Magnitude
-
 					if not v13 or magnitude < v13 then
 						v13 = magnitude
 						v14 = v15
 					end
 				end
-
 				local v15 = ipairs
 				local descendants = v14 and v14:GetDescendants() or {}
 				local v16 = nil
-
 				for _, descendant in v15(descendants) do
 					if descendant.Name == "Leaves" and descendant:IsA("BasePart") and descendant:HasTag("M1HitRegistry") then
 						if not v16 or (descendant.Position - position).Magnitude < (v16.Position - position).Magnitude then
@@ -17633,23 +16361,19 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						end
 					end
 				end
-
 				if v16 then
 					if HiddenGoTo(v16.Position + Vector3.new(0, 0, 6), 10) then
 						HiddenHold(CFrame.new(v16.Position + Vector3.new(0, 0, 6)))
 						HitHiddenPart(v16)
 					end
-
 					return "Follow the footprints and shake the tree"
 				end
-
 				if v14 and HitHiddenTriggers({ v14 }) then
 					return "Follow the footprints and shake the tree"
 				end
 				return "Follow the monkey footprints", true
 			end,
 		}
-
 		tbl9[21] = {
 			Island = "Underwater City",
 			Name = "Fishman Karate",
@@ -17660,11 +16384,9 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					task.wait(2)
 					return "Bend the light for the Water Kung Fu Teacher"
 				end
-
 				return "Waiting for the sealed door", true
 			end,
 		}
-
 		tbl9[22] = {
 			Island = "Underwater City",
 			Name = "Beyond the Bubble",
@@ -17675,24 +16397,19 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					return "Clear the evil from the cavern"
 				end
 				local v12 = game:GetService("CollectionService"):GetTagged("CursedChest")[1]
-
 				if v12 then
 					local isBasePart = v12:IsA("BasePart") and v12 or v12:FindFirstChildWhichIsA("BasePart", true)
-
 					if isBasePart and HiddenSettle(isBasePart.Position + Vector3.new(0, 3, 0), 9) then
 						arg:InvokeServer("OpenChest")
 						HiddenEvent.checked = 0
 						task.wait(2)
 					end
-
 					return "Open the cursed chest"
 				end
-
 				HiddenGoTo(Vector3.new(61696, 532, -1420), 30)
 				return "Ride the bubble to the cavern", localPlayer:DistanceFromCharacter(Vector3.new(61696, 532, -1420)) < 40
 			end,
 		}
-
 		tbl9[23] = {
 			Island = "Magma Village",
 			Name = "Evil Slimes",
@@ -17704,7 +16421,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 				local position = bonusMomentLocations:GetPivot().Position
 				local v11 = nil
-
 				for _, child in ipairs(workspace.Enemies:GetChildren()) do
 					if string.find(child.Name, "Slime") and IsHiddenTarget(child) and (child:GetPivot().Position - position).Magnitude < 400 then
 						v11 = child
@@ -17713,32 +16429,26 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						v11 = nil
 					end
 				end
-
 				if v11 then
 					KillHiddenEnemy(v11)
 					return "Defeat the Evil Slimes"
 				end
 				local tbl10 = {}
-
 				for _, descendant in ipairs(bonusMomentLocations:GetDescendants()) do
 					if descendant:IsA("BasePart") and descendant:HasTag("M1HitRegistry") then
 						table.insert(tbl10, descendant)
 					end
 				end
-
 				if #tbl10 == 0 then
 					return "Waiting for the slime geyser", true
 				end
-
 				table.sort(tbl10, function(arg, arg2)
 					return localPlayer:DistanceFromCharacter(arg.Position) < localPlayer:DistanceFromCharacter(arg2.Position)
 				end)
-
 				HitHiddenPart(tbl10[1])
 				return "Smash the strange geyser"
 			end,
 		}
-
 		tbl9[24] = {
 			Island = "Sky",
 			Name = "Unexpected Guest",
@@ -17760,91 +16470,72 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						arg2.vaultOpened = nil
 					end
 				end)
-
 				local skyCastle = workspace.Map.Sky:FindFirstChild("SkyCastle")
 				if not skyCastle or not arg.Active then
 					return "Waiting for strangers at the castle", true
 				end
 				local skyInterior = skyCastle:FindFirstChild("SkyInterior")
 				local vault = skyInterior and skyInterior:FindFirstChild("Vault")
-
 				if v11.vaultOpened then
 					local angelicVaultChest = workspace:FindFirstChild("AngelicVaultChest")
 					angelicVaultChest = angelicVaultChest and angelicVaultChest:GetPivot().Position or vault and vault:GetPivot().Position
-
 					if angelicVaultChest and HiddenSettle(angelicVaultChest + Vector3.new(0, 3, 5), 10) then
 						arg:InvokeServer("TakeChest")
 						HiddenEvent.checked = 0
 						task.wait(1.5)
 					end
-
 					return "Take the vault treasure"
 				end
-
 				local position = skyCastle:GetPivot().Position
-
 				for _, child in ipairs(workspace.Enemies:GetChildren()) do
 					if IsHiddenTarget(child) and (child:GetPivot().Position - position).Magnitude < 350 then
 						KillHiddenEnemy(child)
 						return "Clear out the castle intruders"
 					end
 				end
-
 				if v11.code and v11.ambushCleared and vault then
 					if HiddenSettle(vault:GetPivot().Position + Vector3.new(0, 3, 6), 12) then
 						arg:InvokeServer("VaultCodes")
 						arg:InvokeServer("TryCode", v11.code)
 						task.wait(1.5)
 					end
-
 					return "Open the Angelic Vault (" .. v11.code .. ")"
 				end
-
 				skyInterior = skyInterior and skyInterior:FindFirstChild("Letter")
-
 				if skyInterior and not v11.code then
 					if HiddenSettle(skyInterior.Position + Vector3.new(0, 3, 3), 8) then
 						local response = arg:InvokeServer("ReadLetter")
 						v11.code = type(response) == "string" and response or nil
 						task.wait(1)
 					end
-
 					return "Read the crumpled letter"
 				end
-
 				if v11.code and not v11.guards then
 					arg:FireServer("CutsceneDone")
 					arg:FireServer("GuardsOut")
 					task.wait(2)
 					return "Wait for the vault guards"
 				end
-
 				local secretDoor = skyCastle:FindFirstChild("SecretDoor")
-
 				if secretDoor and v11.cleared then
 					local n = 0
 					local v12 = nil
-
 					for _, descendant in ipairs(secretDoor:GetDescendants()) do
 						if descendant:IsA("BasePart") and descendant.Size.X * descendant.Size.Y * descendant.Size.Z > n then
 							n = descendant.Size.X * descendant.Size.Y * descendant.Size.Z
 							v12 = descendant
 						end
 					end
-
 					if v12 and HiddenSettle(v12.Position + Vector3.new(0, 0, 4), 10) then
 						arg:FireServer("BreakDoor")
 						task.wait(1.5)
 					end
-
 					return "Break the secret door"
 				end
-
 				HiddenGoTo(position + Vector3.new(0, 20, 0), 60)
 				return "Search the castle", true
 			end,
 		}
-
 		tbl9[25] = {
 			Island = "Sky",
 			Name = "The Clown's Jewels",
@@ -17865,7 +16556,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						arg2.provoked = nil
 					end
 				end)
-
 				if v11.ready then
 					if HiddenGoTo(v11.ready + Vector3.new(0, 3, 0), 4) then
 						arg:FireServer("Collect")
@@ -17873,10 +16563,8 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						HiddenEvent.checked = 0
 						task.wait(1)
 					end
-
 					return "Collect the Skylands treasure"
 				end
-
 				for _, v12 in ipairs(game:GetService("CollectionService"):GetTagged("ClownJewelsGuard")) do
 					local name_ = localPlayer.Name
 					if v12:GetAttribute("LocalEnemy") == name_ and IsHiddenTarget(v12) then
@@ -17884,14 +16572,12 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						return "Defeat the Sky Bandits"
 					end
 				end
-
 				if v11.chest and localPlayer:DistanceFromCharacter(v11.chest) <= 25 then
 					if workspace:FindFirstChild("ClownJewelsLockedChest") or workspace:FindFirstChild("ClownJewelsChest") then
 						v11.missing = nil
 					else
 						v11.missing = v11.missing or tick()
 						local missing = v11.missing
-
 						if tick() - missing > 8 then
 							v11.chest = nil
 							v11.missing = nil
@@ -17899,24 +16585,19 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						end
 					end
 				end
-
 				if v11.chest then
 					local flag = HiddenSettle(v11.chest + Vector3.new(0, 3, 6), 12)
-
 					if flag then
 						flag = tick() - (v11.provoked or 0) > 15
 					end
-
 					if flag then
 						v11.provoked = tick()
 						arg:FireServer("Provoke")
 						task.wait(1)
 						arg:FireServer("BeginFight")
 					end
-
 					return "Claim the chained chest"
 				end
-
 				if not arg.Active then
 					return "The treasure clouds are quiet", true
 				end
@@ -17929,7 +16610,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return "Waiting for the treasure cloud", true
 			end,
 		}
-
 		tbl9[26] = {
 			Island = "Sky",
 			Name = "Electric Fighting Teacher",
@@ -17938,48 +16618,38 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				local electro = HiddenEvent.electro
 				local flag = not electro
 				local flag2
-
 				if flag then
 					flag2 = flag
 				else
 					local time_ = electro.time
 					flag2 = tick() - time_ > 5
 				end
-
 				if flag2 then
 					electro = { time = tick(), state = CommF:InvokeServer("ElectroQuestState") }
 					HiddenEvent.electro = electro
 				end
-
 				local vector = GetNpcPosition("Mad Scientist") or Vector3.new(-4628.9, 12, -355.7)
-
 				if electro.state == 4 then
 					if HiddenSettle(vector + Vector3.new(0, 1.5, 4), 8) then
 						if CommF:InvokeServer("DeliverLightningBolt") ~= 1 then
 							CommF:InvokeServer("BuyElectro")
 						end
-
 						HiddenEvent.electro = nil
 						HiddenEvent.checked = 0
 						task.wait(1.5)
 					end
-
 					return "Bring the Lightning Bolt to the Mad Scientist"
 				end
-
 				if electro.state ~= 1 and electro.state ~= 2 then
 					if HiddenSettle(vector + Vector3.new(0, 1.5, 4), 8) then
 						CommF:InvokeServer("AcceptElectroQuest")
 						HiddenEvent.electro = nil
 						task.wait(1)
 					end
-
 					return "Ask the Mad Scientist about Electric"
 				end
-
 				for k, v12 in pairs(v11) do
 					local M1HitRegistry = nil
-
 					for _, v13 in ipairs(v12) do
 						if v13.Parent and v13:HasTag("M1HitRegistry") then
 							M1HitRegistry = v13
@@ -17988,23 +16658,18 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 							M1HitRegistry = nil
 						end
 					end
-
 					M1HitRegistry = M1HitRegistry or k.Parent and k:HasTag("M1HitRegistry") and k
-
 					if M1HitRegistry then
 						HitHiddenPart(M1HitRegistry)
 						HiddenEvent.electro.time = tick() - 4
 						return "Strike the charged storm cloud"
 					end
-
 					v11[k] = nil
 				end
-
 				HiddenGoTo(Vector3.new(-5025, 820, -640), 200)
 				return "Look for a charged storm cloud", true
 			end,
 		}
-
 		tbl9[27] = {
 			Island = "Fountain",
 			Name = "Fountain Pipe Repair",
@@ -18014,7 +16679,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				if not fountainPipeRepairState or not fountainPipeNodes or not fountainPipeRepairState.pipes then
 					return "Waiting for the fountain pipes", true
 				end
-
 				if not fountainPipeRepairState.fullyRepaired then
 					for _, child in ipairs(fountainPipeNodes:GetChildren()) do
 						local attribute = child:GetAttribute("FountainPipeRepairId")
@@ -18024,66 +16688,53 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 							return "Rotate " .. attribute .. " (" .. fountainPipeRepairState.repairedCount .. "/" .. fountainPipeRepairState.totalPipes .. ")"
 						end
 					end
-
 					return "Waiting for the water to flow", true
 				end
-
 				local boat = fountainPipeRepairState.boat
 				boat = boat and boat:FindFirstChild("FakeVehicleSeat")
-
 				if boat and HiddenSettle(boat.Position + Vector3.new(0, 3, 0), 5) then
 					arg:InvokeServer("TurnIn")
 					HiddenEvent.checked = 0
 					task.wait(3)
 				end
-
 				return "Launch the stuck ship"
 			end,
 		}
-
 		tbl9[28] = {
 			Island = "Colosseum",
 			Name = "King's Apprentice",
 			Run = function(arg)
 				local vector = GetNpcPosition("Colosseum Emperor") or Vector3.new(-1846.5, 90, -3333.6)
 				local kingSApprentice = workspace:FindFirstChild("King's Apprentice")
-
 				if arg.Progress == 1 then
 					if HiddenSettle(vector + Vector3.new(0, 1.5, 4), 8) then
 						arg:FireServer("Report")
 						task.wait(1.5)
 						HiddenEvent.checked = 0
 					end
-
 					return "Report to the Emperor"
 				end
-
 				local v11 = kingSApprentice and FindHiddenEnemy({ "Gladiator", "Upgraded Gladiator", "Supreme Gladiator" }, kingSApprentice.StartMatchHitbox.Position, 250)
 				if v11 then
 					KillHiddenEnemy(v11)
 					return "Defeat the gladiator waves"
 				end
-
 				if not arg.Active then
 					if HiddenSettle(vector + Vector3.new(0, 1.5, 4), 8) then
 						arg:FireServer("Interact")
 						task.wait(1.5)
 					end
-
 					return "Accept the Emperor's challenge"
 				end
-
 				if kingSApprentice and HiddenSettle(kingSApprentice.StartMatchHitbox.Position + Vector3.new(0, 3, 0), 6) then
 					if tick() - (HiddenEvent.matchStarted or 0) > 20 then
 						HiddenEvent.matchStarted = tick()
 						arg:FireServer("StartMatch")
 					end
 				end
-
 				return "Step into the arena"
 			end,
 		}
-
 		tbl9[29] = {
 			Island = "Colosseum",
 			Name = "Legendary Creator Statues",
@@ -18096,7 +16747,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						return false, v12 or "needs an eaten Blox Fruit with M1 for the Fruit statue"
 					end
 				end
-
 				return true
 			end,
 			Run = function()
@@ -18104,12 +16754,10 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				if not podiumModels then
 					return "Waiting for the statues", true
 				end
-
 				local v11 = GetHiddenState("Legendary Creator Statues", function(arg, arg2, arg3)
 					if typeof(arg3) == "Instance" then
 						arg3 = arg3.Name
 					end
-
 					if arg2 == "PodiumLit" then
 						arg[arg3] = true
 					elseif arg2 == "PodiumHit" then
@@ -18119,16 +16767,13 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						for _, v11 in ipairs({ "Melee", "Sword", "Fruit", "Gun" }) do
 							arg[v11] = nil
 						end
-
 						arg.seen = nil
 						arg.tries = nil
 					end
 				end)
-
 				for _, v12 in ipairs({ "Sword", "Fruit", "Melee", "Gun" }) do
 					local podiumTouchBox = podiumModels:FindFirstChild(v12)
 					podiumTouchBox = podiumTouchBox and podiumTouchBox:FindFirstChild("PodiumTouchBox")
-
 					if podiumTouchBox and not v11[v12] then
 						if localPlayer:DistanceFromCharacter(podiumTouchBox.Position) > 12 then
 							HiddenMove(podiumTouchBox.CFrame * CFrame.new(0, 3, 9))
@@ -18136,18 +16781,15 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 							if not HiddenSettle((podiumTouchBox.CFrame * CFrame.new(0, 3, 6)).Position, 10) then
 								return "Go to the " .. v12 .. " statue"
 							end
-
 							if v12 == "Fruit" then
 								if not GetHiddenFruitM1() then
 									EnsureHiddenFruit("the Fruit statue")
 								end
-
 								if not GetHiddenFruitM1() or not EquipHiddenWeapon("Blox Fruit") then
 									NotifyHiddenFruitM1("the Fruit statue")
 									HiddenEvent.skipped["Legendary Creator Statues"] = tick() + 1800
 									return "Need a Blox Fruit with M1 for the Fruit statue", true
 								end
-
 								UseHiddenSkillAt(podiumTouchBox)
 							elseif v12 == "Gun" then
 								if not ShootHiddenGunAt(podiumTouchBox) then
@@ -18157,7 +16799,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 								if not EquipHiddenWeapon(v12) then
 									return "Need a " .. v12 .. " weapon", true
 								end
-
 								if os.clock() - (HiddenEvent.lastHit or 0) >= 0.6 then
 									HiddenEvent.lastHit = os.clock()
 									HiddenModules.RegisterAttack:FireServer(0.3)
@@ -18165,27 +16806,22 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 									v11.tries = v11.tries or {}
 									v11.tries[v12] = (v11.tries[v12] or 0) + 1
 									local flag = v11.tries[v12] >= 10
-
 									if flag then
 										flag = not (v11.seen and v11.seen[v12])
 									end
-
 									if flag then
 										v11[v12] = true
 									end
 								end
 							end
 						end
-
 						return "Power the " .. v12 .. " statue"
 					end
 				end
-
 				HiddenEvent.checked = 0
 				return "Waiting for the statues to answer", true
 			end,
 		}
-
 		tbl9[30] = {
 			Island = "Marine Fortress",
 			Name = "Fortress Flagpole",
@@ -18202,52 +16838,41 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						arg2.hasRope = true
 					end
 				end)
-
 				local flag = not v11.time
-
 				if not flag then
 					local time_ = v11.time
 					flag = tick() - time_ > 20
 				end
-
 				if flag then
 					v11.time = tick()
 					arg:FireServer("Init")
 					task.wait(1.5)
 					return "Check the flagpole"
 				end
-
 				if v11.hasRope and v11.flag then
 					if HiddenSettle(v11.flag + Vector3.new(0, 3, 0), 3) then
 						SetHiddenStep("Raise the flag and dodge the cannons")
 						HoistHiddenFlag(arg, v11.flag + Vector3.new(0, 3, 0))
 						v11.time = nil
 					end
-
 					return "Raise the flag and dodge the cannons"
 				end
-
 				if not arg.Active or not v11.rope then
 					local Parlus = GetNpcPosition("Parlus")
-
 					if Parlus and HiddenSettle(Parlus + Vector3.new(0, 1.5, 3), 8) then
 						arg:FireServer("Start")
 						task.wait(1.5)
 					end
-
 					return "Talk to Parlus"
 				end
-
 				if HiddenSettle(v11.rope + Vector3.new(0, 3, 0), 6) then
 					arg:FireServer("TakeRope")
 					task.wait(1.5)
 					v11.time = nil
 				end
-
 				return "Take the hidden rope"
 			end,
 		}
-
 		tbl9[31] = {
 			Island = "Frozen Village",
 			Name = "Breaking the Ice",
@@ -18261,7 +16886,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return "Break the ice around the Ability Teacher"
 			end,
 		}
-
 		tbl9[32] = {
 			Island = "Middle Town",
 			Name = "Early Access",
@@ -18269,45 +16893,34 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			Run = function(arg)
 				local earlyAccess = HiddenEvent.earlyAccess
 				local flag = not earlyAccess
-
 				if not flag then
 					local time_ = earlyAccess.time
 					flag = tick() - time_ > 8
 				end
-
 				if flag then
 					earlyAccess = {
 						time = tick(),
 						available = arg:InvokeServer("IsAvailable") == true,
 						stage = arg:InvokeServer("GetState"),
 					}
-
 					HiddenEvent.earlyAccess = earlyAccess
 				end
-
 				local n = tonumber(earlyAccess.stage) or 0
-
 				local function fn(arg2, ...)
 					if not HiddenSettle(arg2, 8) then
 						return
 					end
-
 					for _, v11 in ipairs({ ... }) do
 						local response, v12 = arg:InvokeServer(v11)
-
 						if type(v12) == "number" then
 							earlyAccess.stage = v12
 						end
-
 						task.wait(0.5)
 					end
-
 					earlyAccess.time = 0
 				end
-
 				local robotmegaSuperfan = workspace.NPCs:FindFirstChild("robotmega superfan")
 				robotmegaSuperfan = robotmegaSuperfan and robotmegaSuperfan:GetPivot().Position + Vector3.new(0, 1.5, 3) or Vector3.new(-1044.5, 26, 1683)
-
 				if n == 0 then
 					if not earlyAccess.available then
 						return "DevBros are not visiting Middle Town now", true
@@ -18315,31 +16928,25 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					fn(robotmegaSuperfan, "InteractQuestGiver", "AcceptQuest")
 					return "Talk to robotmega superfan"
 				end
-
 				if n == 1 then
 					local earlyAccessBonusMomentAssets = workspace._WorldOrigin:FindFirstChild("EarlyAccessBonusMomentAssets")
 					earlyAccessBonusMomentAssets = earlyAccessBonusMomentAssets and earlyAccessBonusMomentAssets:FindFirstChild("KeySpot")
 					fn(earlyAccessBonusMomentAssets and earlyAccessBonusMomentAssets.Position + Vector3.new(0, 3, 0) or Vector3.new(-1052, 13, 1781), "CollectKey")
 					return "Find the Rear Door Key"
 				end
-
 				if n == 2 then
 					fn(Vector3.new(-1091.8, 14, 1806), "InteractMansionDoor")
 					return "Open the rear door"
 				end
-
 				if n == 3 then
 					HiddenEvent.infiltration = HiddenEvent.infiltration or tick()
 					local infiltration = HiddenEvent.infiltration
-
 					if tick() - infiltration > 9 then
 						HiddenEvent.infiltration = nil
 						fn(localPlayer.Character:GetPivot().Position, "FinishInfiltration")
 					end
-
 					return "Sneak into the dev room"
 				end
-
 				if n == 4 then
 					fn(robotmegaSuperfan, "InteractQuestGiver", "ClaimReward")
 					return "Report to robotmega superfan"
@@ -18347,7 +16954,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return "Waiting for Early Access", true
 			end,
 		}
-
 		tbl9[33] = {
 			Island = "Middle Town",
 			Name = "Lookout",
@@ -18355,23 +16961,19 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			Run = function(arg)
 				local lookout = HiddenEvent.lookout
 				local flag = not lookout
-
 				if not flag then
 					local time_ = lookout.time
 					flag = tick() - time_ > 10
 				end
-
 				if flag then
 					local response = arg:InvokeServer("GetProgress")
 					lookout = { time = tick(), progress = type(response) == "table" and response or nil }
 					HiddenEvent.lookout = lookout
 				end
-
 				local progress = lookout.progress
 				if not progress then
 					return "Waiting for Experienced Captain", true
 				end
-
 				if progress.Unlocked then
 					local experiencedCaptain = workspace.NPCs:FindFirstChild("Experienced Captain")
 					if experiencedCaptain and HiddenSettle(experiencedCaptain:GetPivot().Position + Vector3.new(0, 1.5, 4), 10) then
@@ -18380,31 +16982,24 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					end
 					return "Go to the Experienced Captain for lookout duty"
 				end
-
 				if (progress.SecondsRemaining or 0) > 0 then
 					local time_ = lookout.time
 					local n = progress.SecondsRemaining - (tick() - time_)
-
 					if n > 0 then
 						HiddenEvent.readyAt = HiddenEvent.readyAt or {}
 						HiddenEvent.readyAt.Lookout = tick() + n
 					end
-
 					return "Captain needs time (" .. FormatMagnetTime(math.max(0, n)) .. ")", n > 0
 				end
-
 				local experiencedCaptain = workspace.NPCs:FindFirstChild("Experienced Captain")
-
 				if experiencedCaptain and HiddenSettle(experiencedCaptain:GetPivot().Position + Vector3.new(0, 1.5, 4), 10) then
 					arg:InvokeServer("AdvanceIntroduction")
 					HiddenEvent.lookout = nil
 					task.wait(1)
 				end
-
 				return "Talk to Experienced Captain (" .. (progress.IntroVisits or 0) .. "/3)"
 			end,
 		}
-
 		tbl9[34] = {
 			Island = "Middle Town",
 			Name = "X Marks The Spot",
@@ -18419,87 +17014,66 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						arg2.pickup = typeof(stage) == "CFrame" and stage.Position or arg2.pickup
 					end
 				end)
-
 				local flag = not v11.stage
-
 				if not flag then
 					flag = tick() - (v11.initialized or 0) > 60
 				end
-
 				if flag then
 					v11.initialized = tick()
 					arg:FireServer("Initialize")
 					task.wait(1.5)
 					return "Read treasure map state"
 				end
-
 				if v11.stage == "Tree" then
 					local v12 = FindTaggedPartIn(workspace.Map:FindFirstChild("Town"))
-
 					if v12 then
 						HitHiddenPart(v12)
 					end
-
 					return "Shake the tree for the map"
 				end
-
 				if v11.stage == "Pickup" and v11.pickup then
 					if HiddenSettle(v11.pickup + Vector3.new(0, 2, 0), 6) then
 						arg:FireServer("PickupMap")
 						task.wait(1.5)
 					end
-
 					return "Pick up Treasure Map"
 				end
-
 				if v11.stage == "Map" and v11.piece then
 					if HiddenSettle(v11.piece + Vector3.new(0, 2, 0), 6) then
 						arg:FireServer("CollectCheckpoint")
 						task.wait(1.5)
 					end
-
 					return "Collect broken map piece"
 				end
-
 				if v11.stage == "Dig" and v11.target then
 					local v12 = FindTaggedPartNear(v11.target, 4)
-
 					if v12 then
 						HitHiddenPart(v12)
 					else
 						HiddenGoTo(v11.target + Vector3.new(0, 3, 5), 6)
 					end
-
 					return "Dig at the X"
 				end
-
 				if v11.stage == "Chest" then
 					local persistentParts = workspace._WorldOrigin:FindFirstChild("PersistentParts")
 					persistentParts = persistentParts and persistentParts:FindFirstChild("Buried Treasure")
 					local openPrompt = persistentParts and persistentParts:FindFirstChild("OpenPrompt", true)
-
 					if openPrompt and HiddenSettle(openPrompt.Parent.Position + Vector3.new(0, 2, 3), 6) then
 						fireproximityprompt(openPrompt)
 						task.wait(1.5)
 					end
-
 					return "Open Buried Treasure"
 				end
-
 				if v11.stage == "Enemies" then
 					local v12 = FindHiddenEnemy({ "Desert Skeleton" }, v11.target or localPlayer.Character:GetPivot().Position, 300)
-
 					if v12 then
 						KillHiddenEnemy(v12)
 					end
-
 					return "Defeat treasure guards"
 				end
-
 				return "Waiting for treasure", true
 			end,
 		}
-
 		tbl9[35] = {
 			Island = "Pirate Village",
 			Name = "Windmill Maintenance",
@@ -18509,24 +17083,19 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				if not windmillRig then
 					return "Waiting for windmill", true
 				end
-
 				if not EquipHiddenWeapon("Sword") then
 					return "Need a sword to cut the ropes", true
 				end
-
 				if not HiddenEvent.windmill then
 					HiddenEvent.windmill = { cut = {} }
-
 					HiddenEvent.windmill.connection = ListenHiddenMoment("Windmill Maintenance", function(arg, arg2)
 						if arg == "RopeCut" then
 							HiddenEvent.windmill.cut[arg2] = true
 						end
 					end)
 				end
-
 				for i_ = 1, 5 do
 					local v11 = windmillRig:FindFirstChild("Rope" .. i_ .. "A")
-
 					if v11 and not HiddenEvent.windmill.cut["Rope" .. i_] and v11.Transparency < 1 then
 						if localPlayer:DistanceFromCharacter(v11.Position) > 12 then
 							HiddenMove(v11.CFrame * CFrame.new(0, 0, 5))
@@ -18535,65 +17104,51 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 							HiddenModules.RegisterAttack:FireServer(0.3)
 							HiddenModules.RegisterHit:FireServer(v11)
 						end
-
 						return "Cut windmill rope " .. i_ .. "/5"
 					end
 				end
-
 				return "Waiting for windmill to spin", true
 			end,
 		}
-
 		tbl9[36] = {
 			Island = "Jungle",
 			Name = "Zipline Repair",
 			Run = function(arg)
 				local zipline = HiddenEvent.zipline
 				local flag = not zipline
-
 				if not flag then
 					local time_ = zipline.time
 					flag = tick() - time_ > 30
 				end
-
 				if flag then
 					local v11 = nil
-
 					v11 = ListenHiddenMoment("Zipline Repair", function(arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 						if arg2 == "Setup" and typeof(arg3) == "CFrame" then
 							HiddenEvent.zipline = { time = tick(), pickup = arg3.Position, target = arg7, source = arg8 }
 							v11:Disconnect()
 						end
 					end)
-
 					arg:FireServer("Initialize")
 					task.wait(2)
-
 					if v11.Connected then
 						v11:Disconnect()
 					end
-
 					return "Locate grappling hook"
 				end
-
 				local character = localPlayer.Character
 				local grapplingHook = character:FindFirstChild("Grappling Hook") or localPlayer.Backpack:FindFirstChild("Grappling Hook")
-
 				if not grapplingHook then
 					if HiddenSettle(zipline.pickup + Vector3.new(0, 2, 0), 6) then
 						arg:FireServer("PickupTool")
 						task.wait(1.5)
 					end
-
 					return "Pick up grappling hook"
 				end
-
 				if HiddenSettle(zipline.source + Vector3.new(0, 4, 0), 6) then
 					if grapplingHook.Parent ~= character then
 						character.Humanoid:EquipTool(grapplingHook)
 						task.wait(0.5)
 					end
-
 					local position = character.HumanoidRootPart.Position
 					local target = zipline.target
 					local v11 = require(ReplicatedStorage.Util.Trajectory).getArcAim(position, target)
@@ -18601,11 +17156,9 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					HiddenEvent.checked = 0
 					task.wait(2)
 				end
-
 				return "Throw hook to the zipline"
 			end,
 		}
-
 		tbl9[37] = {
 			Island = "Desert",
 			Name = "Archaeologist's Tablet",
@@ -18614,7 +17167,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				if not archaeologistSTablet then
 					return "Waiting for tablet", true
 				end
-
 				for _, child in ipairs(archaeologistSTablet.Pillars:GetChildren()) do
 					local attribute = child:GetAttribute("NumHits") or 0
 					if attribute < 3 then
@@ -18622,11 +17174,9 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						return "Clear sand " .. child.Name .. " (" .. attribute .. "/3)"
 					end
 				end
-
 				return "Waiting for completion", true
 			end,
 		}
-
 		tbl9[38] = {
 			Island = "Desert",
 			Name = "Rescue Hasan",
@@ -18634,21 +17184,16 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			Run = function(arg)
 				local hasan = workspace.NPCs:FindFirstChild("Hasan")
 				local position = hasan and hasan:GetPivot().Position or Vector3.new(1308, 23, 4492)
-
 				if (arg.Progress or 0) >= 1 then
 					hasan = hasan and HiddenSettle(position + Vector3.new(0, 1.5, 4), 10)
-
 					if hasan then
 						arg:FireServer("Interact")
 						HiddenEvent.checked = 0
 						task.wait(1.5)
 					end
-
 					return "Talk to Hasan"
 				end
-
 				local v11 = FindHiddenEnemy({ "Desert Skeleton" }, Vector3.new(1300, 15, 4460), 250)
-
 				if v11 then
 					HiddenEvent.farmHeight = 25
 					KillHiddenEnemy(v11)
@@ -18657,26 +17202,22 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					HiddenEvent.waveStarted = tick()
 					return "Kill Desert Skeleton"
 				end
-
 				local rescueHasan = workspace:FindFirstChild("Rescue Hasan")
 				rescueHasan = rescueHasan and rescueHasan:FindFirstChild("CutsceneTrigger")
 				if not rescueHasan then
 					return "Waiting for the pyramid scene", true
 				end
-
 				if tick() - (HiddenEvent.hasanHelped or 0) < 90 then
 					HiddenEvent.stallGrace = tick() + 20
 					return "Waiting for Hasan's skeletons to come out of the coffins"
 				end
 				local flag = (HiddenEvent.hasanTries or 0) >= 2
 				local flag2
-
 				if flag then
 					flag2 = (HiddenEvent.hasanTries or 0) < 4
 				else
 					flag2 = flag
 				end
-
 				if flag2 and hasan then
 					if HiddenSettle(position + Vector3.new(0, 1.5, 4), 10) then
 						arg:FireServer("Interact")
@@ -18684,10 +17225,8 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						HiddenEvent.hasanTries = (HiddenEvent.hasanTries or 0) + 1
 						task.wait(1.5)
 					end
-
 					return "Talk to Hasan to claim the reward"
 				end
-
 				if (HiddenEvent.hasanTries or 0) >= 4 then
 					HiddenEvent.hasanTries = 0
 					HiddenEvent.skipped["Rescue Hasan"] = tick() + 600
@@ -18695,7 +17234,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					HiddenEvent.current = nil
 					return "Hasan's intro did not start, trying again later", true
 				end
-
 				if not HiddenEvent.hasanEntering then
 					if not HiddenSettle(rescueHasan.Position + Vector3.new(0, 5, 38), 8) then
 						return "Go to the pyramid entrance"
@@ -18706,22 +17244,18 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					HiddenEvent.hasanEntering = tick()
 					localPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(rescueHasan.Position + Vector3.new(0, 4, 0))
 				end
-
 				HiddenEvent.stallGrace = tick() + 30
 				local v12 = RunHiddenDialogue({ "Help Hasan" }, 14)
 				HiddenEvent.hasanEntering = nil
-
 				if v12 then
 					HiddenEvent.hasanHelped = tick()
 					HiddenEvent.hasanTries = 0
 					return "Help Hasan"
 				end
-
 				HiddenEvent.hasanTries = (HiddenEvent.hasanTries or 0) + 1
 				return "Walk into the pyramid again"
 			end,
 		}
-
 		tbl9[39] = {
 			Island = "Desert",
 			Name = "Prickly Harvest",
@@ -18730,7 +17264,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			Run = function(arg)
 				local desertMerchant = workspace.NPCs:FindFirstChild("Desert Merchant")
 				local flag = arg:InvokeServer("TurnInReady") == true
-
 				if flag or not HiddenEvent.cactusStarted then
 					if desertMerchant and HiddenSettle(desertMerchant:GetPivot().Position + Vector3.new(0, 1.5, 4), 10) then
 						local response = arg:InvokeServer("Interact")
@@ -18739,26 +17272,20 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 							return "Cacti not blooming yet", true
 						end
 					end
-
 					return flag and "Turn in Cactus Petals" or "Talk to Desert Merchant"
 				end
-
 				local huge = math.huge
 				local v11 = nil
-
 				for _, child in ipairs(workspace.Map.Desert.Cacti:GetChildren()) do
 					local trunk = child:FindFirstChild("Trunk")
-
 					if trunk and trunk:HasTag("M1HitRegistry") then
 						local v12 = localPlayer:DistanceFromCharacter(trunk.Position)
-
 						if v12 < huge then
 							huge = v12
 							v11 = trunk
 						end
 					end
 				end
-
 				if v11 then
 					HitHiddenPart(v11)
 					return "Harvest cactus"
@@ -18766,10 +17293,8 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return "Waiting for cacti", true
 			end,
 		}
-
 		HiddenQuests = tbl9
 	end
-
 	HiddenAnnouncements = {
 		{ "pirate sails", "Battle Plans" },
 		{ "drilling", "Magma Ore Extraction" },
@@ -18804,13 +17329,10 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		{ "secret cloud", "The Clown's Jewels" },
 		{ "skylands castle", "Unexpected Guest" },
 	}
-
 	HiddenAnnounceDriven = {}
-
 	for _, v6 in ipairs(HiddenAnnouncements) do
 		HiddenAnnounceDriven[v6[2]] = true
 	end
-
 	HiddenRemoteChecks = {
 		["Crowd Favorite"] = function()
 			return workspace:FindFirstChild("Ring") ~= nil
@@ -18831,30 +17353,24 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			return v6 ~= nil and #ListHiddenRaidShips(v6.World.Position) > 0
 		end,
 	}
-
 	for _, v6 in ipairs(HiddenQuests) do
 		if v6.BossNames and not HiddenRemoteChecks[v6.Name] then
 			local bossNames = v6.BossNames
-
 			HiddenRemoteChecks[v6.Name] = function()
 				return FindAwakenedBoss(nil, bossNames) ~= nil
 			end
 		end
 	end
-
 	SweepHiddenRemote = function(arg)
 		if tick() - (HiddenEvent.remoteSweep or 0) < 5 then
 			return
 		end
 		HiddenEvent.remoteSweep = tick()
 		HiddenEvent.remoteSeen = HiddenEvent.remoteSeen or {}
-
 		for _, v6 in ipairs(HiddenQuests) do
 			local v7 = HiddenRemoteChecks[v6.Name]
-
 			if v7 and arg["Sea1/" .. v6.Island .. "/" .. v6.Name] ~= true then
 				local ok, result = pcall(v7)
-
 				if ok and result then
 					if not HiddenEvent.remoteSeen[v6.Name] then
 						HiddenEvent.remoteSeen[v6.Name] = true
@@ -18869,7 +17385,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end
 	end
-
 	HiddenPresenceQuests = {
 		["Battle Plans"] = "Marine Fortress",
 		["Magma Ore Extraction"] = "Magma Village",
@@ -18882,44 +17397,34 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		["Tavern Brawl"] = "Pirate Village",
 		["Sewer Gangs"] = "Fountain",
 	}
-
 	NearestHiddenSpawn = function(arg)
 		local playerSpawns = workspace._WorldOrigin:FindFirstChild("PlayerSpawns")
 		local v6, v7, v8 = ipairs(playerSpawns and playerSpawns:GetDescendants() or {})
 		local v9 = nil
 		local v10 = nil
-
 		for _, v11 in v6, v7, v8 do
 			if v11:IsA("BasePart") then
 				local magnitude = (v11.Position - arg).Magnitude
-
 				if not v9 or magnitude < v9 then
 					v9 = magnitude
 					v10 = v11
 				end
 			end
 		end
-
 		return v10 and v10.Position + Vector3.new(0, 4, 0), v9
 	end
-
 	PickHiddenParkSpot = function(arg)
 		local tbl9 = {}
-
 		for _, v6 in ipairs(HiddenQuests) do
 			local island = HiddenPresenceQuests[v6.Name] and v6.Island
-
 			if island and arg["Sea1/" .. v6.Island .. "/" .. v6.Name] ~= true and (not v6.Requires or arg[v6.Requires] == true) and not table.find(tbl9, island) then
 				table.insert(tbl9, island)
 			end
 		end
-
 		local park = HiddenEvent.park
 		local flag
-
 		if park then
 			flag = not table.find(tbl9, park.island)
-
 			if not flag then
 				local since = park.since
 				flag = tick() - since > 900
@@ -18927,19 +17432,15 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		else
 			flag = park
 		end
-
 		if flag then
 			local n = (table.find(tbl9, park.island) or 0) % math.max(#tbl9, 1) + 1
 			park = tbl9[n] and { island = tbl9[n], since = tick() } or nil
 		elseif not park and #tbl9 > 0 then
 			park = { island = tbl9[1], since = tick() }
 		end
-
 		HiddenEvent.park = park
-
 		if park then
 			local v6 = GetHiddenIsland(park.island)
-
 			if v6 then
 				local v7, v8 = NearestHiddenSpawn(v6.World.Position)
 				if v7 and v8 < 2500 then
@@ -18948,47 +17449,37 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return v6.TeleportPoints[1].Position + Vector3.new(0, 4, 0)
 			end
 		end
-
 		return NearestHiddenSpawn(localPlayer.Character:GetPivot().Position) or Vector3.new(-826, 30, 1613)
 	end
-
 	HiddenSkipFile = "Vxeze Hub/hidden_skip.json"
-
 	SaveHiddenSkip = function()
 		if type(writefile) ~= "function" then
 			return
 		end
 		local tbl9 = { user = localPlayer.UserId, skips = {} }
-
 		for k, v6 in pairs(HiddenEvent.skipped) do
 			if type(k) == "string" and not k:find("^Reward:") and v6 > tick() then
 				local floor = math.floor
 				tbl9.skips[k] = os.time() + floor(v6 - tick())
 			end
 		end
-
 		pcall(function()
 			writefile(HiddenSkipFile, game:GetService("HttpService"):JSONEncode(tbl9))
 		end)
 	end
-
 	LoadHiddenSkip = function()
 		if HiddenEvent.skipLoaded then
 			return
 		end
 		HiddenEvent.skipLoaded = true
-
 		pcall(function()
 			if type(isfile) == "function" and isfile(HiddenSkipFile) then
 				local data = game:GetService("HttpService"):JSONDecode(readfile(HiddenSkipFile))
-
 				if data.user == localPlayer.UserId then
 					local v6 = pairs
 					local skips = data.skips or {}
-
 					for k, skip in v6(skips) do
 						local n = skip - os.time()
-
 						if n > 0 and not HiddenEvent.skipped[k] then
 							HiddenEvent.skipped[k] = tick() + n
 						end
@@ -18997,7 +17488,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end)
 	end
-
 	HiddenRetryDelay = function(arg)
 		local readyAt = HiddenEvent.readyAt and HiddenEvent.readyAt[arg.Name]
 		if readyAt then
@@ -19014,10 +17504,8 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		end
 		return retryDelay
 	end
-
 	OnHiddenAnnouncement = function(arg)
 		local v6 = string.lower(tostring(arg))
-
 		for _, v7 in ipairs(HiddenAnnouncements) do
 			if string.find(v6, v7[1], 1, true) then
 				HiddenEvent.announced = HiddenEvent.announced or {}
@@ -19026,20 +17514,16 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end
 	end
-
 	WatchHiddenAnnouncements = function()
 		if HiddenEvent.watching then
 			return
 		end
 		HiddenEvent.watching = true
 		HiddenEvent.momentEvent = {}
-
 		ReplicatedStorage.Remotes.BonusMomentsRemoteEvent.OnClientEvent:Connect(function(arg)
 			HiddenEvent.momentEvent[tostring(arg)] = tick()
 		end)
-
 		local notifications = localPlayer.PlayerGui:WaitForChild("Notifications", 10)
-
 		if notifications then
 			notifications.DescendantAdded:Connect(function(descendant)
 				if descendant:IsA("TextLabel") then
@@ -19048,7 +17532,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				end
 			end)
 		end
-
 		pcall(function()
 			game:GetService("TextChatService").MessageReceived:Connect(function(arg)
 				if not arg.TextSource then
@@ -19057,7 +17540,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end)
 		end)
 	end
-
 	CheckHiddenStall = function()
 		local current = HiddenEvent.current
 		local humanoidRootPart = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -19068,32 +17550,25 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		local stall = HiddenEvent.stall
 		local position = humanoidRootPart.Position
 		local parent = not stall or stall.quest ~= current or stall.step ~= HiddenEvent.step or (position - stall.position).Magnitude > 25 or HiddenEvent.fighting and HiddenEvent.fighting.Parent
-
 		if not parent then
 			parent = tick() < (HiddenEvent.stallGrace or 0)
 		end
-
 		local flag
-
 		if parent then
 			flag = parent
 		else
 			flag = tick() - (HiddenEvent.momentEvent and HiddenEvent.momentEvent[current] or 0) < 20
 		end
-
 		local flag2
-
 		if flag then
 			flag2 = flag
 		else
 			flag2 = tick() - (HiddenEvent.announced and HiddenEvent.announced[current] or 0) < 420
 		end
-
 		if flag2 then
 			HiddenEvent.stall = { quest = current, step = HiddenEvent.step, position = position, time = tick() }
 			return
 		end
-
 		if os.date("!*t").min < 8 and string.find(tostring(HiddenEvent.step), "awaken", 1, true) then
 			return
 		end
@@ -19111,19 +17586,16 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		pcall(require(ReplicatedStorage.DialogueController).close)
 		HiddenNotify(current .. " got stuck on \"" .. tostring(stall.step) .. "\", trying another quest", current .. "stall", "warning")
 	end
-
 	HiddenWakeBoost = function(name)
 		HiddenEvent.readyBoost = HiddenEvent.readyBoost or {}
 		return tick() < (HiddenEvent.readyBoost[name] or 0)
 	end
-
 	WakeHiddenQuests = function(progress, hint)
 		HiddenEvent.waiting = HiddenEvent.waiting or {}
 		HiddenEvent.readyBoost = HiddenEvent.readyBoost or {}
 		HiddenEvent.readyAt = HiddenEvent.readyAt or {}
 		HiddenEvent.wokeMoment = HiddenEvent.wokeMoment or {}
 		HiddenEvent.wakeCheck = HiddenEvent.wakeCheck or {}
-
 		local function wake(quest, why)
 			if HiddenEvent.current == quest.Name then
 				return
@@ -19134,13 +17606,11 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			HiddenEvent.wakeCheck[quest.Name] = tick() + 60
 			HiddenNotify(quest.Name .. " is ready (" .. why .. "), going back", quest.Name .. "wake", "found")
 		end
-
 		for _, quest in ipairs(HiddenQuests) do
 			local name = quest.Name
 			local key = "Sea1/" .. quest.Island .. "/" .. name
 			local skipped = (HiddenEvent.skipped[name] or 0) > tick()
 			local blocked = HiddenEvent.waiting[name] ~= nil or HiddenEvent.readyAt[name] ~= nil
-
 			if progress[key] ~= true and skipped and blocked and tick() >= (HiddenEvent.wakeCheck[name] or 0) then
 				local readyAt = HiddenEvent.readyAt[name]
 				if readyAt and tick() >= readyAt then
@@ -19166,7 +17636,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 			end
 		end
 	end
-
 	AutoHiddenEvent = function()
 		WatchHiddenAnnouncements()
 		LoadHiddenSkip()
@@ -19177,59 +17646,45 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 		end
 		local v7 = GetHiddenRaidHint()
 		local flag = v7.State == "Arming" or v7.State == "Armed" or v7.State == "Triggered"
-
 		if not flag then
 			flag = (tonumber(v7.Seconds) or math.huge) < 300
 		end
-
 		local flag2 = v7.State ~= "Triggered"
-
 		if flag2 then
 			flag2 = (tonumber(v7.Seconds) or 0) > 180
 		end
-
 		pcall(WakeHiddenQuests, v6, v7)
-
 		local tbl9 = {}
 		local tbl10 = {}
 		local tbl11 = {}
-
 		for k, v8 in pairs(v6) do
 			local flag3 = v8 == true and string.match(k, "^Sea1/([^/]+)/")
-
 			if flag3 then
 				tbl11[flag3] = (tbl11[flag3] or 0) + 1
 			end
 		end
-
 		for _, v8 in ipairs(HiddenQuests) do
 			local active = GetHiddenMoment(v8.Name)
 			local flag3 = v8.Name == "Rescue Hasan" and active
-
 			if flag3 then
 				flag3 = tick() - (HiddenEvent.hasanHelped or 0) < 150
 			end
-
 			if flag3 then
 				tbl10[v8] = -2
 				HiddenEvent.skipped[v8.Name] = nil
 			else
 				local hintIsland = v8.HintIsland
 				local readyBoost = HiddenWakeBoost(v8.Name)
-
 				if hintIsland then
 					active = active and active.Active
-
 					if active then
 						local name_ = v8.Name
 						hintIsland = not GetHiddenBossHour().checked[name_]
 					else
 						hintIsland = active
 					end
-
 					hintIsland = hintIsland or flag and not flag2 and IsHiddenBossHinted(v7, v8.HintIsland, v8.BossNames)
 				end
-
 				if readyBoost then
 					tbl10[v8] = -1.5
 				elseif hintIsland then
@@ -19242,81 +17697,61 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				else
 					local n = GetHiddenIsland(v8.Island)
 					n = n and localPlayer:DistanceFromCharacter(n.World.Position) or 1000000
-
 					if v8.Island == HiddenEvent.currentIsland then
 						n = n * (0.0001)
 					end
-
 					tbl10[v8] = 1 + math.max(n - (tbl11[v8.Island] or 0) * 4000, 0)
 				end
 			end
-
 			if not HiddenEvent.only or HiddenEvent.only[v8.Name] then
 				table.insert(tbl9, v8)
 			end
 		end
-
 		table.sort(tbl9, function(arg, arg2)
 			return tbl10[arg] < tbl10[arg2]
 		end)
-
 		HiddenEvent.waiting = HiddenEvent.waiting or {}
 		local n = 0
-
-		for _, v8 in ipairs(tbl9) do repeat 
+		for _, v8 in ipairs(tbl9) do repeat
 			local str2 = "Sea1/" .. v8.Island .. "/" .. v8.Name
-
 			if v6[str2] ~= true then
 				n = n + (1)
 			end
-
 			local flag3 = v6[str2] ~= true and (not v8.Requires or v6[v8.Requires] == true)
-
 			if flag3 then
 				flag3 = tick() >= (HiddenEvent.skipped[v8.Name] or 0)
 			end
-
 			if flag3 then
 				flag3 = not (tick() < (HiddenEvent.prepUntil or 0) and tbl10[v8] >= 1)
 			end
-
 			if flag3 then
 				local v9 = GetHiddenMoment(v8.Name)
 				local v10 = HiddenRemoteChecks[v8.Name]
 				local flag4 = v10 and HiddenPresenceQuests[v8.Name] and not v8.HintIsland and not v9
-
 				if flag4 then
 					flag4 = tick() - ((HiddenEvent.announced or {})[v8.Name] or 0) > 900
 				end
-
 				if flag4 then
 					local flag5 = v8.Name == "Rescue Hasan"
-
 					if flag5 then
 						flag5 = tick() - (HiddenEvent.hasanHelped or 0) < 150
 					end
-
 					flag4 = not flag5
 				end
-
 				local flag5 = true
 				local awakenedBossQuests = nil
-
 				if flag4 then
 					local ok, result = pcall(v10)
 					ok = ok and not result
 					awakenedBossQuests = nil
-
 					if ok then
 						flag5 = false
 						awakenedBossQuests = "not up yet (checked from afar)"
 					end
 				end
-
 				if flag5 and v8.Precheck and (not v9 or v8.HintIsland and not v9.Active) then
 					flag5, awakenedBossQuests = v8.Precheck(v7)
 				end
-
 				if not flag5 then
 					if HiddenEvent.waiting[v8.Name] ~= awakenedBossQuests then
 						if v8.HintIsland then
@@ -19325,12 +17760,10 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 							HiddenNotify(v8.Name .. ": " .. awakenedBossQuests, v8.Name .. awakenedBossQuests)
 						end
 					end
-
 					HiddenEvent.waiting[v8.Name] = awakenedBossQuests
 					HiddenEvent.skipped[v8.Name] = tick() + 30
 					break
 				end
-
 				if HiddenEvent.current ~= v8.Name then
 					HiddenEvent.current = v8.Name
 					HiddenEvent.currentIsland = v8.Island
@@ -19339,10 +17772,8 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					HiddenEvent.islandArrived = nil
 					HiddenNotify("Start " .. v8.Name .. " (" .. v8.Island .. ")", v8.Name, "start")
 				end
-
 				HiddenEvent.idleSince = nil
 				local flag6 = not v9
-
 				if flag6 and v8.BossNames then
 					for _, child in ipairs(workspace.Enemies:GetChildren()) do
 						if child:GetAttribute("BossIndicatorAwakened") and IsHiddenTarget(child) then
@@ -19357,7 +17788,6 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						end
 					end
 				end
-
 				if flag6 and v8.NoMoment then
 					local v11 = v8.NoMoment()
 					if v11 then
@@ -19365,20 +17795,16 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						return
 					end
 				end
-
 				if flag6 then
 					if HiddenGoToIsland(v8.Island) then
 						HiddenEvent.islandArrived = HiddenEvent.islandArrived or tick()
 						local islandArrived = HiddenEvent.islandArrived
-
 						if tick() - islandArrived > 8 then
 							HiddenEvent.islandArrived = nil
-
 							if v8.HintIsland then
 								local name_ = v8.Name
 								GetHiddenBossHour().checked[name_] = true
 							end
-
 							HiddenEvent.skipped[v8.Name] = math.max(HiddenEvent.skipped[v8.Name] or 0, tick() + HiddenRetryDelay(v8))
 							SaveHiddenSkip()
 							HiddenEvent.waiting[v8.Name] = v8.Name .. " is not happening on " .. v8.Island
@@ -19388,25 +17814,20 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					else
 						HiddenEvent.islandArrived = nil
 					end
-
 					return
 				end
-
 				HiddenEvent.islandArrived = nil
 				local v11, v12 = v8.Run(v9)
 				SetHiddenStep(v11 or "Working")
-
 				if v12 then
 					HiddenEvent.waitingSince = HiddenEvent.waitingSince or tick()
 					local announced = HiddenEvent.announced and HiddenEvent.announced[v8.Name]
 					local waitingSince = HiddenEvent.waitingSince
 					local n3 = tick() - waitingSince
 					announced = announced and tick() - announced < 420
-
 					if announced then
 						announced = v9 and v9.Active and 420 or 60
 					end
-
 					if (announced or 6) < n3 then
 						HiddenEvent.waiting[v8.Name] = v11
 						HiddenEvent.skipped[v8.Name] = math.max(HiddenEvent.skipped[v8.Name] or 0, tick() + HiddenRetryDelay(v8))
@@ -19422,72 +17843,55 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 						HiddenEvent.readyAt[v8.Name] = nil
 					end
 				end
-
 				return
 			end
 		until true end
-
 		HiddenEvent.current = nil
-
 		if n == 0 and HiddenEvent.only then
 			SetHiddenStep("Targeted quest finished")
 			HiddenEvent.checked = 0
 			return
 		end
-
 		if n == 0 then
 			SetHiddenStep("All 39 secrets are complete")
 			SaveSettings("Auto Secret Quest", false)
-
 			if getgenv().ToggleSecretQuest and getgenv().ToggleSecretQuest.SetStage then
 				getgenv().ToggleSecretQuest:SetStage(false)
 			end
-
 			HiddenNotify("All 39 secret quests are done, turning off", "secretalldone", "success")
 			return
 		end
-
 		HiddenEvent.idleSince = HiddenEvent.idleSince or tick()
-
 		if tick() - (HiddenEvent.idleNotified or 0) > 300 then
 			HiddenEvent.idleNotified = tick()
 			HiddenNotify("No secret quest is available right now (" .. n .. " left), checking again soon", "idle", "warning")
 		end
-
 		local tbl12 = {}
-
 		for k in pairs(HiddenEvent.waiting) do
 			local str2 = nil
-
 			for _, v8 in ipairs(HiddenQuests) do
 				if v8.Name == k then
 					str2 = "Sea1/" .. v8.Island .. "/" .. v8.Name
 				end
 			end
-
 			if str2 and v6[str2] ~= true then
 				table.insert(tbl12, k)
 			end
 		end
-
 		local v8 = nil
-
 		for _, v9 in pairs(HiddenEvent.skipped) do
 			if v9 > tick() and (not v8 or v9 < v8) then
 				v8 = v9
 			end
 		end
-
 		if PrepareHiddenChef(v6) then
 			return
 		end
 		local min = os.date("!*t").min
 		local flag3 = Settings["Hidden Hop Dead Hour"] ~= false and min >= 50 and min <= 58
-
 		if flag3 then
 			flag3 = tick() - (HiddenEvent.hopAt or 0) > 100
 		end
-
 		if flag3 and not IsHiddenHourUseful(v6) then
 			HiddenEvent.hopAt = tick()
 			if HopHiddenServer() then
@@ -19495,23 +17899,18 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return
 			end
 		end
-
 		local park = HiddenEvent.park
 		local flag4 = Settings["Hidden Hop Dead Hour"] ~= false and park
 		local flag5
-
 		if flag4 then
 			flag5 = tick() - (HiddenEvent.idleSince or tick()) > 1200
 		else
 			flag5 = flag4
 		end
-
 		flag5 = flag5 and min >= 5 and min < 45
-
 		if flag5 then
 			flag5 = tick() - (HiddenEvent.hopAt or 0) > 1200
 		end
-
 		if flag5 then
 			HiddenEvent.hopAt = tick()
 			if HopHiddenServer() then
@@ -19519,19 +17918,15 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 				return
 			end
 		end
-
 		if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
 			local v9 = PickHiddenParkSpot(v6)
 			HiddenEvent.idlePark = v9
-
 			if HiddenGoTo(v9, 60) then
 				HiddenHold(CFrame.new(v9))
 			end
 		end
-
 		SetHiddenStep("Waiting " .. n .. " quests" .. (v8 and " (next check in " .. math.ceil(v8 - tick()) .. "s)" or "") .. ": " .. table.concat(tbl12, ", "))
 	end
-
 	task.spawn(function()
 		while task.wait(1) do
 			pcall(function()
@@ -19540,41 +17935,32 @@ StatusHiddenBoss = HiddenEventSection.CreateLabel({ Title = "Title Awakened Boss
 					SeaOnly(StatusHiddenBoss, "Title Awakened Boss", { 1 })
 					return
 				end
-
 				local v6 = GetHiddenProgress()
 				local n = 0
 				local doneCount = 0
-
 				for _, v7 in pairs(v6) do
 					n = n + (1)
 					doneCount = doneCount + (v7 == true and 1 or 0)
 				end
-
 				if HiddenEvent.doneCount ~= doneCount then
 					HiddenEvent.doneCount = doneCount
 					HiddenEvent.doneAt = tick()
 				end
-
 				StatusHiddenProgress.SetText(string.format("Secret Quest : %d/39 Quests", doneCount))
 				StatusHiddenQuest.SetText("Title Quest : " .. (HiddenEvent.current or "None"))
 				StatusHiddenStep.SetText("Doing Quest : " .. (IsSecretQuestOn() and HiddenEvent.step or "None"))
-
 				if Place_Id.sea1() then
 					local v7 = GetHiddenRaidHint()
 					local setText = StatusHiddenBoss.SetText
 					local boss = v7.Boss
-
 					if boss then
 						boss = v7.Boss .. " on " .. tostring(v7.Island) .. " in " .. FormatMagnetTime(tonumber(v7.Seconds) or 0)
 					end
-
 					setText("Title Awakened Boss : " .. (boss or "None"))
 				end
 			end)
 		end
 	end)
-
-
 HiddenEventSection.CreateToggle({
 	Title = "Hop Server For Secret Quest",
 	Desc = "Hop khi không có quest / giờ chết",
@@ -19582,11 +17968,9 @@ HiddenEventSection.CreateToggle({
 }, function(v)
 	SaveSettings("Hop Server For Secret Quest", v)
 end)
-
 if Settings["Hidden Hop Dead Hour"] == nil then
 	Settings["Hidden Hop Dead Hour"] = true
 end
-
 HiddenEventSection.CreateToggle({
 	Title = "Auto Secret Quest",
 	Desc = "Auto complete 39 Sea 1 secret quests (Hidden Event)",
@@ -19602,14 +17986,12 @@ HiddenEventSection.CreateToggle({
 		end
 		return
 	end
-
 	SaveSettings("Auto Secret Quest", arg)
 	getgenv().ToggleSecretQuest = {
 		SetStage = function(_, on)
 			SaveSettings("Auto Secret Quest", on and true or false)
 		end,
 	}
-
 	if not arg then
 		HiddenEvent.running = false
 		pcall(HiddenRelease)
@@ -19618,22 +18000,18 @@ HiddenEventSection.CreateToggle({
 		end)
 		return
 	end
-
 	if HiddenEvent.running then
 		return
 	end
 	HiddenEvent.running = true
-
 	task.spawn(function()
 		pcall(function()
 			game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("BuyHaki", "Geppo")
 		end)
 	end)
-
 	if type(HiddenDialogueLoop) == "function" then
 		task.spawn(HiddenDialogueLoop)
 	end
-
 	task.spawn(function()
 		while Settings["Auto Secret Quest"] and task.wait(0.15) do
 			local ok, result
@@ -19645,7 +18023,6 @@ HiddenEventSection.CreateToggle({
 				ok = true
 				result = nil
 			end
-
 			if not ok then
 				print("[SecretQuest]", result)
 				HiddenEvent.lastError = tostring(result)
@@ -19654,13 +18031,11 @@ HiddenEventSection.CreateToggle({
 					HiddenNotify("Error: " .. tostring(result):sub(1, 120), "error", "error")
 				end
 			end
-
 			pcall(function()
 				if CheckHiddenStall then
 					CheckHiddenStall()
 				end
 			end)
-
 			local anchored = HiddenEvent.anchored
 			if anchored then
 				anchored = tick() - (HiddenEvent.holdTime or 0) > 0.6
@@ -19668,13 +18043,11 @@ HiddenEventSection.CreateToggle({
 			if anchored and HiddenRelease then
 				HiddenRelease()
 			end
-
 			local str2 = tostring(HiddenEvent.step or "")
 			if str2:find("^Waiting") or str2:find(" stirs on ") or str2 == "Idle" then
 				task.wait(0.6)
 			end
 		end
-
 		pcall(function()
 			if HiddenRelease then
 				HiddenRelease()
@@ -19683,8 +18056,6 @@ HiddenEventSection.CreateToggle({
 		HiddenEvent.running = false
 	end)
 end)
-
-
 BuyMeleeQuestDefs = {
 	["Electro"] = { Name = "Electric Fighting Teacher", Island = "Sky" },
 	["Fishman Karate"] = { Name = "Fishman Karate", Island = "Underwater City" },
@@ -19694,7 +18065,6 @@ BuyMeleeDone = {}
 BuyMeleeChecked = {}
 BuyMeleeDriverRunning = false
 BuyMeleeTravelAt = 0
-
 function BuyMeleeQuestDone(def, force)
 	local key = "Sea1/" .. def.Island .. "/" .. def.Name
 	local ok, progress = pcall(GetHiddenProgress, force)
@@ -19710,7 +18080,6 @@ function BuyMeleeQuestDone(def, force)
 	end
 	return false
 end
-
 function BuyMeleeStartDriver()
 	if BuyMeleeDriverRunning or HiddenEvent.running then
 		return
@@ -19718,17 +18087,14 @@ function BuyMeleeStartDriver()
 	BuyMeleeDriverRunning = true
 	BuyMeleeSecretForce = true
 	HiddenEvent.running = true
-
 	task.spawn(function()
 		pcall(function()
 			game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("BuyHaki", "Geppo")
 		end)
 	end)
-
 	if type(HiddenDialogueLoop) == "function" then
 		task.spawn(HiddenDialogueLoop)
 	end
-
 	task.spawn(function()
 		while next(BuyMeleePending) and Place_Id.sea1() and task.wait(0.15) do
 			local ok, result
@@ -19739,17 +18105,14 @@ function BuyMeleeStartDriver()
 				SetHiddenStep("Paused while another feature is running")
 				ok = true
 			end
-
 			if not ok then
 				print("[BuyMeleeQuest]", result)
 			end
-
 			pcall(function()
 				if CheckHiddenStall then
 					CheckHiddenStall()
 				end
 			end)
-
 			local anchored = HiddenEvent.anchored
 			if anchored then
 				anchored = tick() - (HiddenEvent.holdTime or 0) > 0.6
@@ -19757,13 +18120,11 @@ function BuyMeleeStartDriver()
 			if anchored and HiddenRelease then
 				HiddenRelease()
 			end
-
 			local step = tostring(HiddenEvent.step or "")
 			if step:find("^Waiting") or step:find(" stirs on ") or step == "Idle" then
 				task.wait(0.6)
 			end
 		end
-
 		BuyMeleeSecretForce = false
 		pcall(function()
 			if HiddenRelease then
@@ -19777,7 +18138,6 @@ function BuyMeleeStartDriver()
 		BuyMeleeDriverRunning = false
 	end)
 end
-
 function BuyMeleeSync()
 	if next(BuyMeleePending) then
 		HiddenEvent.only = BuyMeleePending
@@ -19788,7 +18148,6 @@ function BuyMeleeSync()
 		HiddenEvent.only = nil
 	end
 end
-
 function BuyMeleeCancel(melee)
 	local def = BuyMeleeQuestDefs[melee]
 	if def then
@@ -19796,7 +18155,6 @@ function BuyMeleeCancel(melee)
 		BuyMeleeSync()
 	end
 end
-
 function BuyMeleeGate(melee)
 	local def = BuyMeleeQuestDefs[melee]
 	if not def then
@@ -19805,12 +18163,10 @@ function BuyMeleeGate(melee)
 	if BuyMeleeDone[melee] then
 		return true
 	end
-
 	local force = tick() - (BuyMeleeChecked[melee] or 0) > 5
 	if force then
 		BuyMeleeChecked[melee] = tick()
 	end
-
 	local done = BuyMeleeQuestDone(def, force)
 	if done == true then
 		BuyMeleeDone[melee] = true
@@ -19821,7 +18177,6 @@ function BuyMeleeGate(melee)
 		end)
 		return true
 	end
-
 	if not Place_Id.sea1() then
 		BuyMeleePending[def.Name] = nil
 		BuyMeleeSync()
@@ -19838,11 +18193,9 @@ function BuyMeleeGate(melee)
 		end
 		return false
 	end
-
 	if done == nil then
 		return false
 	end
-
 	if not BuyMeleePending[def.Name] then
 		BuyMeleePending[def.Name] = true
 		pcall(function()
@@ -19852,7 +18205,6 @@ function BuyMeleeGate(melee)
 	BuyMeleeSync()
 	return false
 end
-
 print("[BananaCat] Secret Quest (39) module loaded — section ở đầu Farming Other")
 FishingSection = FarmotherMain.CreateSection("Fishing")
 FishingSection.CreateToggle(
@@ -22043,9 +20395,6 @@ getgenv().CheckIsplayingRaid = function()
 	end
 end
 getgenv().buychip = true
--- Mua Special Microchip: uu tien BELI (100k). Chi dung trai trong inventory khi beli khong du
--- (toggle "Get Fruit In Inventory Low Beli"). Neu dang cam trai thi server tru trai thay vi beli
--- nen thu tool dang cam truoc khi mua bang beli (tru khi dang bat Hop Sever Raid, can trai that).
 function BuyRaidChip(raid)
 	local CF = game:GetService("ReplicatedStorage").Remotes.CommF_
 	local beli = 0
@@ -23291,9 +21640,6 @@ end
 local function flatDist(a, b)
 	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
 end
--- Tween thuyền: logic TweenBoatTo của Topi SeaEvent
--- Heartbeat + Lerp + PivotTo, BodyVelocity "SeaBoatBV" (MaxForce chỉ trục Y), noclip thuyền
--- Giữ nguyên chữ ký + object trả về (PlaybackState/Speed/Target/Pause/Cancel...) để code cũ không phải sửa
 function manageTween(J, F, q, c, lvl)
 	if not J or not J:IsA("BasePart") or typeof(F) ~= "CFrame" then
 		return
@@ -23303,8 +21649,6 @@ function manageTween(J, F, q, c, lvl)
 	if not y[J] and (J.Position - F.Position).Magnitude <= H then
 		return
 	end
-
-	-- đang chạy cùng key -> chỉ cập nhật đích/tốc độ
 	local cur = y[J]
 	if cur and cur.TweenKey == c and cur.PlaybackState == Enum.PlaybackState.Playing then
 		cur.Target, cur.Speed, cur.Level = F, q, lvl and true or nil
@@ -23320,7 +21664,6 @@ function manageTween(J, F, q, c, lvl)
 			prev:Cancel()
 		end)
 	end
-
 	local boat = J.Parent
 	local isModel = boat and boat:IsA("Model")
 	local rel = isModel and J.CFrame:ToObjectSpace(boat:GetPivot()) or CFrame.new()
@@ -23333,14 +21676,11 @@ function manageTween(J, F, q, c, lvl)
 		J.AssemblyLinearVelocity = Vector3.zero
 		J.AssemblyAngularVelocity = Vector3.zero
 	end
-
 	local D = { PlaybackState = Enum.PlaybackState.Playing, Speed = q, Target = F, TweenKey = c, Level = lvl and true or nil }
 	local finished, paused = false, false
 	local noclipConn
 	local lifted, baseY, lastOv = false, J.Position.Y, nil
 	local W = J.CFrame
-
-	-- BodyVelocity chống chìm (giống SetBoatBodyVelocity)
 	local bv = J:FindFirstChild("SeaBoatBV")
 	if not bv then
 		bv = Instance.new("BodyVelocity")
@@ -23350,7 +21690,6 @@ function manageTween(J, F, q, c, lvl)
 		bv.P = 9999
 		bv.Parent = J
 	end
-
 	local function finish(state)
 		if finished then
 			return
@@ -23361,7 +21700,6 @@ function manageTween(J, F, q, c, lvl)
 			noclipConn = nil
 		end
 		if lastOv then
-			-- đang giữ độ cao 160/1000 khi có người trên pháo -> thả BV sau 4s nếu hết người
 			task.delay(4, function()
 				if J.Parent and not y[J] and not BoatHasPassenger(J) and bv.Parent then
 					bv:Destroy()
@@ -23390,7 +21728,6 @@ function manageTween(J, F, q, c, lvl)
 			getgenv().noclip = false
 		end
 	end
-
 	D.Play = function(s)
 		if finished then return end
 		paused = false
@@ -23407,14 +21744,11 @@ function manageTween(J, F, q, c, lvl)
 	D.Destroy = function(s)
 		s:Cancel()
 	end
-
 	y[J] = D
 	getgenv()[c] = D
 	P = P + 1
 	l(true)
 	getgenv().noclip = true
-
-	-- noclip thuyền + nhân vật
 	do
 		local parts, nextScan = {}, 0
 		noclipConn = x.Stepped:Connect(function()
@@ -23445,8 +21779,6 @@ function manageTween(J, F, q, c, lvl)
 			end
 		end)
 	end
-
-	-- đích hiệu dụng: có người trên pháo -> giữ Y 160 (gần Tiki 1000), né vùng Tiki
 	local function effective()
 		local tgt = D.Target
 		local rot = tgt - tgt.Position
@@ -23473,7 +21805,6 @@ function manageTween(J, F, q, c, lvl)
 		end
 		return tgt, nil
 	end
-
 	task.spawn(function()
 		while not finished and J.Parent do
 			local dt = x.Heartbeat:Wait()
@@ -23484,18 +21815,15 @@ function manageTween(J, F, q, c, lvl)
 					finish(Enum.PlaybackState.Cancelled)
 					break
 				end
-
 				local E, ov = effective()
-				-- đổi chế độ độ cao -> snap Y ngay (không bay chéo)
 				if ov ~= lastOv then
 					local ny = ov or E.Y
 					W = CFrame.new(W.X, ny, W.Z) * (W - W.Position)
 					lastOv = ov
 				end
 				if (J.Position - W.Position).Magnitude > 100 then
-					W = J.CFrame -- bị server kéo lại -> đồng bộ lại
+					W = J.CFrame
 				end
-
 				local diff = E.Position - W.Position
 				local d = diff.Magnitude
 				local step = math.min(D.Speed, 4000) * dt
@@ -23588,7 +21916,6 @@ function GetOwnerDrivenBoat(name)
 	end
 	return nil
 end
--- san cung: owner reset/chet thi acc san cung cung reset de hoi sinh gan owner, do phai bay ve lau
 task.spawn(function()
 	local lastChar, diedMarked, lastReset = nil, nil, 0
 	while task.wait(0.3) do
@@ -23656,7 +21983,6 @@ end
 function BuyBoatAndTeleBoat(P)
 	local Y = checkboat()
 	if Settings["Auto Sea Event With Friend"] and Settings["Auto Sea Event"] then
-		-- san cung: chi tele len phao trong cua thuyen owner dang lai. Da ngoi roi thi dung yen, khong bam theo nua.
 		local hum = t.Character and t.Character:FindFirstChildOfClass("Humanoid")
 		local hrp = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
 		if not hum or not hrp then
@@ -23724,15 +22050,12 @@ function BuyBoatAndTeleBoat(P)
 			WarnOnce("MultiWait", "Cho cac acc da chon ngoi du vao phao...")
 			return
 		end
-		-- co player khac ngoi phao: tween Y 160; chi minh localplayer tren thuyen: giu Y mac dinh cua mode tween boat
-		-- Y mac dinh cua mode tween boat (nho lai khi thuyen dang o muc 160/1000 do co player tren phao)
 		local pivotY = Y.WorldPivot.Y
 		if math.abs(pivotY - 160) > 5 and math.abs(pivotY - 1000) > 5 then
 			getgenv().__SeaBoatDefaultY = pivotY
 		end
 		local seaY = getgenv().__SeaBoatDefaultY or pivotY
 		if BoatHasPassenger(Y.VehicleSeat) then
-			-- co player tren phao: trong 3000 cua Tiki = Y 1000, ngoai = Y 160 (manageTween tu nhay Y theo vi tri)
 			local nearTiki = game.PlaceId == getgenv().CheckPlaceId and flatDist(Y.VehicleSeat.Position, TIKI_POS) < TIKI_AVOID_R
 			seaY = nearTiki and 1000 or 160
 		end
@@ -23839,7 +22162,6 @@ function WarnOnce(b, l)
 		A.CreateNoti({ Title = "Banana Cat Hub", Desc = l, ShowTime = 5 })
 	end)
 end
--- Sea Beast: theo doi Submerge/Reappear/Death (theo ten animation) + HP text, de doi sea khi lan va bo ngay khi chet
 SeaBeastStates = SeaBeastStates or setmetatable({}, { __mode = "k" })
 local function seaBeastApplyTrack(st, track)
 	local n1, n2 = "", ""
@@ -24128,7 +22450,6 @@ function UseSkillonlyFruit()
 		end
 	end
 end
-
 function AutoSeabeast()
 	if not StackFarmOther then
 		return
@@ -24144,7 +22465,6 @@ function AutoSeabeast()
 		WarnOnce("NoSeaEvent", "Chua chon su kien nao o Sea Event > Select Sea Events.")
 		return
 	end
-
 	b = DetectSeaEvents()
 	if not b then
 		getgenv().PathSeaBeast = false
@@ -24352,7 +22672,6 @@ FarmingSeaEventSection.CreateToggle(
 		SaveSettings("Auto Sea Event", _)
 	end
 )
-
 local _
 if game.PlaceId == getgenv().CheckPlaceId then
 	_ = require(game:GetService("ReplicatedStorage").DangerDistance)
@@ -33136,7 +31455,6 @@ a.CreateButton({ Title = "Copy Config" }, function()
 	A.CreateNoti({ Title = "Banana Cat Hub", Desc = "Successfully Copy Config", ShowTime = 5 })
 end)
 a.CreateBind({ Title = "Toggle GUI", Key = Enum.KeyCode.LeftControl }, function()
-	-- TopiUI: phim an/hien do cua so tu xu ly qua Window.MinimizeKey (adapter dat tu o Toggle GUI)
 	if A.Window then
 		pcall(function()
 			A.Window:Minimize()
@@ -33151,7 +31469,6 @@ spawn(function()
 			return
 		end
 		local AUTO_FILE = FolderName .. "/AutoLoad.lua"
-
 		pcall(function()
 			local src = debug.getinfo(1, "S").source
 			if type(src) == "string" and #src > 100000 and src:find("Auto Load Script", 1, true) then
@@ -33161,7 +31478,6 @@ spawn(function()
 				writefile(AUTO_FILE, src)
 			end
 		end)
-
 		local function body()
 			local url = getgenv().AutoLoadURL
 			if type(url) == "string" and #url > 0 then
@@ -33176,7 +31492,6 @@ spawn(function()
 			end
 			return nil
 		end
-
 		local queued = false
 		while not queued do
 			if Settings["Auto Load Script"] then
@@ -33208,7 +31523,6 @@ loadstring(
 	'if getgenv().__BC_NAMECALL == game.JobId then return end\10getgenv().__BC_NAMECALL = game.JobId\10local MT = getrawmetatable(game)\10local OldNameCall = MT.__namecall\10setreadonly(MT, false)\10MT.__namecall = newcclosure(function(self, ...)\10 local Method = getnamecallmethod()\10 local Args = { ... }\10 if\10 Method == "FireServer"\10 and self.Name == "RemoteEvent"\10 and AimPos\10 and tostring(AimPos.X) ~= "nan"\10 and (\10 Settings["Auto Event Prehistoric Island"]\10 or Settings["Kill players When complete Trial"]\10 or Settings["Auto Quest Dragon Hunter"]\10 or Settings["Auto Quest Dojo Trainer"]\10 or Settings["Farm Mastery"]\10 or Settings["Auto Attack Leviathan"]\10 or Settings["Auto Sea Event"]\10 or Settings["Auto Upgrade Race V2-V3"]\10 or Settings["Auto Trial"]\10 or Settings["Auto Aimbot"]\10 or Settings["Auto Shipwright"]\10 )\10 then\10 if #Args == 1 and typeof(Args[1]) == "Vector3" then\10 Args[1] = AimPos.Position\10 end\10 if #Args == 1 and typeof(Args[1]) == "CFrame" then\10 Args[1] = AimPos\10 end\10 end\10 return OldNameCall(self, unpack(Args))\10end)\10setreadonly(MT, true)\10'
 )()
 x = game:GetService("RunService")
-
 if not getgenv().__NOCLIP_STEPPED then
 	getgenv().__NOCLIP_STEPPED = x.Stepped:Connect(function()
 		local char = t.Character
@@ -33227,8 +31541,6 @@ if not getgenv().__NOCLIP_STEPPED then
 		end
 	end)
 end
-
--- [TopiFix] IsFarmOn: co farm/tween feature nao dang bat khong (de KHONG tu tat tween khi dang farm)
 do
 	local FARM_PAGES = {
 		["Farming"] = true,
@@ -33282,7 +31594,6 @@ do
 		return on
 	end
 end
-
 local function safeRequire(getModule)
 	local ok, res = pcall(function()
 		return require(getModule())
@@ -33335,7 +31646,6 @@ if not getgenv().BananaCatMainLoop then
 				ff.P = 10000
 				ff.Parent = T
 			end
-			-- [TopiFix] farm bat: khong tu huy tween/FloatForce (khong roi); farm tat: dung han tween
 			local farmOn = secretOn or IsFarmOn()
 			if farmOn then
 				__farmWasOn, __farmOffUntil = true, 0
@@ -33418,19 +31728,14 @@ if not getgenv().BananaCatMainLoop then
 		end
 	end)
 end
--- NOTIFY CÓ/KHÔNG: "Dừng all farm"
--- hiện 1 lần sau khi load (chỉ khi đang có toggle farm bật), tự xóa sau 20s
--- Có: tắt hết toggle farm 1 lần (bật lại bình thường) | Không / X / hết 20s: xóa notify, không làm gì
 task.spawn(function()
-	task.wait(0.2) -- chờ toggle đã lưu bật xong
+	task.wait(0.2)
 	pcall(function()
 		local Lib = A.Library
 		if not Lib or type(Lib.NotifyYesNo) ~= "function" then
 			warn("[TopiFix] UI lib chưa có NotifyYesNo, bỏ qua notify dừng farm")
 			return
 		end
-
-		-- page nào tính là farm: true = cả page, table = chỉ các section liệt kê
 		local FARM_PAGES = {
 			["Farming"] = true,
 			["Stack Farming"] = true,
@@ -33441,14 +31746,12 @@ task.spawn(function()
 			["Sea Event"] = { ["Farming"] = true, ["Kitsune Event"] = true, ["Leviathan Event"] = true },
 			["Volcano Event"] = { ["Farming Volcano"] = true, ["Fully Volcano"] = true },
 		}
-		-- toggle chỉ là tùy chọn, không phải farm -> không tắt
 		local SKIP_TITLE = {
 			["Just Use Skill when Player Active Ken"] = true,
 			["Change Size Reel"] = true,
 			["No Frog"] = true,
 		}
 		local SKIP_PATTERN = { "^Use ", "^Ignore ", "^Account " }
-
 		local function isFarm(title, o)
 			if type(o) ~= "table" or o.type ~= "toggle" then
 				return false
@@ -33467,7 +31770,6 @@ task.spawn(function()
 			end
 			return true
 		end
-
 		local function farmsOn()
 			local list = {}
 			for title, o in pairs(A.Options) do
@@ -33477,11 +31779,9 @@ task.spawn(function()
 			end
 			return list
 		end
-
 		if #farmsOn() == 0 then
 			return
 		end
-
 		Lib:NotifyYesNo({
 			Title = "Topi Hub",
 			Content = "Dừng all farm",
