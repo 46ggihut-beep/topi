@@ -9046,6 +9046,16 @@ SettingAutoFarmSection.CreateSlider(
 	end
 )
 SettingAutoFarmSection.CreateToggle(
+	{
+		Title = "Multi Quest Per NPC",
+		Desc = "Farm level: xoay vong nhan nhieu quest cung 1 NPC",
+		Default = Settings["Multi Quest Per NPC"] ~= false,
+	},
+	function(o)
+		SaveSettings("Multi Quest Per NPC", o)
+	end
+)
+SettingAutoFarmSection.CreateToggle(
 	{ Title = "Ignore Attack Katakuri", Desc = nil, Default = Settings["Ignore Attack Katakuri"] or false },
 	function(o)
 		SaveSettings("Ignore Attack Katakuri", o)
@@ -9276,42 +9286,67 @@ function CFrameQuest()
 	getgenv().questpoint.SkyExp1Quest = CFrame.new(-7857.28516, 5544.34033, -382.321503)
 end
 local function B(C)
-	local J = Z.Data.QuestData
-	local F, q, c = J and (next(J.Task)), 0, {}
-	for D, r in pairs(Z.Data.NPCList) do
+	-- Chọn NPC có quest cao nhất đủ level (bỏ qua boss quest: Task count <= 1)
+	local bestNpc, bestLevel, best = nil, -1, nil
+	for _, r in pairs(Z.Data.NPCList) do
 		if not table.find(V, r.InternalQuestName) then
-			for V, n in pairs(r.Levels) do
-				D = H[r.InternalQuestName][V]
-				if D then
-					local u, W = next(D.Task)
-					if W and W > 1 and n <= C and n >= q then
-						c = {
-							Level = n,
-							Name = r.NPCName,
-							QuestName = r.InternalQuestName,
-							Pos = r.Position,
-							Id = V,
-							Mob = u,
-						}
-						if F == u and V > 1 then
-							J = H[r.InternalQuestName][V - 1]
-							if J and J.Task then
-								for H, C in pairs(J.Task) do
-									if H ~= F and C > 1 then
-										c.Mob = H
-										c.Id = V - 1
-										break
-									end
-								end
-							end
+			local qdata = H[r.InternalQuestName]
+			if qdata then
+				for id, n in pairs(r.Levels) do
+					local D = qdata[id]
+					if D then
+						local mob, cnt = next(D.Task)
+						if cnt and cnt > 1 and n <= C and n >= bestLevel then
+							bestNpc, bestLevel = r, n
+							best = {
+								Level = n,
+								Name = r.NPCName,
+								QuestName = r.InternalQuestName,
+								Pos = r.Position,
+								Id = id,
+								Mob = mob,
+							}
 						end
-						q = n
 					end
 				end
 			end
 		end
 	end
-	return c
+	if not best then
+		return {}
+	end
+
+	-- Multi quest / 1 NPC: xoay vòng qua tất cả quest đủ level của NPC đó
+	if getgenv().MultiQuestPerNPC ~= false and Settings["Multi Quest Per NPC"] ~= false then
+		local qdata = H[bestNpc.InternalQuestName]
+		local ids = {}
+		for id, n in pairs(bestNpc.Levels) do
+			local D = qdata[id]
+			if D and n <= C then
+				local _, cnt = next(D.Task)
+				if cnt and cnt > 1 then
+					table.insert(ids, id)
+				end
+			end
+		end
+		table.sort(ids)
+		if #ids > 1 then
+			local last = getgenv().__LvlQuestLast
+			if last and last.QuestName == best.QuestName then
+				for i, id in ipairs(ids) do
+					if id == last.Id then
+						local nextId = ids[(i % #ids) + 1]
+						local D = qdata[nextId]
+						best.Id = nextId
+						best.Level = bestNpc.Levels[nextId]
+						best.Mob = next(D.Task)
+						break
+					end
+				end
+			end
+		end
+	end
+	return best
 end
 TakeQuestLevel = function()
 	local V = B(t.Data.Level.Value)
@@ -9337,6 +9372,7 @@ TakeQuestLevel = function()
 	if (H - B.Position).Magnitude <= 8 and C.Health > 0 then
 		wait(0.3)
 		CommF:InvokeServer("StartQuest", tostring(V.QuestName), V.Id)
+		getgenv().__LvlQuestLast = { QuestName = tostring(V.QuestName), Id = V.Id }
 	else
 		toTarget(CFrame.new(H) * CFrame.new(0, 4, 2), true)
 	end
