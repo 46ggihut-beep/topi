@@ -8000,8 +8000,6 @@ __BringPull = __BringPull or setmetatable({}, { __mode = "k" })
 __BringBlock = __BringBlock or setmetatable({}, { __mode = "k" })
 __BringSnap = __BringSnap or setmetatable({}, { __mode = "k" })
 function __BringPullStep(dt)
-	local STOP_DIST = 8
-	local PULL_SPEED = 300
 	local SNAP_DIST = 8
 	local SNAP_LIMIT = 2
 	dt = math.clamp(tonumber(dt) or 1 / 60, 1 / 240, 1 / 20)
@@ -8009,11 +8007,11 @@ function __BringPullStep(dt)
 	for mob, d in pairs(__BringPull) do
 		local mobRoot = mob and mob.Parent and mob:FindFirstChild("HumanoidRootPart")
 		local mobHum = mob and mob.Parent and mob:FindFirstChildOfClass("Humanoid")
-		if not mobRoot or not mobHum or mobHum.Health <= 0 or now - d.t > 0.3 or not Settings["Bring Mob"] then
+		if not mobRoot or not mobHum or mobHum.Health <= 0 or now - d.t > 0.3 or (not Settings["Bring Mob"] and not d.force) then
 			__BringPull[mob] = nil
-		elseif __BringBlock[mob] then
+		elseif __BringBlock[mob] and not d.force then
 			__BringPull[mob] = nil
-		elseif d.last and (mobRoot.Position - d.last).Magnitude > SNAP_DIST then
+		elseif not d.force and d.last and (mobRoot.Position - d.last).Magnitude > SNAP_DIST then
 			local sn = __BringSnap[mob]
 			if not sn or now - sn.t > 2 then
 				sn = { n = 0, t = now }
@@ -8037,12 +8035,11 @@ function __BringPullStep(dt)
 			end
 		else
 			local delta = d.pos - mobRoot.Position
-			local flat = Vector3.new(delta.X, 0, delta.Z)
-			local dist = flat.Magnitude
+			local dist = delta.Magnitude
 			local v = mobRoot.AssemblyLinearVelocity
-			if dist > STOP_DIST then
-				local step = math.min(PULL_SPEED * dt, dist - STOP_DIST * 0.5)
-				mobRoot.CFrame = mobRoot.CFrame + flat.Unit * step
+			if dist > 0.05 then
+				-- teleport thẳng mob tới pos (giữ nguyên hướng xoay của mob)
+				mobRoot.CFrame = CFrame.new(d.pos) * (mobRoot.CFrame - mobRoot.CFrame.Position)
 			end
 			mobRoot.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
 			mobRoot.AssemblyAngularVelocity = Vector3.zero
@@ -8059,7 +8056,8 @@ getgenv().__BF_BringConn = (getgenv().__BF_Track or function(c) return c end)(
 	end)
 )
 function BringMob(Q)
-	if not Settings["Bring Mob"] or not Q or not Q.Parent then
+	local aura = TRexAuraOn() -- Aura Fruit bật: luôn bring mob farm, bỏ qua mọi điều kiện chặn
+	if (not Settings["Bring Mob"] and not aura) or not Q or not Q.Parent then
 		return
 	end
 	local root = Q:FindFirstChild("HumanoidRootPart")
@@ -8087,50 +8085,56 @@ function BringMob(Q)
 		DeleteIgnoredMob()
 	end
 	local playerRoot = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
-	if not playerRoot or (playerRoot.Position - root.Position).Magnitude > 300 then
+	if not playerRoot then
+		return
+	end
+	local inRange = (playerRoot.Position - root.Position).Magnitude <= 300
+	-- đủ điều kiện (Bring Mob bật + trong tầm) thì bring cả nhóm, không thì chỉ bring mob farm (khi Aura Fruit bật)
+	local bringOthers = Settings["Bring Mob"] and inRange
+	if not bringOthers and not aura then
 		return
 	end
 	local buddhaFarm = BuddhaFarmOn() or TRexAuraOn()
 	local maxCount = buddhaFarm and math.huge or math.max(2, tonumber(Settings["Bring Mob Count"]) or 6)
-	local range = buddhaFarm and 500 or math.clamp(tonumber(Settings["Bring Mob Distance"]) or 300, 100, 500)
 	local targets = {}
-	if not Q:FindFirstChild("Ignored") and not __BringBlock[Q] then
+	if aura or (not Q:FindFirstChild("Ignored") and not __BringBlock[Q]) then
 		table.insert(targets, Q)
 	end
 	local cands = {}
 	for _, mob in ipairs(workspace.Enemies:GetChildren()) do
-		if mob ~= Q and mob.Name ~= "PropHitboxPlaceholder" and mob.Name ~= "Blank Buddy"
+		if mob ~= Q and mob.Name == Q.Name and mob.Name ~= "PropHitboxPlaceholder" and mob.Name ~= "Blank Buddy"
 			and not __BringBlock[mob] and not mob:FindFirstChild("Ignored") and IsMobAlive(mob) then
 			local mobRoot = mob:FindFirstChild("HumanoidRootPart")
 			if mobRoot then
 				local dist = (mobRoot.Position - l.Position).Magnitude
-				if dist <= range then
-					cands[#cands + 1] = { mob = mob, dist = dist }
-				end
+				cands[#cands + 1] = { mob = mob, dist = dist }
 			end
 		end
 	end
 	table.sort(cands, function(a, b) return a.dist < b.dist end)
 	for _, c in ipairs(cands) do
-		if #targets >= maxCount then break end
+		if #targets >= maxCount or not bringOthers then break end
 		table.insert(targets, c.mob)
 	end
-	if #cands == 0 or (playerRoot.Position - root.Position).Magnitude > 300 then
+	if #targets == 0 then
 		return
 	end
 	for _, mob in ipairs(targets) do
-		if mob.Parent and not __BringBlock[mob] and IsMobAlive(mob) then
+		local force = aura and mob == Q
+		if mob.Parent and (force or not __BringBlock[mob]) and IsMobAlive(mob) then
 			local mobRoot = mob:FindFirstChild("HumanoidRootPart")
 			if mobRoot then
 				sizepart(mob)
 				local canControl = true
-				pcall(function() canControl = isnetworkowner2(mobRoot) end)
+				if not force then
+					pcall(function() canControl = isnetworkowner2(mobRoot) end)
+				end
 				if canControl then
 					local entry = __BringPull[mob]
 					if entry then
-						entry.pos, entry.t = l.Position, tick()
+						entry.pos, entry.t, entry.force = l.Position, tick(), force
 					else
-						__BringPull[mob] = { pos = l.Position, t = tick() }
+						__BringPull[mob] = { pos = l.Position, t = tick(), force = force }
 					end
 					__FreezeMobLocally(mob)
 				end
@@ -8321,32 +8325,45 @@ do
 			TR.D = TR.D + 1
 		end
 	end
+	function TR.GetTool()
+		local c = TR.Plr.Character
+		if c then
+			for _, v in ipairs(c:GetChildren()) do
+				if v:IsA("Tool") and v:FindFirstChild("LeftClickRemote") then
+					return v
+				end
+			end
+		end
+		local bp = TR.Plr:FindFirstChild("Backpack")
+		if bp then
+			for _, v in ipairs(bp:GetChildren()) do
+				if v:IsA("Tool") and v:FindFirstChild("LeftClickRemote") then
+					return v
+				end
+			end
+		end
+		return nil
+	end
 	function TR.Fire()
-		local fruit = TR.GetFruit()
-		if not fruit then
+		local tool = TR.GetTool()
+		if not tool then
 			return false
 		end
 		if not TR.HasTarget() then
 			return false
 		end
-		local remote = fruit:FindFirstChild("LeftClickRemote")
-		if remote then
-			remote:FireServer(TR.AimDir() or TR.Vec, 1)
-			task.wait(TR.HoldTime)
-			remote:FireServer(false)
-			return true
+		local dir = TR.AimDir()
+		if not dir then
+			return false
 		end
-		local rf, re = fruit:FindFirstChild("RemoteFunction"), fruit:FindFirstChild("RemoteEvent")
-		if rf then
-			if re then
-				local root = TR.Root()
-				local dir = TR.AimDir()
-				re:FireServer(root and dir and (root.Position + dir * 10) or nil)
-			end
-			rf:InvokeServer("TAP")
-			return true
+		-- 1) M1
+		tool.LeftClickRemote:FireServer(dir, 1)
+		-- 2) chạy tiếp sau M1 (nếu tool có RemoteEvent)
+		local ev = tool:FindFirstChild("RemoteEvent")
+		if ev then
+			ev:FireServer(false)
 		end
-		return false
+		return true
 	end
 	function TR.Tune()
 		local now = tick()
@@ -8375,17 +8392,13 @@ do
 	function TR.Start()
 		TR.Stop()
 		local myId = TR.Id
-		TR.Delay, TR.S, TR.D, TR.WinStart = 0.15, 0, 0, tick()
-		TR.Conn = getgenv().__BF_Track(game:GetService("RunService").Heartbeat:Connect(function()
-			pcall(TR.Monitor)
-		end))
+		TR.Delay = 0.3 -- nghỉ giữa mỗi lần đánh
 		task.spawn(function()
 			while Settings["Aura T-rex"] and TR.Id == myId do
 				local ok, fired = pcall(TR.Fire)
 				if ok and fired then
 					TR.S = TR.S + 1
 				end
-				pcall(TR.Tune)
 				task.wait(TR.Delay)
 			end
 			if TR.Id == myId and TR.Conn then
@@ -8395,7 +8408,7 @@ do
 		end)
 	end
 	SettingFarmMainSection.CreateToggle(
-		{ Title = "Aura Fruit", Desc = "Auto M1 fruit dang co (moi loai fruit)", Default = Settings["Aura T-rex"] or false },
+		{ Title = "Aura Fruit", Desc = "Auto M1 tool co LeftClickRemote (moi loai fruit)", Default = Settings["Aura T-rex"] or false },
 		function(I)
 			SaveSettings("Aura T-rex", I)
 			if I then
@@ -8632,12 +8645,6 @@ SettingFarmMainSection.CreateSlider(
 	{ Title = "Bring Mob Count", Min = 2, Max = 10, Default = Settings["Bring Mob Count"] or 6, Precise = true },
 	function(I)
 		SaveSettings("Bring Mob Count", I)
-	end
-)
-SettingFarmMainSection.CreateSlider(
-	{ Title = "Bring Mob Distance", Min = 100, Max = 500, Default = Settings["Bring Mob Distance"] or 300, Precise = true },
-	function(I)
-		SaveSettings("Bring Mob Distance", I)
 	end
 )
 SettingFarmMainSection.CreateToggle(
@@ -9031,6 +9038,7 @@ SettingAutoFarmSection.CreateDropdown(
 	},
 	function(o)
 		SaveSettings("Select Method Farm", o)
+		getgenv().__LvlQuestLast = nil
 	end
 )
 SettingAutoFarmSection.CreateSlider(
@@ -9043,16 +9051,6 @@ SettingAutoFarmSection.CreateSlider(
 	},
 	function(o)
 		SaveSettings("Distance Farm Aura", o)
-	end
-)
-SettingAutoFarmSection.CreateToggle(
-	{
-		Title = "Multi Quest Per NPC",
-		Desc = "Farm level: xoay vong nhan nhieu quest cung 1 NPC",
-		Default = Settings["Multi Quest Per NPC"] ~= false,
-	},
-	function(o)
-		SaveSettings("Multi Quest Per NPC", o)
 	end
 )
 SettingAutoFarmSection.CreateToggle(
@@ -9081,6 +9079,7 @@ local o = SettingAutoFarmSection.CreateToggle(
 	{ Title = "Start Farm", Desc = nil, Default = Settings["Start Farm"] or false },
 	function(V)
 		SaveSettings("Start Farm", V)
+		getgenv().__LvlQuestLast = nil
 	end
 )
 getgenv().BuddhaFarmToggle = SettingAutoFarmSection.CreateToggle(
@@ -9317,7 +9316,11 @@ local function B(C)
 	end
 
 	-- Multi quest / 1 NPC: xoay vòng qua tất cả quest đủ level của NPC đó
-	if getgenv().MultiQuestPerNPC ~= false and Settings["Multi Quest Per NPC"] ~= false then
+	local levelFarmOn = Settings["Start Farm"]
+		and (Settings["Select Method Farm"] == nil or Settings["Select Method Farm"] == "Level Farm")
+	if not levelFarmOn then
+		getgenv().__LvlQuestLast = nil
+	else
 		local qdata = H[bestNpc.InternalQuestName]
 		local ids = {}
 		for id, n in pairs(bestNpc.Levels) do
@@ -9372,7 +9375,12 @@ TakeQuestLevel = function()
 	if (H - B.Position).Magnitude <= 8 and C.Health > 0 then
 		wait(0.3)
 		CommF:InvokeServer("StartQuest", tostring(V.QuestName), V.Id)
-		getgenv().__LvlQuestLast = { QuestName = tostring(V.QuestName), Id = V.Id }
+		if
+			Settings["Start Farm"]
+			and (Settings["Select Method Farm"] == nil or Settings["Select Method Farm"] == "Level Farm")
+		then
+			getgenv().__LvlQuestLast = { QuestName = tostring(V.QuestName), Id = V.Id }
+		end
 	else
 		toTarget(CFrame.new(H) * CFrame.new(0, 4, 2), true)
 	end
@@ -31696,6 +31704,14 @@ if not getgenv().BananaCatMainLoop then
 				if not ToggleNoclip() or tick() - k.LastCall > 2 then
 					TweenManager.CancelCurrent(true)
 				end
+			end
+			-- không có logic nào gọi tween trong 3s -> tự tắt tween/float để player di chuyển được
+			if
+				tick() - k.LastCall > 3
+				and not secretOn
+				and (TweenManager.currentTween or getgenv().Tween or (T and T:FindFirstChild("FloatForce")))
+			then
+				TweenManager.CancelCurrent(true)
 			end
 			if ToggleNoclip() or Settings.Noclip then
 				local T, b, a = next, t.Character:GetDescendants()
