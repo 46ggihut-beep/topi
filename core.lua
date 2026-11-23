@@ -8007,11 +8007,11 @@ function __BringPullStep(dt)
 	for mob, d in pairs(__BringPull) do
 		local mobRoot = mob and mob.Parent and mob:FindFirstChild("HumanoidRootPart")
 		local mobHum = mob and mob.Parent and mob:FindFirstChildOfClass("Humanoid")
-		if not mobRoot or not mobHum or mobHum.Health <= 0 or now - d.t > 0.3 or (not Settings["Bring Mob"] and not d.force) then
+		if not mobRoot or not mobHum or mobHum.Health <= 0 or now - d.t > 0.3 or not Settings["Bring Mob"] then
 			__BringPull[mob] = nil
-		elseif __BringBlock[mob] and not d.force then
+		elseif __BringBlock[mob] then
 			__BringPull[mob] = nil
-		elseif not d.force and d.last and (mobRoot.Position - d.last).Magnitude > SNAP_DIST then
+		elseif d.last and (mobRoot.Position - d.last).Magnitude > SNAP_DIST then
 			local sn = __BringSnap[mob]
 			if not sn or now - sn.t > 2 then
 				sn = { n = 0, t = now }
@@ -8056,8 +8056,7 @@ getgenv().__BF_BringConn = (getgenv().__BF_Track or function(c) return c end)(
 	end)
 )
 function BringMob(Q)
-	local aura = TRexAuraOn() -- Aura Fruit bật: luôn bring mob farm, bỏ qua mọi điều kiện chặn
-	if (not Settings["Bring Mob"] and not aura) or not Q or not Q.Parent then
+	if not Settings["Bring Mob"] or not Q or not Q.Parent then
 		return
 	end
 	local root = Q:FindFirstChild("HumanoidRootPart")
@@ -8085,19 +8084,13 @@ function BringMob(Q)
 		DeleteIgnoredMob()
 	end
 	local playerRoot = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
-	if not playerRoot then
-		return
-	end
-	local inRange = (playerRoot.Position - root.Position).Magnitude <= 300
-	-- đủ điều kiện (Bring Mob bật + trong tầm) thì bring cả nhóm, không thì chỉ bring mob farm (khi Aura Fruit bật)
-	local bringOthers = Settings["Bring Mob"] and inRange
-	if not bringOthers and not aura then
+	if not playerRoot or (playerRoot.Position - root.Position).Magnitude > 300 then
 		return
 	end
 	local buddhaFarm = BuddhaFarmOn() or TRexAuraOn()
 	local maxCount = buddhaFarm and math.huge or math.max(2, tonumber(Settings["Bring Mob Count"]) or 6)
 	local targets = {}
-	if aura or (not Q:FindFirstChild("Ignored") and not __BringBlock[Q]) then
+	if not Q:FindFirstChild("Ignored") and not __BringBlock[Q] then
 		table.insert(targets, Q)
 	end
 	local cands = {}
@@ -8113,28 +8106,25 @@ function BringMob(Q)
 	end
 	table.sort(cands, function(a, b) return a.dist < b.dist end)
 	for _, c in ipairs(cands) do
-		if #targets >= maxCount or not bringOthers then break end
+		if #targets >= maxCount then break end
 		table.insert(targets, c.mob)
 	end
-	if #targets == 0 then
+	if #targets == 0 or (playerRoot.Position - root.Position).Magnitude > 300 then
 		return
 	end
 	for _, mob in ipairs(targets) do
-		local force = aura and mob == Q
-		if mob.Parent and (force or not __BringBlock[mob]) and IsMobAlive(mob) then
+		if mob.Parent and not __BringBlock[mob] and IsMobAlive(mob) then
 			local mobRoot = mob:FindFirstChild("HumanoidRootPart")
 			if mobRoot then
 				sizepart(mob)
 				local canControl = true
-				if not force then
-					pcall(function() canControl = isnetworkowner2(mobRoot) end)
-				end
+				pcall(function() canControl = isnetworkowner2(mobRoot) end)
 				if canControl then
 					local entry = __BringPull[mob]
 					if entry then
-						entry.pos, entry.t, entry.force = l.Position, tick(), force
+						entry.pos, entry.t = l.Position, tick()
 					else
-						__BringPull[mob] = { pos = l.Position, t = tick(), force = force }
+						__BringPull[mob] = { pos = l.Position, t = tick() }
 					end
 					__FreezeMobLocally(mob)
 				end
