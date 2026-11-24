@@ -3560,7 +3560,7 @@ TopiHub = TopiHub or {
 	Cache = {},
 	LastHop = 0,
 	Busy = false,
-	Delay = 5,
+	Delay = 1,
 }
 function TopiHub.Request(method, path, body)
 	local fn = getgenv().ExploitReq or request or http_request
@@ -4914,6 +4914,27 @@ function ToggleNoclip()
 		return true
 	end
 end
+do
+	local __RS = game:GetService("RunService")
+	if not getgenv().__NOCLIP_STEPPED then
+		getgenv().__NOCLIP_STEPPED = __RS.Stepped:Connect(function()
+			local char = game:GetService("Players").LocalPlayer.Character
+			if not char then
+				return
+			end
+			local ok, on = pcall(function()
+				return Settings.Noclip or TweenManager.currentTween or ToggleNoclip()
+			end)
+			if ok and on then
+				for _, p in ipairs(char:GetDescendants()) do
+					if p:IsA("BasePart") and p.CanCollide then
+						p.CanCollide = false
+					end
+				end
+			end
+		end)
+	end
+end
 local l = game:GetService("TweenService")
 getgenv().TweenManager = {
 	currentTween = nil,
@@ -5592,6 +5613,7 @@ getgenv().BoatTween = (function()
 	local DISMOUNT_DIST = 500
 	local DEALER_SKIP_DIST = 1000
 	local REUSE_DIST = 300
+	local BOAT_TWEEN_Y = 300
 	local lp = game:GetService("Players").LocalPlayer
 	local RS = game:GetService("ReplicatedStorage")
 	local VIM = game:GetService("VirtualInputManager")
@@ -5765,7 +5787,7 @@ getgenv().BoatTween = (function()
 			pcall(
 				manageTween,
 				seat,
-				CFrame.new(tpos.X, st.seaY, tpos.Z) * (seat.CFrame - seat.Position),
+				CFrame.new(tpos.X, BOAT_TWEEN_Y, tpos.Z) * (seat.CFrame - seat.Position),
 				bspeed,
 				"TweenBoat"
 			)
@@ -8658,7 +8680,7 @@ SettingFarmMainSection.CreateToggle(
 SettingFarmMainSection.CreateToggle(
 	{
 		Title = "Use Boat Tween",
-		Desc = "Tween xa: mua Dinghy o Boat Dealer gan nhat, lai thuyen toi cach dich 500 stud roi nhay xuong. Toc do thuyen = Value Speed Tween Boat",
+		Desc = "Tween xa: mua Dinghy o Boat Dealer gan nhat, lai thuyen o do cao Y = 150 toi cach dich 500 stud roi nhay xuong. Toc do thuyen = Value Speed Tween Boat",
 		Default = Settings["Use Boat Tween"] or false,
 	},
 	function(I)
@@ -31556,25 +31578,6 @@ end)
 loadstring(
 	'if getgenv().__BC_NAMECALL == game.JobId then return end\10getgenv().__BC_NAMECALL = game.JobId\10local MT = getrawmetatable(game)\10local OldNameCall = MT.__namecall\10setreadonly(MT, false)\10MT.__namecall = newcclosure(function(self, ...)\10 local Method = getnamecallmethod()\10 local Args = { ... }\10 if\10 Method == "FireServer"\10 and self.Name == "RemoteEvent"\10 and AimPos\10 and tostring(AimPos.X) ~= "nan"\10 and (\10 Settings["Auto Event Prehistoric Island"]\10 or Settings["Kill players When complete Trial"]\10 or Settings["Auto Quest Dragon Hunter"]\10 or Settings["Auto Quest Dojo Trainer"]\10 or Settings["Farm Mastery"]\10 or Settings["Auto Attack Leviathan"]\10 or Settings["Auto Sea Event"]\10 or Settings["Auto Upgrade Race V2-V3"]\10 or Settings["Auto Trial"]\10 or Settings["Auto Aimbot"]\10 or Settings["Auto Shipwright"]\10 )\10 then\10 if #Args == 1 and typeof(Args[1]) == "Vector3" then\10 Args[1] = AimPos.Position\10 end\10 if #Args == 1 and typeof(Args[1]) == "CFrame" then\10 Args[1] = AimPos\10 end\10 end\10 return OldNameCall(self, unpack(Args))\10end)\10setreadonly(MT, true)\10'
 )()
-x = game:GetService("RunService")
-if not getgenv().__NOCLIP_STEPPED then
-	getgenv().__NOCLIP_STEPPED = x.Stepped:Connect(function()
-		local char = t.Character
-		if not char then
-			return
-		end
-		local ok, on = pcall(function()
-			return Settings.Noclip or TweenManager.currentTween or ToggleNoclip()
-		end)
-		if ok and on then
-			for _, p in ipairs(char:GetDescendants()) do
-				if p:IsA("BasePart") and p.CanCollide then
-					p.CanCollide = false
-				end
-			end
-		end
-	end)
-end
 do
 	local FARM_PAGES = {
 		["Farming"] = true,
