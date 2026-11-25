@@ -467,11 +467,11 @@ function TRexAuraOn()
 	return Settings ~= nil and Settings["Aura T-rex"] == true
 end
 function FruitFarmY()
-	return 15
+	return 10
 end
 function BuddhaFarmY()
 	if TRexAuraOn() then
-		return 15
+		return 10
 	end
 	local ch = t and (workspace:FindFirstChild("Characters") and workspace.Characters:FindFirstChild(t.Name) or t.Character)
 	if ch then
@@ -7372,45 +7372,61 @@ v_u_51 = 1
 v_u_52 = time
 v_u_53 = v_u_52()
 local function m(E, l, Q)
+	-- M1 fruit dung logic cua toggle Aura Fruit (LeftClickRemote:FireServer(dir, 1) -> RemoteEvent:FireServer(false))
 	local d = t.Character
-	local I = d and (d.PrimaryPart or (d:FindFirstChild("HumanoidRootPart")))
-	if not I or not E then
+	local root = d and (d.PrimaryPart or d:FindFirstChild("HumanoidRootPart"))
+	if not root or not E then
 		return false
 	end
-	local _ = Q and E.Position or E.PrimaryPart and E.PrimaryPart.Position
-	if not _ then
+	local pos = Q and E.Position or E.PrimaryPart and E.PrimaryPart.Position
+	if not pos then
 		return false
 	end
-	local o, V, N =
-		(_ - I.Position).Unit, ((g.Hit.Position - I.Position) * Vector3.new(1, 0, 1)).Unit, NameWeapon("Blox Fruit")
-	I = N and (d:FindFirstChild(N))
-	if not I then
+	-- bao cho Aura Fruit biet farm dang dung fruit -> Aura Fruit tam dung
+	getgenv().__FruitFarmAt = tick()
+	-- uu tien fruit dang cam, sau do tool bat ky co LeftClickRemote (giong Aura Fruit)
+	local tool
+	local fruitName = NameWeapon("Blox Fruit")
+	local held = fruitName and d:FindFirstChild(fruitName)
+	if held and held:FindFirstChild("LeftClickRemote") then
+		tool = held
+	else
+		for _, v in ipairs(d:GetChildren()) do
+			if v:IsA("Tool") and v:FindFirstChild("LeftClickRemote") then
+				tool = v
+				break
+			end
+		end
+	end
+	if not tool then
+		-- fruit khong co LeftClickRemote: giu cach cu (TAP)
+		if not held then
+			return false
+		end
+		local rf, re = held:FindFirstChild("RemoteFunction"), held:FindFirstChild("RemoteEvent")
+		if rf then
+			if re then
+				re:FireServer(pos)
+			end
+			rf:InvokeServer("TAP")
+			return true
+		end
 		return false
 	end
-	d, E, Q = I:FindFirstChild("LeftClickRemote"), I:FindFirstChild("RemoteFunction"), I:FindFirstChild("RemoteEvent")
-	if not d and E then
-		if Q then
-			Q:FireServer(_)
-		end
-		E:InvokeServer("TAP")
+	-- delay 0.3s giua moi lan danh (giong Aura Fruit)
+	local now = tick()
+	if now - (getgenv().__FruitM1Last or 0) < 0.3 then
 		return true
 	end
-	if d and N == "Mammoth-Mammoth" then
-		d:FireServer(_)
-		return true
+	getgenv().__FruitM1Last = now
+	local flat = (pos - root.Position) * Vector3.new(1, 0, 1)
+	local dir = flat.Magnitude < 0.01 and Vector3.new(0.01, -0.8, 0.01) or flat.Unit
+	tool.LeftClickRemote:FireServer(dir, 1)
+	local ev = tool:FindFirstChild("RemoteEvent")
+	if ev then
+		ev:FireServer(false)
 	end
-	if d then
-		v_u_51 = v_u_51 + (1)
-		if v_u_51 > 5 then
-			v_u_51 = 1
-		end
-		d:FireServer(o, v_u_51)
-		if l then
-			d:FireServer(V, v_u_51)
-		end
-		return true
-	end
-	return false
+	return true
 end
 getgenv().UseFruitM1 = function(g, E)
 	return m(g, E, false)
@@ -8357,6 +8373,10 @@ do
 		return nil
 	end
 	function TR.Fire()
+		-- farm dang dung M1 fruit -> tam dung Aura Fruit, farm xong tu chay lai
+		if tick() - (getgenv().__FruitFarmAt or 0) < 0.6 then
+			return false
+		end
 		local tool = TR.GetTool()
 		if not tool then
 			return false
@@ -9653,7 +9673,7 @@ function DetectMobAura()
 	return H
 end
 getgenv().StackFarm = true
-getgenv().YPosFruit = 15
+getgenv().YPosFruit = 10
 function CheckCDSkillTransformation(V, H)
 	local B, C, J = next, game:GetService("Players").LocalPlayer.PlayerGui.Main.Skills[V.Name]:GetChildren()
 	for F, F in B, C, J do
@@ -18839,8 +18859,10 @@ function TeleportSeaEvents(V)
 	if not V then
 		return
 	end
+	-- Aura Fruit bat -> dung Y cua "Use Click M1 Fruit For Sea Event", bat ke weapon / Dragonstorm / Skull Guitar
+	local fruitY = Settings["Use Click M1 Fruit For Sea Event"] or TRexAuraOn()
 	if V:FindFirstChild("Engine") and (V:FindFirstChild("Health")) and V.Health.Value > 0 then
-		local y = Settings["Use Click M1 Fruit For Sea Event"] and -25 or -15
+		local y = fruitY and -25 or -15
 		toTarget(V.Engine.CFrame * CFrame.new(0, y, 0))
 		return
 	end
@@ -18849,7 +18871,7 @@ function TeleportSeaEvents(V)
 			(Vector3.new(0, V:FindFirstChild("HumanoidRootPart").Position.Y, 0) - Vector3.new(0, -60, 0)).Magnitude
 			<= 175
 		then
-			if Settings["Use Click M1 Fruit For Sea Event"] then
+			if fruitY then
 				toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, 200 + PosDodgeskill, 0), true)
 			else
 				toTarget(V.HumanoidRootPart.CFrame * CFrame.new(0, 200 + PosDodgeskill, 50), true)
@@ -18859,8 +18881,8 @@ function TeleportSeaEvents(V)
 		end
 	else
 		local y = V.Name
-		local P = ((Settings["Use Click M1 Fruit For Sea Event"]) and 20 or ((y == "Terrorshark") and 60 or 20))
-		if y == "Terrorshark" and Settings["Use Dragonstorm For Sea Event"] then
+		local P = (fruitY and 20 or ((y == "Terrorshark") and 60 or 20))
+		if y == "Terrorshark" and Settings["Use Dragonstorm For Sea Event"] and not TRexAuraOn() then
 			P = 200
 		end
 		if V:FindFirstChildWhichIsA("Humanoid") and V.Humanoid.Health > 0 then
