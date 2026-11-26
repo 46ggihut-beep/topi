@@ -5613,7 +5613,7 @@ getgenv().BoatTween = (function()
 	local DISMOUNT_DIST = 500
 	local DEALER_SKIP_DIST = 1000
 	local REUSE_DIST = 300
-	local BOAT_TWEEN_Y = 300
+	local ARRIVE_DIST = 450
 	local lp = game:GetService("Players").LocalPlayer
 	local RS = game:GetService("ReplicatedStorage")
 	local VIM = game:GetService("VirtualInputManager")
@@ -5784,10 +5784,13 @@ getgenv().BoatTween = (function()
 				return true
 			end
 			local bspeed = tonumber(Settings["Value Speed Tween Boat"]) or 350
+			local sp = seat.Position
+			local off = sp - tpos
+			local aim = off.Magnitude > ARRIVE_DIST and (tpos + off.Unit * ARRIVE_DIST) or sp
 			pcall(
 				manageTween,
 				seat,
-				CFrame.new(tpos.X, BOAT_TWEEN_Y, tpos.Z) * (seat.CFrame - seat.Position),
+				CFrame.new(aim) * (seat.CFrame - seat.Position),
 				bspeed,
 				"TweenBoat"
 			)
@@ -8700,7 +8703,7 @@ SettingFarmMainSection.CreateToggle(
 SettingFarmMainSection.CreateToggle(
 	{
 		Title = "Use Boat Tween",
-		Desc = "Tween xa: mua Dinghy o Boat Dealer gan nhat, lai thuyen o do cao Y = 150 toi cach dich 500 stud roi nhay xuong. Toc do thuyen = Value Speed Tween Boat",
+		Desc = "Tween xa: mua Dinghy o Boat Dealer gan nhat, tween thang thuyen toi gan dich (khong co dinh Y) roi nhay xuong khi cach dich 500 stud. Toc do thuyen = Value Speed Tween Boat",
 		Default = Settings["Use Boat Tween"] or false,
 	},
 	function(I)
@@ -26814,6 +26817,16 @@ KillTrialSection.CreateToggle(
 	end
 )
 KillTrialSection.CreateToggle(
+	{
+		Title = "Use Dragonstorm For Kill Player trial",
+		Desc = "Chi hoat dong khi bat Kill players When complete Trial. Khong can bat Kill Aura With DragonStorm. Se dung Dragonstorm de ban player trial, bay vong tron quanh target.",
+		Default = Settings["Use Dragonstorm For Kill Player trial"] or false,
+	},
+	function(g)
+		SaveSettings("Use Dragonstorm For Kill Player trial", g)
+	end
+)
+KillTrialSection.CreateToggle(
 	{ Title = "Use Skill when Kill Player", Desc = nil, Default = Settings["Use Skill when Kill Player"] or false },
 	function(g)
 		SaveSettings("Use Skill when Kill Player", g)
@@ -27252,6 +27265,32 @@ spawn(function()
 						if g then
 							repeat
 								task.wait()
+								if Settings["Use Dragonstorm For Kill Player trial"] then
+									-- Dragonstorm trial: khong can Kill Aura With DragonStorm. Bay vong tron quanh target (tam = target, R=100, Y = Y target + 50, toc do 200 stud/s) thay vi di sat target, roi ban thang vao target
+									pcall(function()
+										local char = t.Character
+										if char and not char:FindFirstChild("Dragonstorm") then
+											if t.Backpack:FindFirstChild("Dragonstorm") then
+												equiptool("Dragonstorm")
+											elseif tick() - (getgenv().__DSTrialLoadTick or 0) > 3 then
+												getgenv().__DSTrialLoadTick = tick()
+												game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("LoadItem", "Dragonstorm")
+											end
+										end
+									end)
+									getgenv().AimPos = g.HumanoidRootPart.CFrame
+									if g and g.Parent and g:FindFirstChild("HumanoidRootPart") and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
+										local tp = g.HumanoidRootPart.Position
+										local SPIN_R, SPIN_Y, SPIN_SPEED = 100, 50, 200
+										local ang = tick() * (SPIN_SPEED / SPIN_R)
+										local pos = Vector3.new(tp.X + math.cos(ang) * SPIN_R, tp.Y + SPIN_Y, tp.Z + math.sin(ang) * SPIN_R)
+										t.Character.HumanoidRootPart.CFrame = CFrame.lookAt(pos, tp)
+									end
+									if getgenv().ShootGunDS and g and g.Parent then
+										local part = g:FindFirstChild("Head") or g:FindFirstChild("HumanoidRootPart")
+										if part then getgenv().ShootGunDS(part) end
+									end
+								else
 								task.spawn(function()
 									if not game:GetService("Lighting").Blur.Enabled then
 										game:GetService("VirtualInputManager"):SendKeyEvent(true, "E", false, game)
@@ -27300,6 +27339,7 @@ spawn(function()
 										end)
 									end
 								end
+								end -- end if Dragonstorm trial / else melee cu
 							until not g
 								or not g.Parent
 								or g.Humanoid.Health <= 0
