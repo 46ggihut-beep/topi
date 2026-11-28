@@ -290,6 +290,21 @@ local function readText(inst)
 	end
 	return nil
 end
+local function getHudQuestWindow(pg)
+	local ok, w = pcall(function()
+		return pg.HUDRoot.Root.HUD.CoreSafeArea.QuestWindow
+	end)
+	if not ok or not w then
+		return nil
+	end
+	local on = true
+	if w:IsA("GuiObject") then
+		on = w.Visible
+	elseif w:IsA("ScreenGui") then
+		on = w.Enabled
+	end
+	return on and w or nil
+end
 function GetQuestTitle()
 	local lp = game:GetService("Players").LocalPlayer
 	local pg = lp and lp:FindFirstChild("PlayerGui")
@@ -312,6 +327,13 @@ function GetQuestTitle()
 		local fr = tr:FindFirstChild("Frame")
 		if on and fr and fr.Visible then
 			return readText(fr:FindFirstChild("header"))
+		end
+	end
+	local hq = getHudQuestWindow(pg)
+	if hq then
+		local txt = readText(hq)
+		if txt then
+			return txt
 		end
 	end
 	return nil
@@ -364,6 +386,12 @@ function GetQuestText()
 			for _, t in ipairs(collectText(tr)) do
 				parts[#parts + 1] = t
 			end
+		end
+	end
+	local hq = getHudQuestWindow(pg)
+	if hq then
+		for _, t in ipairs(collectText(hq)) do
+			parts[#parts + 1] = t
 		end
 	end
 	return table.concat(parts, " | ")
