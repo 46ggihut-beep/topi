@@ -1838,6 +1838,30 @@ SectionShopMisc.CreateButton({ Title = "Buy Race Ghoul" }, function()
 	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Ectoplasm", "BuyCheck", 4)
 	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Ectoplasm", "Change", 4)
 end)
+local BuyRaceDragonOn = false
+SectionShopMisc.CreateToggle({ Title = "Buy Race Dragon", Desc = nil, Default = false }, function(f)
+	BuyRaceDragonOn = f
+	if f then
+		spawn(function()
+			while BuyRaceDragonOn and (task.wait()) do
+				local ok, err = pcall(function()
+					local target = Vector3.new(5772, 1209, 804)
+					if t:DistanceFromCharacter(target) < 8 then
+						game:GetService("ReplicatedStorage").Modules.Net["RF/InteractDragonQuest"]:InvokeServer({
+							NPC = "Dragon Wizard",
+							Command = "DragonRace",
+						})
+					else
+						getgenv().BackupTween(CFrame.new(target))
+					end
+				end)
+				if not ok then
+					print(err)
+				end
+			end
+		end)
+	end
+end)
 SectionShopFighting = PageShop.CreateSection("Fighting Shop")
 local g = {}
 getgenv().notsave = g
